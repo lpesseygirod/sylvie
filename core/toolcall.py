@@ -114,13 +114,18 @@ class StreamSplitter:
                     self.in_tool = False
                     continue
                 break
+            # A stray </think> in fast mode is dropped (the model occasionally emits one).
+            stray = self.buf.find(THINK_CLOSE)
+            if stray >= 0:
+                self.buf = self.buf[:stray] + self.buf[stray + len(THINK_CLOSE) :]
+                continue
             idx = self.buf.find(TOOL_OPEN)
             if idx >= 0:
                 self._emit(out, "text", self.buf[:idx])
                 self.buf = self.buf[idx + len(TOOL_OPEN) :]
                 self.in_tool = True
                 continue
-            n = self._safe_prefix_len(self.buf, TOOL_OPEN)
+            n = min(self._safe_prefix_len(self.buf, TOOL_OPEN), self._safe_prefix_len(self.buf, THINK_CLOSE))
             self._emit(out, "text", self.buf[:n])
             self.buf = self.buf[n:]
             break

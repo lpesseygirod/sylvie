@@ -62,3 +62,19 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 ### T10 — The system prompt is frozen per conversation
 - **What:** each conversation stores the system prompt it started with; new facts learned mid-conversation are already in the history. It's rebuilt only when Lea states a new preference (so it applies immediately).
 - **Why:** the prompt cache only works if the beginning of the prompt doesn't change. Rebuilding it after every new fact would make every turn re-read the whole conversation (seconds instead of ~0.3 s).
+
+### T11 — Speech output: macOS/iOS system voices for now (Kokoro blocked by GPL dependencies)
+- **What:** Sylvie speaks with the system voices (AVSpeechSynthesizer) on the device that plays the audio. Defaults: Samantha (EN), Mónica (ES), Thomas (FR) — decision 9, Lea can change in `config.yaml`. For nicer voices, Lea can download "Premium"/"Enhanced" voices in System Settings → Accessibility → Spoken Content.
+- **Why:** Kokoro's Spanish and French pronunciation needs **espeak-ng (GPL-3.0)**, and its English path pulls a GPL phonemizer and **num2words (LGPL)**. The plan forbids adding GPL components without Lea. System voices are free, local, instant, and cover all three languages.
+- **Alternatives:** Kokoro with espeak-ng (better voices; needs Lea's OK on GPL — private local use is allowed by the GPL, but it's her call). Listed in LEA-TODO.
+- **Side benefit:** speaking on the device (Mac or iPhone) means no audio is sent back over the network; the server sends sentences as text.
+
+### T12 — Whisper gets a short hint prompt
+- **What:** `INITIAL_PROMPT = "Sylvie, Lea. Hola Sylvie, can you check esto? Oui, merci Sylvie."`
+- **Why:** measured on test audio: fixed the spelling "Silvie" and a garbled Spanish/English mixed sentence ("¿can y o un cheque…" → "can you check el horario…"), and transcription got faster (~125 ms for 3 s of audio).
+
+### T13 — Voice answers: short spoken part, details on screen
+- **What:** in voice mode Sylvie is told to answer in Lea's language with 1–3 plain sentences first, details after a blank line. Only the first paragraph (max 4 sentences) is spoken; code/tables are never spoken. "Let me check…" is sent the moment a tool call starts.
+
+### T14 — Warm-up runs a realistic dummy turn
+- **Why:** measured: the first real question after start paid 1.5 s of one-time GPU kernel compilation unless the warm-up used the same path (cached system prompt + ~150 new tokens). Now the first question is as fast as later ones.

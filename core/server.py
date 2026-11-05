@@ -185,6 +185,35 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
 
         return StreamingResponse(sse(), media_type="text/event-stream", headers={"Cache-Control": "no-store"})
 
+    @app.post("/api/voice/turn")
+    async def voice(request: Request, conversation_id: str | None = None, channel: str = "voice"):
+        """Body: WAV audio. Streams transcript, the answer and `speak` events (one per sentence).
+        The audio is only held in memory and dropped right after transcription."""
+        from voice.loop import voice_turn
+
+        s = S()
+        wav = await request.body()
+        if len(wav) > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "audio too long")
+        if channel not in ("voice", "phone"):
+            raise HTTPException(400)
+        gen = voice_turn(s, wav, conversation_id=conversation_id, channel=channel)
+        del wav
+
+        def sse():
+            cid = conversation_id
+            try:
+                for ev in gen:
+                    if ev["type"] == "meta":
+                        cid = ev["conversation_id"]
+                    yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+            finally:
+                if cid:
+                    s.stop(cid)
+                gen.close()
+
+        return StreamingResponse(sse(), media_type="text/event-stream", headers={"Cache-Control": "no-store"})
+
     @app.post("/api/chat/{cid}/stop")
     def stop(cid: str):
         S().stop(cid)

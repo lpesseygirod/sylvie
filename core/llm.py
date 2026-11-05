@@ -237,11 +237,15 @@ class LLM:
             tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
             # _cached_prefill snapshots everything but the last token, so add a throwaway one.
             self._cached_prefill(tokens + [tokens[-1]])
-            # One tiny throwaway generation compiles the GPU kernels (the first run is ~2x slower).
-            from mlx_lm import stream_generate
-
-            for _ in stream_generate(self.model, self.tokenizer, tokens[-8:], max_tokens=4):
-                pass
+            # A tiny throwaway turn on top of the cached prefix compiles the GPU kernels for exactly
+            # the path real turns take (cached prefix + new tokens). Without it the first real
+            # question pays ~1.5 s extra.
+            filler = "<context>\nTime: 09:00, Monday\n</context>\n\n" + "Hi Sylvie, how are you today? " * 18
+            sample = self.render(
+                [{"role": "system", "content": system_prompt}, {"role": "user", "content": filler}], tools=tools
+            )
+            q: queue.Queue = queue.Queue()
+            self._generate_into(q, sample, 2, False, None, use_cache=True)
 
         self._executor.submit(_job).result()
 

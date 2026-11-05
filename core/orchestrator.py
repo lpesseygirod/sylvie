@@ -17,7 +17,7 @@ from core.config import Config, load_config
 from core.context import history_messages, maybe_summarize, system_with_summary
 from core.conversations import Conversations
 from core.db import Database
-from core.lang import phrase
+from core.lang import guess_language, phrase
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
 from core.router import route
 from core.toolcall import StreamSplitter, ToolCall
@@ -37,6 +37,7 @@ from tools.registry import ToolContext, available_tools, execute, validate
 log = logging.getLogger("sylvie")
 
 MAX_TOOL_ROUNDS = 4
+LANG_NAMES = {"en": "English", "es": "Spanish", "fr": "French"}
 MAX_ATTACHMENT_CHARS = 20000
 
 
@@ -118,6 +119,7 @@ class Sylvie:
         self.docs = DocsIndex(db, embedder)
         self.bg = BackgroundWorker(idle_seconds=idle_seconds)
         self._stops: dict[str, threading.Event] = {}
+        self._stt = None
 
     @classmethod
     def build(cls, cfg: Config | None = None) -> Sylvie:
@@ -149,11 +151,27 @@ class Sylvie:
             private_terms=[self.cfg.get_path("user.name", "Lea")],
         )
 
+    def speech_to_text(self):
+        if self._stt is None:
+            from voice.stt import SpeechToText
+
+            self._stt = SpeechToText(
+                self.cfg.get_path("voice.stt_model", "mlx-community/whisper-large-v3-turbo")
+            )
+        return self._stt
+
     def warm(self) -> None:
         """Load models and pre-read the system prompt so the first answer is fast."""
         self.llm.load()
         self.embedder.embed_one("warm up")
         self.llm.warm(self.current_system_prompt(), available_tools(self.tool_context()))
+        if self.cfg.get_path("voice.enabled", True):
+            import numpy as np
+
+            stt = self.speech_to_text()
+            stt.load()
+            # One throwaway transcription compiles Whisper's GPU kernels (first run is ~4 s).
+            stt.transcribe(np.sin(np.linspace(0, 2000, 16000)).astype(np.float32) * 0.1, language="en")
 
     def stop(self, conversation_id: str) -> None:
         ev = self._stops.get(conversation_id)
@@ -189,6 +207,13 @@ class Sylvie:
             }
 
             notes: list[str] = []
+            if channel in ("voice", "phone"):
+                notes.append(
+                    "Lea is talking to you by voice. Answer in the SAME language as her message below "
+                    f"(it sounds like {LANG_NAMES.get(guess_language(text), 'English')}). Start with a short "
+                    "spoken answer: 1-3 plain sentences, no markdown, no lists. If details help, add them "
+                    "after a blank line: they are shown on screen, not read aloud."
+                )
             # 1. "Sylvie, forget that"
             with trace.stage("forget"):
                 forgotten = forget(self.memory, text, [f"{cid}#{i}" for i in prev_user_ids])
@@ -264,6 +289,7 @@ class Sylvie:
             tools = available_tools(tctx)
             display_parts: list[str] = []
             invalid_calls = 0
+            announced = False
             final_mid = None
             for round_no in range(MAX_TOOL_ROUNDS + 1):
                 # Tools are dropped on the last round, or after a second malformed call (retry once).
@@ -290,6 +316,11 @@ class Sylvie:
                             if kind == "text":
                                 trace.mark("first_token")
                             yield {"type": kind, "text": s}
+                        if sp.in_tool and not announced:
+                            # Say "let me check" the moment a tool call starts, not after it's written.
+                            announced = True
+                            trace.mark("first_status")
+                            yield {"type": "status", "text": phrase("checking", text)}
                     for kind, s in sp.flush():
                         yield {"type": kind, "text": s}
                 visible = sp.visible_text.strip()
@@ -310,8 +341,6 @@ class Sylvie:
                 # Tool round
                 if visible:
                     display_parts.append(visible)
-                if round_no == 0:
-                    yield {"type": "status", "text": phrase("checking", text)}
                 assistant_msg = {
                     "role": "assistant",
                     "content": visible,

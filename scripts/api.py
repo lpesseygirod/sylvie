@@ -54,3 +54,22 @@ elif cmd == "CHAT":
             elif ev["type"] != "thinking":
                 print(ev)
     print("SYLVIE:", text)
+elif cmd == "VOICE":
+    wav = Path(sys.argv[2]).read_bytes()
+    t0 = time.time()
+    first_speak = None
+    with httpx.stream(
+        "POST", BASE + "/api/voice/turn", content=wav, headers={**H, "Content-Type": "audio/wav"}, timeout=300
+    ) as r:
+        for line in r.iter_lines():
+            if not line.startswith("data: "):
+                continue
+            ev = json.loads(line[6:])
+            if ev["type"] == "transcript":
+                print(f"heard ({ev['language']}, {ev['ms']} ms): {ev['text']}")
+            elif ev["type"] == "speak":
+                first_speak = first_speak or time.time() - t0
+                print(f"  speak +{time.time() - t0:.2f}s [{ev['language']}]: {ev['text']}")
+            elif ev["type"] == "done":
+                print(f"first sentence ready after {first_speak or 0:.2f}s (audio upload → speakable text)")
+                print("trace:", ev.get("trace"))

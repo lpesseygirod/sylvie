@@ -56,6 +56,13 @@ proactivity:
 knowledge:
   folders: []                      # Lea chooses (decision 4); nothing indexed until she does
 
+voice:
+  enabled: true
+  stt_model: mlx-community/whisper-large-v3-turbo
+  # Speech output uses macOS/iOS system voices on the device (see docs/decisions.md, T11).
+  voices: {en: "Samantha", es: "Mónica", fr: "Thomas"}   # default — Lea can change (decision 9)
+  wake_greeting: {en: "Hello Lea", es: "Hola Lea", fr: "Bonjour Lea"}
+
 privacy:
   log_conversations: true
   delete_audio_after_transcription: true

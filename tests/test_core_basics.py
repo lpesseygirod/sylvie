@@ -58,3 +58,12 @@ def test_trace_records_stages():
     t.mark("first_token")
     d = t.to_dict()
     assert "recall" in d["stages_ms"] and "first_token" in d["marks_ms"]
+
+
+def test_stray_think_close_in_fast_mode_is_dropped():
+    sp = StreamSplitter(thinking=False)
+    raw = "Lisbon, Lea.</think>"
+    for i in range(0, len(raw), 4):
+        sp.feed(raw[i : i + 4])
+    sp.flush()
+    assert sp.visible_text == "Lisbon, Lea."
