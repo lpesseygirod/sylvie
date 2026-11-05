@@ -61,6 +61,7 @@ class Example:
     license: str
     tag: str
     weight: float = 1.0
+    tools: list | None = None
 
     @property
     def prompt(self) -> str:
@@ -130,8 +131,15 @@ def build(
         if row["tag"] == "personal" and not include_personal:
             excluded["personal"] += 1
             continue
-        msgs = row["messages"] + [{"role": "assistant", "content": row["chosen"]}]
-        examples.append(Example(msgs, row["source"], row["license"], row["tag"], row["weight"]))
+        final = {"role": "assistant", "content": row["chosen"]}
+        if row.get("reasoning"):
+            final["reasoning_content"] = row["reasoning"]  # the chat template renders it inside <think>
+        tools = json.loads(row["tools"]) if row.get("tools") else None
+        examples.append(
+            Example(
+                row["messages"] + [final], row["source"], row["license"], row["tag"], row["weight"], tools
+            )
+        )
     if open_data is not None:
         examples += oasst_examples(open_data, open_limit, seed)
 
@@ -161,7 +169,13 @@ def build(
         p = out / f"{split}.jsonl"
         with open(p, "w", encoding="utf-8") as f:
             for ex in rows:
-                f.write(json.dumps({"messages": ex.messages}, ensure_ascii=False) + "\n")
+                f.write(
+                    json.dumps(
+                        {"messages": ex.messages} | ({"tools": ex.tools} if ex.tools else {}),
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
         hashes[split] = hashlib.sha256(p.read_bytes()).hexdigest()
 
     counts: dict = {"train": len(train), "valid": len(valid), "by_source": {}, "by_license": {}, "by_tag": {}}

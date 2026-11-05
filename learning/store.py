@@ -86,6 +86,9 @@ class LearningStore:
             # ready = may be trained on; staged = overnight output waiting for Lea's morning spot-check
             self.db.execute("ALTER TABLE training_examples ADD COLUMN status TEXT NOT NULL DEFAULT 'ready'")
             self.db.execute("ALTER TABLE training_examples ADD COLUMN batch TEXT")
+        if "tools" not in cols:
+            self.db.execute("ALTER TABLE training_examples ADD COLUMN tools TEXT")  # JSON tool definitions
+            self.db.execute("ALTER TABLE training_examples ADD COLUMN reasoning TEXT")  # thinking-mode trace
 
     # ---------- corrections ----------
     def _row(self, r) -> Correction:
@@ -144,14 +147,16 @@ class LearningStore:
         correction_id: int | None = None,
         status: str = "ready",
         batch: str | None = None,
+        tools: list | None = None,
+        reasoning: str | None = None,
     ) -> int:
         if not source.startswith(ALLOWED_SOURCE_PREFIXES):
             raise DisallowedSource(f"source '{source}' is not allowed in training data (plan rule 4)")
         if tag not in ("personal", "general"):
             raise ValueError("tag must be personal or general")
         return self.db.execute(
-            "INSERT INTO training_examples(kind, messages, chosen, rejected, tag, source, license, weight, correction_id, created_at, status, batch) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO training_examples(kind, messages, chosen, rejected, tag, source, license, weight, correction_id, "
+            "created_at, status, batch, tools, reasoning) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 "preference" if rejected else "sft",
                 json.dumps(messages, ensure_ascii=False),
@@ -165,6 +170,8 @@ class LearningStore:
                 utcnow(),
                 status,
                 batch,
+                json.dumps(tools, ensure_ascii=False) if tools else None,
+                reasoning,
             ),
         ).lastrowid
 

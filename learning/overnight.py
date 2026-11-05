@@ -84,30 +84,14 @@ class Item:
 
 
 # ---------- question sources ----------
-def checkable_questions(rng: random.Random, n: int) -> list[Item]:
-    """Arithmetic/finance with answers computed by code (seed differs from the eval sets)."""
-    out = []
-    for _ in range(n):
-        kind = rng.choice(["pct", "mul", "fv"])
-        if kind == "pct":
-            p, x = rng.choice([4, 7.5, 12, 19, 25, 45]), rng.randint(30, 5000)
-            q, v = (
-                rng.choice(
-                    [f"What's {p}% of {x}?", f"¿Cuánto es el {p}% de {x}?", f"Combien font {p} % de {x} ?"]
-                ),
-                p * x / 100,
-            )
-        elif kind == "mul":
-            a, b = rng.randint(130, 9900), rng.randint(13, 990)
-            q, v = f"{a} × {b} = ?", a * b
-        else:
-            pv, r, yrs = rng.choice([800, 3000, 15000]), rng.choice([1.5, 3, 5, 7]), rng.randint(2, 20)
-            q, v = (
-                f"If I put {pv}€ at {r}% a year compounded yearly for {yrs} years, how much will I have?",
-                pv * (1 + r / 100) ** yrs,
-            )
-        out.append(Item(f"chk-{rng.randint(0, 10**9)}", q, "checkable", expected=round(v, 2)))
-    return out
+def checkable_questions(path: Path, rng: random.Random, n: int) -> list[Item]:
+    """GSM8K word problems (MIT, human-written) with known answers — checked by code, not the judge."""
+    from learning.skills import gsm8k
+
+    return [
+        Item(f"gsm-{rng.randint(0, 10**9)}", r["question"], "checkable", expected=float(r["answer"]))
+        for r in gsm8k(path, rng, n)
+    ]
 
 
 def oasst_questions(path: Path, rng: random.Random, n: int) -> list[Item]:
@@ -342,6 +326,13 @@ def main() -> None:
         return (r.content, r.sources) if r.ok else None
 
     try:
+        from learning.skills import practice_skills
+
+        print("skills:", practice_skills(
+            night.pool.use("sylvie"), night.store, cfg, cfg.data_dir / "datasets" / "open" / "gsm8k" / "train.jsonl",
+            n=cfg.get_path("learning.skill_practice_per_night", 40), batch=night.batch,
+            model_name=str(cfg.get_path("llm.model")).split("/")[-1], stop=lambda: night.stop,
+        ), flush=True)  # fmt: skip
         research_interests(
             night.pool.use("sylvie"), sylvie.interests, sylvie.docs, db, search_with_sources,
             cfg.data_dir / "notes", every=cfg.get_path("schedule.interest_research", "weekly"),
