@@ -242,7 +242,8 @@ class LLM:
             # question pays ~1.5 s extra.
             filler = "<context>\nTime: 09:00, Monday\n</context>\n\n" + "Hi Sylvie, how are you today? " * 18
             sample = self.render(
-                [{"role": "system", "content": system_prompt}, {"role": "user", "content": filler}], tools=tools
+                [{"role": "system", "content": system_prompt}, {"role": "user", "content": filler}],
+                tools=tools,
             )
             q: queue.Queue = queue.Queue()
             self._generate_into(q, sample, 2, False, None, use_cache=True)

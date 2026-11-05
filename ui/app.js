@@ -431,10 +431,43 @@
   function notifyNative(msg) {
     try { window.webkit?.messageHandlers?.sylvie?.postMessage(msg); } catch (_) {}
   }
-  window.sylvie = { send: (t, channel) => send(t, channel || "voice"), newChat, openConv, stop };
+  // Voice turns run in the Mac app, which forwards each server event here so the panel shows
+  // the live transcript and the written answer.
+  let voiceMsg = null;
+  function voiceEvent(ev) {
+    const box = $("#messages");
+    const empty = $("#empty");
+    if (ev.type === "transcript") {
+      if (!ev.text) return;
+      if (empty) empty.remove();
+      box.appendChild(userMsg("🎙 " + ev.text));
+      voiceMsg = assistantMsg();
+      voiceMsg.bubble.classList.add("cursor");
+      box.appendChild(voiceMsg.root);
+    } else if (ev.type === "meta") {
+      if (S.cid !== ev.conversation_id) { S.cid = ev.conversation_id; $("#conv-title").textContent = ev.title; loadConvs(); }
+    } else if (voiceMsg && ev.type === "done") {
+      voiceMsg.bubble.classList.remove("cursor");
+      voiceMsg.status.hidden = true;
+      if (ev.message_id) { voiceMsg.id = ev.message_id; renderActions(voiceMsg, { id: ev.message_id, trace: ev.trace, mode: voiceMsg.mode }); }
+      voiceMsg = null;
+    } else if (voiceMsg && ev.type !== "speak") {
+      handle(ev, voiceMsg);
+    }
+    box.scrollTop = box.scrollHeight;
+  }
+
+  window.sylvie = { send: (t, channel) => send(t, channel || "voice"), newChat, openConv, stop, voiceEvent };
 
   // ---------- start ----------
-  if (params.get("embed") === "panel") document.body.classList.add("panel");
+  if (params.get("embed") === "panel") {
+    document.body.classList.add("panel");
+    const bar = el("div", "panel-bar", `<button id="open-full">Open full chat ↗</button><button id="panel-new">New</button>`);
+    $("#main").prepend(bar);
+    $("#open-full").onclick = () => notifyNative({ type: "openChat", conversation_id: S.cid });
+    $("#panel-new").onclick = () => newChat();
+    addEventListener("keydown", (e) => { if (e.key === "Escape" && !S.streaming) notifyNative({ type: "closePanel" }); });
+  }
   pollHealth();
   loadConvs().then(() => { if (params.get("c")) openConv(params.get("c")); });
 })();

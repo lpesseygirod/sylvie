@@ -1,0 +1,112 @@
+import AVFoundation
+import Speech
+import SylvieCore
+
+/// Listens for "Sylvie" using Apple's on-device speech recognizer (nothing leaves the Mac).
+///
+/// Interim solution until the custom wake-word model is trained (plan, Phase 2). Recognition
+/// tasks are restarted regularly because they're meant for utterances, not endless audio.
+final class WakeWordListener {
+    var onWake: (() -> Void)?
+    var onStopCommand: (() -> Void)?
+    /// Only while Sylvie is speaking or thinking: "stop" / "para" / "arrête" interrupts her.
+    var listensForStop = false
+
+    private let recognizer: SFSpeechRecognizer?
+    private let matcher = WakeMatcher()
+    private let lock = NSLock()
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var task: SFSpeechRecognitionTask?
+    private var seenWakes = 0
+    private var startedAt = Date()
+    private var enabled = false
+    private let maxTaskSeconds: TimeInterval = 45
+
+    init(localeIdentifier: String = "en-US") {
+        recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
+    }
+
+    var isAvailable: Bool { recognizer?.isAvailable == true && recognizer?.supportsOnDeviceRecognition == true }
+
+    func start() {
+        lock.lock()
+        enabled = true
+        lock.unlock()
+        beginTask()
+    }
+
+    func stop() {
+        lock.lock()
+        enabled = false
+        task?.cancel()
+        request?.endAudio()
+        task = nil
+        request = nil
+        lock.unlock()
+    }
+
+    func append(_ buffer: AVAudioPCMBuffer) {
+        lock.lock()
+        let req = request
+        let tooOld = Date().timeIntervalSince(startedAt) > maxTaskSeconds
+        lock.unlock()
+        req?.append(buffer)
+        if tooOld { restart() }
+    }
+
+    func restart() {
+        lock.lock()
+        task?.cancel()
+        request?.endAudio()
+        task = nil
+        request = nil
+        let on = enabled
+        lock.unlock()
+        if on { beginTask() }
+    }
+
+    private func beginTask() {
+        guard let recognizer, recognizer.isAvailable else { return }
+        let req = SFSpeechAudioBufferRecognitionRequest()
+        req.shouldReportPartialResults = true
+        req.requiresOnDeviceRecognition = true  // private: never sent to Apple's servers
+        req.contextualStrings = ["Sylvie"]
+        req.addsPunctuation = false
+        lock.lock()
+        request = req
+        seenWakes = 0
+        startedAt = Date()
+        lock.unlock()
+        let newTask = recognizer.recognitionTask(with: req) { [weak self] result, error in
+            guard let self else { return }
+            if let result {
+                let text = result.bestTranscription.formattedString
+                self.check(text)
+                if result.isFinal { self.restart() }
+            } else if error != nil {
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.restart() }
+            }
+        }
+        lock.lock()
+        task = newTask
+        lock.unlock()
+    }
+
+    private func check(_ text: String) {
+        let count = matcher.wakeCount(in: text)
+        lock.lock()
+        let isNewWake = count > seenWakes
+        if isNewWake { seenWakes = count }
+        let stopMode = listensForStop
+        lock.unlock()
+        if stopMode && matcher.isStop(text) {
+            DispatchQueue.main.async { self.onStopCommand?() }
+            restart()
+            return
+        }
+        if isNewWake {
+            DispatchQueue.main.async { self.onWake?() }
+            restart()  // fresh transcript, so the next "Sylvie" counts again
+        }
+    }
+}

@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index
+.PHONY: setup check lint test bench chat run open download search index app app-test
 
 setup:
 	uv sync
@@ -19,6 +19,8 @@ test:
 	$(UV) pytest
 
 check: lint test
+
+check-all: check app-test
 
 bench:
 	$(UV) python scripts/benchmark.py
@@ -43,3 +45,9 @@ search:
 
 index:
 	$(UV) python -c "from core.orchestrator import Sylvie; s = Sylvie.build(); print(s.docs.index_folders(s.cfg.get_path('knowledge.folders') or []))"
+
+app:
+	zsh scripts/build_mac_app.sh
+
+app-test:
+	swift test --package-path app/SylvieMac --scratch-path "$(HOME)/Library/Caches/SylvieBuild"

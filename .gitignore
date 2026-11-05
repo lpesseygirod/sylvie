@@ -9,3 +9,4 @@ _to_delete/
 app/**/build/
 app/**/DerivedData/
 xcuserdata/
+app/SylvieMac/.build/
