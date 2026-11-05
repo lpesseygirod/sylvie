@@ -57,10 +57,10 @@ def train(
     model_id: str,
     build_dir: Path,
     iters: int = 200,
-    num_layers: int = 16,
+    num_layers: int = 8,
     learning_rate: float = 1e-5,
     batch_size: int = 1,
-    max_seq_length: int = 1024,
+    max_seq_length: int = 512,
     version: str | None = None,
     segment: int = 100,
     seed: int = 0,
@@ -120,10 +120,11 @@ def main() -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--build", required=True)
     ap.add_argument("--iters", type=int, default=200)
-    ap.add_argument("--layers", type=int, default=16)
+    ap.add_argument("--layers", type=int, default=8)
+    ap.add_argument("--max-seq", type=int, default=512)
     ap.add_argument("--lr", type=float, default=1e-5)
     a = ap.parse_args()
-    out = train(a.model, Path(a.build), a.iters, a.layers, a.lr)
+    out = train(a.model, Path(a.build), a.iters, a.layers, a.lr, max_seq_length=a.max_seq)
     print(json.dumps(json.loads((out / "meta.json").read_text())["losses"], indent=1))
     print(f"Adapter saved to {out}")
 

@@ -118,10 +118,11 @@ def build(
     valid_fraction: float = 0.08,
     seed: int = 0,
     name: str | None = None,
+    max_chars: int = 1600,
 ) -> BuildReport:
     guard = EvalGuard()
     examples: list[Example] = []
-    excluded = {"personal": 0, "eval_overlap": 0, "bad_source": 0}
+    excluded = {"personal": 0, "eval_overlap": 0, "bad_source": 0, "too_long": 0}
     for row in store.examples():
         if not row["source"].startswith(ALLOWED_SOURCE_PREFIXES):
             excluded["bad_source"] += 1
@@ -138,6 +139,11 @@ def build(
     for ex in examples:
         if guard.overlaps(ex.prompt):
             excluded["eval_overlap"] += 1
+            continue
+        # Long examples are dropped, not truncated: training memory grows steeply with length on
+        # these hybrid-attention models (a ~1300-token sample needed >40 GB on the 9B).
+        if sum(len(m["content"]) for m in ex.messages) > max_chars:
+            excluded["too_long"] += 1
             continue
         # Weighting by repetition: Lea's corrections (weight 2) appear twice, etc.
         kept += [ex] * max(1, round(ex.weight))
