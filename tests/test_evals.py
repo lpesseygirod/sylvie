@@ -37,3 +37,12 @@ def test_compare_flags_regressions():
     old = {"summary": {"math": {"accuracy": 0.9}, "style": {"accuracy": 0.5}}}
     new = {"summary": {"math": {"accuracy": 0.7}, "style": {"accuracy": 0.8}}}
     assert compare(old, new)["regressions"] == ["math"]
+
+
+def test_scorer_handles_typographic_minus_and_spanish_thousands():
+    assert score(
+        {"prompt": "x", "check": {"type": "number", "value": -3970.54, "tol": 0.05}}, "**NPV = −3970.54**", []
+    )
+    assert score(
+        {"prompt": "x", "check": {"type": "contains", "value": "3600"}}, "¡Hola! 3.600 segundos.", []
+    )

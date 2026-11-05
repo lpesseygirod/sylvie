@@ -77,14 +77,22 @@ MULTI = [
     ("fr", "Quel est le symbole chimique de l'or ?", "au"),
     ("en", "What's the chemical symbol for sodium?", "na"),
     ("en", "How many minutes are in three hours?", "180"),
-    ("es", "Oye, ¿cuántos segundos hay en una hora? Quick answer please", "3600"),
-    ("fr", "Dis-moi, what's the capital of Japan?", "tokyo"),
+    (
+        None,
+        "Oye, ¿cuántos segundos hay en una hora? Quick answer please",
+        "3600",
+    ),  # mixed: any language is fine
+    (None, "Dis-moi, what's the capital of Japan?", "tokyo"),
 ]
 
 
 def multilingual_items() -> list[dict]:
     return [
-        {"id": f"multi-{i}", "prompt": q, "check": {"type": "contains", "value": a, "lang": lang}}
+        {
+            "id": f"multi-{i}",
+            "prompt": q,
+            "check": {"type": "contains", "value": a} | ({"lang": lang} if lang else {}),
+        }
         for i, (lang, q, a) in enumerate(MULTI)
     ]
 

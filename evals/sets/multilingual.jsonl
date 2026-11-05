@@ -6,5 +6,5 @@
 {"set": "multilingual", "id": "multi-5", "prompt": "Quel est le symbole chimique de l'or ?", "check": {"type": "contains", "value": "au", "lang": "fr"}}
 {"set": "multilingual", "id": "multi-6", "prompt": "What's the chemical symbol for sodium?", "check": {"type": "contains", "value": "na", "lang": "en"}}
 {"set": "multilingual", "id": "multi-7", "prompt": "How many minutes are in three hours?", "check": {"type": "contains", "value": "180", "lang": "en"}}
-{"set": "multilingual", "id": "multi-8", "prompt": "Oye, ¿cuántos segundos hay en una hora? Quick answer please", "check": {"type": "contains", "value": "3600", "lang": "es"}}
-{"set": "multilingual", "id": "multi-9", "prompt": "Dis-moi, what's the capital of Japan?", "check": {"type": "contains", "value": "tokyo", "lang": "fr"}}
+{"set": "multilingual", "id": "multi-8", "prompt": "Oye, ¿cuántos segundos hay en una hora? Quick answer please", "check": {"type": "contains", "value": "3600"}}
+{"set": "multilingual", "id": "multi-9", "prompt": "Dis-moi, what's the capital of Japan?", "check": {"type": "contains", "value": "tokyo"}}

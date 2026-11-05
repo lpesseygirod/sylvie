@@ -38,6 +38,7 @@ def _norm(s: str) -> str:
 def number_candidates(text: str) -> list[float]:
     """All plausible numbers in a text, trying both '1.234,5' and '1,234.5' conventions."""
     out = []
+    text = text.replace("−", "-").replace("–", "-")  # typographic minus / en dash
     for tok in re.findall(r"-?\d[\d.,   ]*\d|-?\d", text):
         t = re.sub(r"[   ]", "", tok)
         variants = {t.replace(",", ""), t.replace(".", "").replace(",", ".")}
@@ -59,7 +60,11 @@ def score(item: dict, answer: str, tools: list[str]) -> bool | None:
         target = float(c["value"])
         return any(abs(x - target) <= max(tol, abs(target) * 1e-6) for x in number_candidates(answer))
     if kind == "contains":
-        ok = _norm(str(c["value"])) in _norm(answer)
+        value = str(c["value"])
+        if re.fullmatch(r"-?\d+(\.\d+)?", value):  # numbers: "3.600" / "3 600" / "3600" all count
+            ok = float(value) in number_candidates(answer)
+        else:
+            ok = _norm(value) in _norm(answer)
         if ok and c.get("lang"):
             ok = guess_language(answer, default=c["lang"]) == c["lang"]
         return ok
@@ -185,14 +190,40 @@ def compare(old: dict, new: dict, tolerance: float = 0.05) -> dict:
     return {"rows": rows, "regressions": regressions}
 
 
+def rescore(path: Path) -> dict:
+    """Re-scores a saved run with the current scorer (no model needed)."""
+    report = json.loads(path.read_text())
+    items = {i["id"]: i for i in load_items(sorted({r["set"] for r in report["results"]}), None)}
+    for r in report["results"]:
+        if r["id"] in items:
+            r["ok"] = score(items[r["id"]], r["answer"], r["tools"])
+    summary = {}
+    for r in report["results"]:
+        sm = summary.setdefault(r["set"], {"n": 0, "scored": 0, "correct": 0})
+        sm["n"] += 1
+        if r["ok"] is not None:
+            sm["scored"] += 1
+            sm["correct"] += int(r["ok"])
+    for sm in summary.values():
+        sm["accuracy"] = round(sm["correct"] / sm["scored"], 3) if sm["scored"] else None
+    report["summary"] = summary
+    path.write_text(json.dumps(report, indent=1, ensure_ascii=False))
+    return report
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--rescore", default=None, help="re-score a saved results file")
     ap.add_argument("--label", default="base")
     ap.add_argument("--adapter", default=None)
     ap.add_argument("--model", default=None)
     ap.add_argument("--sets", default="math,finance,multilingual,tools,general,style,memory,lea_questions")
     ap.add_argument("--limit", type=int, default=None)
     a = ap.parse_args()
+    if a.rescore:
+        for name, sm in rescore(Path(a.rescore))["summary"].items():
+            print(f"  {name:<14} {sm['correct']}/{sm['scored']}  ({sm['accuracy']})")
+        return
     run(a.label, a.sets.split(","), a.adapter, a.model, a.limit)
 
 
