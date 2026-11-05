@@ -1,0 +1,39 @@
+[project]
+name = "sylvie"
+version = "0.1.0"
+description = "Lea's private, local AI assistant"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "huggingface-hub>=2.4.0",
+    "keyring>=25.7.0",
+    "mlx-lm>=0.32.2",
+    "pypdf>=6.21.4",
+    "python-multipart>=0.0.33",
+    "pyyaml>=6.0.3",
+    "sqlite-vec>=0.1.9",
+    "uvicorn>=0.54.0",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]

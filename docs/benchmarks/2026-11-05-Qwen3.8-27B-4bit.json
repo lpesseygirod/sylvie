@@ -1,0 +1,55 @@
+{
+  "model": "mlx-community/Qwen3.8-27B-4bit",
+  "load_s": 6.9,
+  "weights_gb": 15.13,
+  "results": [
+    {
+      "case": "short / fast",
+      "thinking": false,
+      "prompt_tokens": 39,
+      "generated_tokens": 66,
+      "ttft_s": 0.47,
+      "prefill_tok_s": 83.5,
+      "gen_tok_s": 24.8,
+      "peak_mem_gb": 15.47,
+      "wall_s": 3.13,
+      "sample": "Madrid was chosen as the capital in 1561 by King Philip II primarily because of its central geographic location, which facilitated better communication and administration across the diverse territorie"
+    },
+    {
+      "case": "short / thinking",
+      "thinking": true,
+      "prompt_tokens": 63,
+      "generated_tokens": 204,
+      "ttft_s": 0.44,
+      "prefill_tok_s": 144.3,
+      "gen_tok_s": 24.7,
+      "peak_mem_gb": 15.52,
+      "wall_s": 8.72,
+      "sample": "The user is asking why Madrid became the capital of Spain, in two sentences. Let me think about the historical reasons.\n\nMadrid became the capital in 1561 when King Philip II moved the court there fro"
+    },
+    {
+      "case": "long 8000 / fast",
+      "thinking": false,
+      "prompt_tokens": 7886,
+      "generated_tokens": 56,
+      "ttft_s": 11.42,
+      "prefill_tok_s": 690.9,
+      "gen_tok_s": 24.4,
+      "peak_mem_gb": 18.4,
+      "wall_s": 13.72,
+      "sample": "Madrid rose to prominence when King Philip II selected it as the location for the royal court in 1561. This strategic decision effectively established the city as the permanent capital of Spain, trans"
+    },
+    {
+      "case": "long 8000 / thinking",
+      "thinking": true,
+      "prompt_tokens": 7910,
+      "generated_tokens": 152,
+      "ttft_s": 12.04,
+      "prefill_tok_s": 657.4,
+      "gen_tok_s": 24.0,
+      "peak_mem_gb": 18.4,
+      "wall_s": 18.38,
+      "sample": "The user is asking me to explain in two sentences why Madrid became the capital of Spain. The background notes (repeated many times, but the content is the same) tell me that Madrid began as a small M"
+    }
+  ]
+}
