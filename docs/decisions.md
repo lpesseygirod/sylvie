@@ -101,3 +101,7 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 
 ### T21 — Dashboard as a separate page (`/dashboard`) of the same web UI
 - **Why:** same look, no extra toolkit; also opens in the Mac app's chat window.
+
+### T22 — Prompt cache priorities (bug found by the eval)
+- **Problem:** the baseline eval showed time-to-first-word growing from 0.2 s to 3–10 s. Cause: the prompt cache kept 6 snapshots and evicted the oldest — the shared system-prompt snapshot — so after 6 conversations every new chat re-read ~2,000 tokens.
+- **Fix:** the warm-up snapshot is stored as a "system" entry (evicted last); the cache is capped at 3 GB. Measured after the fix: 12 fresh conversations in a row all start in ~0.22 s.
