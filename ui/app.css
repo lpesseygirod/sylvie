@@ -161,3 +161,17 @@ body.panel .panel-bar { display: flex; justify-content: flex-end; gap: 6px; padd
 .confirm-card { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin: 6px 0; font-size: 14px; }
 .confirm-card .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
 .confirm-card button:disabled { opacity: .5; }
+
+.why-box { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.why-box input { flex: 1; min-width: 220px; padding: 5px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; font-size: 13px; }
+.why-box .meta, .meta { font-size: 12px; color: var(--muted); }
+.count { background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; margin-left: 3px; }
+#open-memory.has-badge::after { content: "•"; color: var(--accent); margin-left: 4px; font-size: 18px; line-height: 0; }
+.corr { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
+.corr.proposed { border-color: var(--accent); }
+.corr .old, .corr .new { margin: 6px 0; padding: 6px 10px; border-radius: 8px; font-size: 14px; }
+.corr .old { background: var(--user); max-height: 140px; overflow-y: auto; opacity: .85; }
+.corr .new { background: var(--accent-soft); }
+.corr b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.corr .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+.corr .row button { padding: 4px 10px; }

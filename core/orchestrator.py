@@ -31,7 +31,9 @@ from lea_profile.notice import confirm_question, notice
 from lea_profile.preferences import PreferenceStore, detect_preference
 from lea_profile.style import StyleStore
 from lea_profile.summary import profile_text
-from memory.extract import run_extraction
+from learning.store import LearningStore
+from learning.teacher import Teacher, is_wrong_feedback
+from memory.extract import REMEMBER_RE, run_extraction
 from memory.forget import forget
 from memory.recall import recall
 from memory.store import MemoryStore
@@ -121,6 +123,8 @@ class Sylvie:
         self.interests = InterestStore(db, embedder)
         self.docs = DocsIndex(db, embedder)
         self.actions = actions if actions is not None else ActionRunner(cfg, ActionLog(db))
+        self.learning = LearningStore(db)
+        self.teacher = Teacher(self, self.learning)
         self.bg = BackgroundWorker(idle_seconds=idle_seconds)
         self._stops: dict[str, threading.Event] = {}
         self._stt = None
@@ -272,6 +276,20 @@ class Sylvie:
                         f"Lea asked to undo the last action ({last.name}). Result: {out.content} Confirm briefly."
                     )
                     yield {"type": "action", "status": "undone" if out.ok else "failed", "id": last.id}
+
+            # 1c. "Sylvie, that's wrong" → thumbs down on the last answer + the teacher reviews it
+            if forgotten is None and is_wrong_feedback(text):
+                last_answer = next(
+                    (m for m in reversed(self.convs.visible_messages(cid)) if m["role"] == "assistant"), None
+                )
+                if last_answer is not None:
+                    self.convs.set_feedback(last_answer["id"], -1)
+                    self.teacher.report(last_answer["id"], "wrong", comment=text)
+                    notes.append(
+                        "Lea says your previous answer was wrong. Say sorry in a few words; if you can see the "
+                        "mistake, correct it now, otherwise ask briefly what was wrong. A deeper review runs later."
+                    )
+                    yield {"type": "notice", "kind": "feedback", "message_id": last_answer["id"]}
 
             # 2. "No Sylvie, I prefer…" → saved and applied right now
             system_prompt = conv.get("system_prompt")
@@ -460,8 +478,11 @@ class Sylvie:
             self.memory.add(
                 f["fact"], key=f["key"], category=f["category"], source=source, sensitive=f["sensitive"]
             )
+        explicit = bool(REMEMBER_RE.search(message))
         for topic in ex.interests:
-            self.interests.bump(topic)
+            i = self.interests.bump(topic)
+            if i is not None and explicit and i.status == "guess":
+                self.interests.set_status(i.id, "confirmed")  # "remember I'm into X" — Lea said it herself
         for topic in ex.interests_removed:
             self.interests.remove(topic)
         for s in ex.style:

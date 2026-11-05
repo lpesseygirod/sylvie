@@ -227,7 +227,34 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
             raise HTTPException(400)
         s.convs.set_feedback(mid, v)
         s.convs.log_event("feedback", {"message_id": mid, "value": v})
+        correction = s.teacher.report(mid, "thumbs_down") if v == -1 else None
+        return {"ok": True, "correction_id": correction}
+
+    @app.post("/api/messages/{mid}/teach")
+    def teach(mid: int, body: dict = Body(...)):
+        """Optional: Lea says what was wrong after a thumbs down."""
+        cid = S().teacher.report(mid, "thumbs_down", comment=str(body.get("comment", ""))[:1000] or None)
+        return {"ok": True, "correction_id": cid}
+
+    @app.get("/api/corrections")
+    def corrections(status: str | None = None):
+        return [c.to_dict() for c in S().learning.corrections(status=status)]
+
+    @app.post("/api/corrections/{cid}/accept")
+    def correction_accept(cid: int, body: dict = Body(default={})):
+        try:
+            return S().teacher.accept(cid, edited_text=(body or {}).get("text"))
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+
+    @app.post("/api/corrections/{cid}/reject")
+    def correction_reject(cid: int):
+        S().teacher.reject(cid)
         return {"ok": True}
+
+    @app.get("/api/training/stats")
+    def training_stats():
+        return S().learning.stats()
 
     @app.post("/api/messages/{mid}/edit")
     def edit(mid: int, body: dict = Body(...)):
@@ -238,6 +265,7 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
             raise HTTPException(400)
         s.convs.set_edit(mid, text)
         s.convs.log_event("edit", {"message_id": mid, "original": m["content"], "edited": text})
+        s.teacher.report(mid, "edit", edited=text)
         return {"ok": True}
 
     @app.post("/api/upload")

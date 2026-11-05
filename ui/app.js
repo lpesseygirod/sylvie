@@ -183,9 +183,35 @@
         await api(`/api/messages/${p.id}/feedback`, { method: "POST", body: { value: cur } });
         a.querySelectorAll("[data-a=up],[data-a=down]").forEach((x) => x.classList.remove("on"));
         if (cur) b.classList.add("on");
+        if (cur === -1 && !$(".why-box", p.root)) askWhy(p);
       }
       if (b.dataset.a === "edit") editAnswer(p, m);
     };
+  }
+
+  function askWhy(p) {
+    const box = el("div", "why-box", `<input placeholder="What was wrong? (optional — helps Sylvie learn)"><button class="btn-ghost">Send</button>
+      <span class="meta">Sylvie's teacher will review this; see 🧠 → Corrections.</span>`);
+    const inp = $("input", box);
+    const go = async () => {
+      if (inp.value.trim()) await api(`/api/messages/${p.id}/teach`, { method: "POST", body: { comment: inp.value.trim() } });
+      box.innerHTML = `<span class="meta">✓ Thanks — the teacher will look at it.</span>`;
+      refreshBadge();
+    };
+    $("button", box).onclick = go;
+    inp.onkeydown = (e) => { if (e.key === "Enter") go(); };
+    p.actions.insertAdjacentElement("afterend", box);
+    inp.focus();
+  }
+
+  async function refreshBadge() {
+    try {
+      const pending = await api("/api/corrections?status=proposed");
+      const b = $("#corr-badge");
+      b.hidden = !pending.length;
+      b.textContent = pending.length;
+      $("#open-memory").classList.toggle("has-badge", pending.length > 0);
+    } catch (_) {}
   }
 
   function editAnswer(p, m) {
@@ -387,7 +413,12 @@
 
   // ---------- memory dialog ----------
   let memTab = "preferences";
-  $("#open-memory").onclick = () => { $("#memory-dialog").showModal(); renderMemory(); };
+  $("#open-memory").onclick = () => {
+    if (!$("#corr-badge").hidden) memTab = "corrections";  // proposals are waiting: show them first
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("active", x.dataset.tab === memTab));
+    $("#memory-dialog").showModal();
+    renderMemory();
+  };
   document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => {
     memTab = b.dataset.tab;
     document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("active", x === b));
@@ -410,6 +441,37 @@
           ...(f.active ? [btn("Forget", () => api(`/api/memory/${f.id}`, { method: "DELETE" }))] : []));
         body.appendChild(r);
       }
+      return;
+    }
+    if (memTab === "corrections") {
+      const list = await api("/api/corrections");
+      if (!list.length) body.textContent = "No corrections yet. Thumbs-down an answer or say “Sylvie, that's wrong” and her teacher proposes a better one here.";
+      for (const c of list) {
+        const card = el("div", "corr " + c.status);
+        const status = { queued: "⏳ The teacher will review this soon", proposed: "", accepted: "✓ Accepted", rejected: "Rejected", failed: "The review failed" }[c.status];
+        card.innerHTML = `<div class="meta">You asked: “${esc(c.question.slice(0, 200))}”</div>
+          <div class="old"><b>Before</b>${md(c.original)}</div>
+          ${c.proposal && c.status !== "accepted" ? `<div class="new"><b>Proposed</b>${md(c.proposal)}</div>` : ""}
+          ${c.final_answer && c.status === "accepted" ? `<div class="new"><b>Now</b>${md(c.final_answer)}</div>` : ""}
+          ${c.diagnosis && c.diagnosis.problem ? `<div class="meta">Problem: ${esc(c.diagnosis.problem)}</div>` : ""}
+          ${c.rule && c.rule.type !== "none" && c.rule.text ? `<div class="meta">Rule it will remember: ${esc(c.rule.text)}</div>` : ""}
+          ${c.sources && c.sources.length ? `<div class="sources">${sourcesHtml(c.sources)}</div>` : ""}
+          <div class="meta">${status}</div>`;
+        if (c.status === "proposed") {
+          const row = el("div", "row");
+          row.appendChild(btn("Reject", () => api(`/api/corrections/${c.id}/reject`, { method: "POST" })));
+          row.appendChild(btn("Edit & accept", async () => {
+            const t = prompt("Edit the answer", c.proposal);
+            if (t) await api(`/api/corrections/${c.id}/accept`, { method: "POST", body: { text: t } });
+          }));
+          const ok = btn("Accept", () => api(`/api/corrections/${c.id}/accept`, { method: "POST", body: {} }));
+          ok.className = "btn-primary";
+          row.appendChild(ok);
+          card.appendChild(row);
+        }
+        body.appendChild(card);
+      }
+      refreshBadge();
       return;
     }
     const prof = await api("/api/profile");
@@ -492,5 +554,7 @@
     addEventListener("keydown", (e) => { if (e.key === "Escape" && !S.streaming) notifyNative({ type: "closePanel" }); });
   }
   pollHealth();
+  refreshBadge();
+  setInterval(refreshBadge, 60000);
   loadConvs().then(() => { if (params.get("c")) openConv(params.get("c")); });
 })();
