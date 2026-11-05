@@ -125,7 +125,7 @@ class LLM:
         return len(self.tokenizer.encode(text, add_special_tokens=False))
 
     # ---------- generation ----------
-    def _cached_prefill(self, tokens: list[int], use_cache: bool = True):
+    def _cached_prefill(self, tokens: list[int], use_cache: bool = True, cache_type: str = "assistant"):
         """Reuse the longest cached prefix of `tokens`, process the rest except the last token,
         and snapshot the cache. Returns (cache, remaining_tokens, reused_count).
 
@@ -139,7 +139,13 @@ class LLM:
         from mlx_lm.models.cache import LRUPromptCache, make_prompt_cache
 
         if self._prompt_cache is None:
-            self._prompt_cache = LRUPromptCache(max_size=self.cfg.get_path("llm.prompt_cache_entries", 6))
+            # "system" entries (the shared system prompt, from warm()) are evicted last; conversation
+            # snapshots go first. Measured: without this, after 6 conversations the system prompt fell
+            # out and every new conversation re-read ~2k tokens (3–10 s to the first word).
+            self._prompt_cache = LRUPromptCache(
+                max_size=self.cfg.get_path("llm.prompt_cache_entries", 8),
+                max_bytes=int(self.cfg.get_path("llm.prompt_cache_gb", 3) * 1e9),
+            )
         cache, rest = (
             self._prompt_cache.fetch_nearest_cache(self.model_id, tokens) if use_cache else (None, [])
         )
@@ -152,7 +158,9 @@ class LLM:
             self.model(mx.array(body[i : i + step])[None], cache=cache)
             mx.eval([c.state for c in cache])
         if body and use_cache:
-            self._prompt_cache.insert_cache(self.model_id, tokens[:-1], copy.deepcopy(cache))
+            self._prompt_cache.insert_cache(
+                self.model_id, tokens[:-1], copy.deepcopy(cache), cache_type=cache_type
+            )
         return cache, rest[-1:], reused
 
     def _generate_into(
@@ -262,7 +270,7 @@ class LLM:
             prefix = full[: full.rindex("<|im_start|>user")]
             tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
             # _cached_prefill snapshots everything but the last token, so add a throwaway one.
-            self._cached_prefill(tokens + [tokens[-1]])
+            self._cached_prefill(tokens + [tokens[-1]], cache_type="system")
             # A tiny throwaway turn on top of the cached prefix compiles the GPU kernels for exactly
             # the path real turns take (cached prefix + new tokens). Without it the first real
             # question pays ~1.5 s extra.
