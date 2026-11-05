@@ -297,6 +297,16 @@ class Overnight:
         return p
 
 
+class _LazyJudge:
+    """Swaps to the judge model only when a grade is actually needed (keeps one model in memory)."""
+
+    def __init__(self, pool):
+        self.pool = pool
+
+    def complete(self, messages, **kw):
+        return self.pool.use("judge").complete(messages, **kw)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-minutes", type=int, default=60)
@@ -322,6 +332,29 @@ def main() -> None:
     )
     signal.signal(signal.SIGTERM, lambda *_: setattr(night, "stop", True))
     end = time.time() + a.max_minutes * 60
+
+    # Short jobs first: interest research (needs SearXNG) and conversation practice.
+    from lea_profile.summary import profile_text
+    from learning.practice import practice, research_interests
+
+    def search_with_sources(q: str):
+        r = execute(ToolCall("web_search", {"query": q}), sylvie.tool_context())
+        return (r.content, r.sources) if r.ok else None
+
+    try:
+        research_interests(
+            night.pool.use("sylvie"), sylvie.interests, sylvie.docs, db, search_with_sources,
+            cfg.data_dir / "notes", every=cfg.get_path("schedule.interest_research", "weekly"),
+        )  # fmt: skip
+        if not night.stop:
+            style = profile_text(sylvie.memory, sylvie.style, sylvie.interests)
+            practice(
+                night.pool.use("sylvie"), _LazyJudge(night.pool), night.store, db, style, sylvie.current_system_prompt(),
+                RUBRIC, batch=night.batch, model_name=str(cfg.get_path("llm.model")).split("/")[-1],
+            )  # fmt: skip
+    except Exception as e:  # extras must never stop the main loop
+        print(f"extras failed: {e}", flush=True)
+
     while time.time() < end and not night.stop:
         night.run_batch(a.batch)
         print(json.dumps(night.stats), flush=True)
