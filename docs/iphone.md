@@ -9,25 +9,22 @@ Its coordination server sees which devices exist and when they connect (metadata
 The fully self-run alternative is plain WireGuard, which needs a port forward on your router.
 
 1. Install Tailscale on the Mac and on the iPhone (App Store), sign in with the same account on both.
-2. On the Mac, in a terminal, publish Sylvie's phone gateway on your tailnet only:
+   (Claude can't do this part: it needs your account and a macOS VPN approval.)
+2. Make sure Sylvie is running, then on the Mac:
    ```
-   tailscale serve --bg --https=443 http://127.0.0.1:8765
+   make phone NAME="Lea's iPhone"
    ```
-   (Sylvie still listens only on 127.0.0.1; Tailscale forwards encrypted traffic to it. Don't use `tailscale funnel` — that would make it public.)
-3. Find your Mac's tailnet name: `tailscale status` → e.g. `lea-mac.tail1234.ts.net`.
-4. Put it in `config.yaml`:
-   ```yaml
-   phone:
-     allowed_hosts: ["lea-mac.tail1234.ts.net"]
-   ```
-   and restart Sylvie.
+   This does everything else:
+   - publishes Sylvie's phone gateway on your tailnet only (`tailscale serve`). Sylvie still listens only on 127.0.0.1, and it never uses `tailscale funnel`, which would make it public.
+   - puts your Mac's tailnet name (e.g. `lea-mac.tail1234.ts.net`) in `config.yaml → phone.allowed_hosts`
+   - pairs the phone and prints its token **once**, plus the URL for the Shortcut. Unpaired devices are rejected.
+3. Restart Sylvie.
 
-## 2. Pair the phone
+## 2. Pairing more devices later
 
 ```
-make pair NAME="Lea's iPhone"
+make pair NAME="Lea's iPad"
 ```
-Copy the token it prints (it's shown only once). Unpaired devices are rejected.
 
 ## 3. "Hey Siri, Sylvie" Shortcut (hands-free, also on Watch, AirPods, CarPlay)
 

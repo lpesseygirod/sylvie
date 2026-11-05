@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair eval
+.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval
 
 setup:
 	uv sync
@@ -55,6 +55,9 @@ app-test:
 
 pair:
 	$(UV) python scripts/pair_device.py $(NAME)
+
+phone:
+	$(UV) python scripts/setup_phone.py $(NAME)
 
 eval:
 	$(UV) python evals/run.py --label base

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -72,3 +74,19 @@ def test_unknown_host_rejected_even_for_devices(setup):
         c.get("/phone/ping", headers={"Authorization": f"Bearer {token}", "Host": "evil.example"}).status_code
         == 403
     )
+
+
+def test_setup_phone_reads_tailnet_name_and_edits_config():
+    from scripts.setup_phone import set_allowed_host, tailnet_name
+
+    assert tailnet_name({"BackendState": "Running", "Self": {"DNSName": "lea-mac.tail1234.ts.net."}}) == (
+        "lea-mac.tail1234.ts.net"
+    )
+    assert tailnet_name({"BackendState": "NeedsLogin", "Self": {"DNSName": "x.ts.net."}}) is None
+    cfg = Path(__file__).resolve().parent.parent.joinpath("config.yaml").read_text()
+    out = set_allowed_host(cfg, "lea-mac.tail1234.ts.net")
+    assert 'allowed_hosts: ["lea-mac.tail1234.ts.net"]' in out
+    assert set_allowed_host(out, "lea-mac.tail1234.ts.net") == out  # running it twice changes nothing
+    assert (
+        out.replace('allowed_hosts: ["lea-mac.tail1234.ts.net"]', "allowed_hosts: []") == cfg
+    )  # nothing else touched
