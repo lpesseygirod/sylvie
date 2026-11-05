@@ -29,12 +29,15 @@ def voice_turn(
             yield ev
             yield {"type": "speak", "text": ev["text"], "language": lang, "filler": True}
             continue
+        if ev["type"] == "done":
+            # The last sentence goes out before "done", so clients know all speech has arrived.
+            for sentence in speaker.flush():
+                yield {"type": "speak", "text": sentence, "language": guess_language(sentence, default=lang)}
+            yield ev
+            continue
         yield ev
         if ev["type"] == "text":
             for sentence in speaker.feed(ev["text"]):
                 yield {"type": "speak", "text": sentence, "language": guess_language(sentence, default=lang)}
         elif ev["type"] == "tool":
             speaker = SentenceStreamer()  # text before a tool call was a filler; speak the real answer fresh
-        elif ev["type"] == "done":
-            for sentence in speaker.flush():
-                yield {"type": "speak", "text": sentence, "language": guess_language(sentence, default=lang)}

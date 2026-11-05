@@ -72,6 +72,7 @@ def test_voice_turn_streams_speak_events(tmp_path):
     assert ev[0] == {"type": "transcript", "text": "¿Qué tiempo hará mañana?", "language": "es", "ms": 120}
     spoken = [e["text"] for e in ev if e["type"] == "speak"]
     assert spoken == ["Mañana hará sol en Madrid.", "Unos 18 grados."]
+    assert ev[-1]["type"] == "done"  # all speech arrives before "done"
     assert "by voice" in s.llm.calls[0]["messages"][-1]["content"]
 
 
