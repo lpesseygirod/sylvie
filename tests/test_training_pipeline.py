@@ -119,3 +119,10 @@ def test_blind_ab_hides_labels_and_counts_wins(tmp_path):
         assert "left_is" not in p  # the UI never learns which is which
         ab.choose(p["id"], "left" if p["left"].startswith("new") else "right")  # Lea always prefers "new"
     assert ab.summary() == {"pending": 0, "decided": 6, "new_wins": 6, "old_wins": 0, "ties": 0}
+
+
+def test_parse_losses_new_table_format():
+    log = "  iter   train_loss\n     1    val 1.187    7.08s\n    10    1.078 \u25bc  37  2.6k\n   300    0.900 \u25bc  1  1\n   300    val 1.020    4.89s\n  21474836480  maximum resident set size\n"
+    out = parse_losses(log)
+    assert out["train_first"] == [1.078] and out["train_last"] == [0.9] and out["val"] == [1.187, 1.02]
+    assert out["peak_mem_gb"] == 21.47

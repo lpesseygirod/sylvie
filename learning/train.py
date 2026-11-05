@@ -35,14 +35,21 @@ def next_version(root: Path) -> str:
 
 
 def parse_losses(log: str) -> dict:
+    """Reads losses from mlx-lm's output (older "Iter N: Train loss X" lines or the newer table)."""
+    log = re.sub(r"\x1b\[[0-9;]*m", "", log)
     train = [float(x) for x in re.findall(r"Train loss ([\d.]+)", log)]
     val = [float(x) for x in re.findall(r"Val loss ([\d.]+)", log)]
+    train += [float(m) for m in re.findall(r"^\s*\d+\s+([\d.]+)\s+[▲▼=]", log, re.M)]
+    val += [float(m) for m in re.findall(r"^\s*\d+\s+val\s+([\d.]+)", log, re.M)]
     peak = [float(x) for x in re.findall(r"Peak mem ([\d.]+) GB", log)]
+    rss = re.search(r"(\d+)\s+maximum resident set size", log)
+    if rss:
+        peak.append(int(rss.group(1)) / 1e9)  # /usr/bin/time -l reports bytes on macOS
     return {
         "train_first": train[:1],
         "train_last": train[-1:],
         "val": val,
-        "peak_mem_gb": max(peak) if peak else None,
+        "peak_mem_gb": round(max(peak), 2) if peak else None,
     }
 
 
@@ -53,7 +60,7 @@ def train(
     num_layers: int = 16,
     learning_rate: float = 1e-5,
     batch_size: int = 1,
-    max_seq_length: int = 2048,
+    max_seq_length: int = 1024,
     version: str | None = None,
 ) -> Path:
     cfg = load_config()
@@ -63,6 +70,7 @@ def train(
     out = root / version
     out.mkdir()
     args = [
+        "/usr/bin/time", "-l",  # reports peak memory
         sys.executable, "-m", "mlx_lm", "lora",
         "--model", model_id, "--train", "--data", str(build_dir), "--adapter-path", str(out),
         "--fine-tune-type", "lora", "--mask-prompt", "--num-layers", str(num_layers),
