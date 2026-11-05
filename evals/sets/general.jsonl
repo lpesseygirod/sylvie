@@ -1,0 +1,8 @@
+{"set": "general", "id": "gen-0", "prompt": "Who wrote 'One Hundred Years of Solitude'?", "check": {"type": "contains", "value": "garcía márquez"}}
+{"set": "general", "id": "gen-1", "prompt": "What's the boiling point of water at sea level in Celsius?", "check": {"type": "contains", "value": "100"}}
+{"set": "general", "id": "gen-2", "prompt": "Which language is primarily spoken in Brazil?", "check": {"type": "contains", "value": "portuguese"}}
+{"set": "general", "id": "gen-3", "prompt": "What does CPU stand for?", "check": {"type": "contains", "value": "central processing unit"}}
+{"set": "general", "id": "gen-4", "prompt": "In what year did the Berlin Wall fall?", "check": {"type": "contains", "value": "1989"}}
+{"set": "general", "id": "gen-5", "prompt": "What is the derivative of x squared?", "check": {"type": "contains", "value": "2x"}}
+{"set": "general", "id": "gen-6", "prompt": "What is the time complexity of binary search?", "check": {"type": "contains", "value": "log"}}
+{"set": "general", "id": "gen-7", "prompt": "Which gas do plants absorb from the air for photosynthesis?", "check": {"type": "contains", "value": "carbon dioxide"}}

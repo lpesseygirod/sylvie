@@ -1,0 +1,6 @@
+{"set": "style", "id": "style-0", "prompt": "hey sylvie, how are you?", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-1", "prompt": "what's a good name for a study group chat?", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-2", "prompt": "¿me das un consejo rápido para concentrarme?", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-3", "prompt": "c'est quoi un ETF, en deux mots ?", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-4", "prompt": "is it worth learning Rust this year?", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-5", "prompt": "tell me something interesting about octopuses", "check": {"type": "style", "max_words": 90}}

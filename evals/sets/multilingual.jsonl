@@ -1,0 +1,10 @@
+{"set": "multilingual", "id": "multi-0", "prompt": "¿Cuál es la capital de Portugal?", "check": {"type": "contains", "value": "lisboa", "lang": "es"}}
+{"set": "multilingual", "id": "multi-1", "prompt": "¿Cuántos días tiene un año bisiesto?", "check": {"type": "contains", "value": "366", "lang": "es"}}
+{"set": "multilingual", "id": "multi-2", "prompt": "¿Qué planeta es el más grande del sistema solar?", "check": {"type": "contains", "value": "júpiter", "lang": "es"}}
+{"set": "multilingual", "id": "multi-3", "prompt": "Quelle est la capitale de l'Italie ?", "check": {"type": "contains", "value": "rome", "lang": "fr"}}
+{"set": "multilingual", "id": "multi-4", "prompt": "Combien de côtés a un hexagone ?", "check": {"type": "contains", "value": "6", "lang": "fr"}}
+{"set": "multilingual", "id": "multi-5", "prompt": "Quel est le symbole chimique de l'or ?", "check": {"type": "contains", "value": "au", "lang": "fr"}}
+{"set": "multilingual", "id": "multi-6", "prompt": "What's the chemical symbol for sodium?", "check": {"type": "contains", "value": "na", "lang": "en"}}
+{"set": "multilingual", "id": "multi-7", "prompt": "How many minutes are in three hours?", "check": {"type": "contains", "value": "180", "lang": "en"}}
+{"set": "multilingual", "id": "multi-8", "prompt": "Oye, ¿cuántos segundos hay en una hora? Quick answer please", "check": {"type": "contains", "value": "3600", "lang": "es"}}
+{"set": "multilingual", "id": "multi-9", "prompt": "Dis-moi, what's the capital of Japan?", "check": {"type": "contains", "value": "tokyo", "lang": "fr"}}

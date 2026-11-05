@@ -1,0 +1,25 @@
+{"set": "math", "id": "math-0", "prompt": "What is 2228 minus 831? Just the number.", "check": {"type": "number", "value": 1397}}
+{"set": "math", "id": "math-1", "prompt": "What is 2594 minus 875? Just the number.", "check": {"type": "number", "value": 1719}}
+{"set": "math", "id": "math-2", "prompt": "What is 1729 minus 432? Just the number.", "check": {"type": "number", "value": 1297}}
+{"set": "math", "id": "math-3", "prompt": "What is 2902 plus 445? Just the number.", "check": {"type": "number", "value": 3347}}
+{"set": "math", "id": "math-4", "prompt": "What is 2910 minus 977? Just the number.", "check": {"type": "number", "value": 1933}}
+{"set": "math", "id": "math-5", "prompt": "What is 7592 plus 631? Just the number.", "check": {"type": "number", "value": 8223}}
+{"set": "math", "id": "math-6", "prompt": "What is 3141 times 186? Just the number.", "check": {"type": "number", "value": 584226}}
+{"set": "math", "id": "math-7", "prompt": "What is 5152 plus 286? Just the number.", "check": {"type": "number", "value": 5438}}
+{"set": "math", "id": "math-8", "prompt": "What is 909 times 509? Just the number.", "check": {"type": "number", "value": 462681}}
+{"set": "math", "id": "math-9", "prompt": "What is 7944 times 589? Just the number.", "check": {"type": "number", "value": 4679016}}
+{"set": "math", "id": "math-10", "prompt": "What is 7982 minus 178? Just the number.", "check": {"type": "number", "value": 7804}}
+{"set": "math", "id": "math-11", "prompt": "What is 6307 plus 125? Just the number.", "check": {"type": "number", "value": 6432}}
+{"set": "math", "id": "math-12", "prompt": "What is 4518 plus 571? Just the number.", "check": {"type": "number", "value": 5089}}
+{"set": "math", "id": "math-13", "prompt": "What is 885 minus 819? Just the number.", "check": {"type": "number", "value": 66}}
+{"set": "math", "id": "math-14", "prompt": "What is 8583 minus 764? Just the number.", "check": {"type": "number", "value": 7819}}
+{"set": "math", "id": "pct-0", "prompt": "What is 21% of 1961?", "check": {"type": "number", "value": 411.81, "tol": 0.01}}
+{"set": "math", "id": "pct-1", "prompt": "What is 33% of 261?", "check": {"type": "number", "value": 86.13, "tol": 0.01}}
+{"set": "math", "id": "pct-2", "prompt": "What is 17.5% of 1873?", "check": {"type": "number", "value": 327.77, "tol": 0.01}}
+{"set": "math", "id": "pct-3", "prompt": "What is 17.5% of 1461?", "check": {"type": "number", "value": 255.68, "tol": 0.01}}
+{"set": "math", "id": "pct-4", "prompt": "What is 21% of 561?", "check": {"type": "number", "value": 117.81, "tol": 0.01}}
+{"set": "math", "id": "pct-5", "prompt": "What is 12% of 485?", "check": {"type": "number", "value": 58.2, "tol": 0.01}}
+{"set": "math", "id": "pct-6", "prompt": "What is 12% of 162?", "check": {"type": "number", "value": 19.44, "tol": 0.01}}
+{"set": "math", "id": "pct-7", "prompt": "What is 33% of 2126?", "check": {"type": "number", "value": 701.58, "tol": 0.01}}
+{"set": "math", "id": "pct-8", "prompt": "What is 5% of 868?", "check": {"type": "number", "value": 43.4, "tol": 0.01}}
+{"set": "math", "id": "pct-9", "prompt": "What is 21% of 329?", "check": {"type": "number", "value": 69.09, "tol": 0.01}}

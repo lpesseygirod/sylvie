@@ -1,0 +1,9 @@
+{"set": "tools", "id": "tool-0", "prompt": "What is 48213 times 9172?", "check": {"type": "tool", "value": "calculator"}}
+{"set": "tools", "id": "tool-1", "prompt": "Calcula 17,5% de 23.480 euros", "check": {"type": "tool", "value": "calculator"}}
+{"set": "tools", "id": "tool-2", "prompt": "What's the latest news about the European Central Bank interest rate decision?", "check": {"type": "tool", "value": "web_search"}}
+{"set": "tools", "id": "tool-3", "prompt": "¿Quién ganó el último Gran Premio de Fórmula 1?", "check": {"type": "tool", "value": "web_search"}}
+{"set": "tools", "id": "tool-4", "prompt": "Hi Sylvie!", "check": {"type": "tool", "value": null}}
+{"set": "tools", "id": "tool-5", "prompt": "Can you explain what a hash table is, in two sentences?", "check": {"type": "tool", "value": null}}
+{"set": "tools", "id": "tool-6", "prompt": "Pause the music", "check": {"type": "tool", "value": "music"}}
+{"set": "tools", "id": "tool-7", "prompt": "Set a timer for 10 minutes for the pasta", "check": {"type": "tool", "value": "set_timer"}}
+{"set": "tools", "id": "tool-8", "prompt": "Mets un rappel pour appeler maman demain à 18h", "check": {"type": "tool", "value": "create_reminder"}}
