@@ -47,6 +47,10 @@ class InterestStore:
         self.db = db
         self.embedder = embedder
         self._vec_cache: dict[str, np.ndarray] = {}
+        # One row per mention, so the dashboard can chart an interest's strength over time.
+        self.db.execute(
+            "CREATE TABLE IF NOT EXISTS interest_events (interest_id INTEGER NOT NULL, at TEXT NOT NULL, amount REAL NOT NULL)"
+        )
 
     def _vec(self, topic: str) -> np.ndarray:
         if topic not in self._vec_cache:
@@ -97,7 +101,29 @@ class InterestStore:
                 "UPDATE interests SET score = ?, mentions = mentions + 1, last_seen = ? WHERE id = ?",
                 (existing.score + amount, now, existing.id),
             )
-        return self.find(topic)
+        found = self.find(topic)
+        if found is not None and found.status != "rejected":
+            self.db.execute(
+                "INSERT INTO interest_events(interest_id, at, amount) VALUES (?,?,?)", (found.id, now, amount)
+            )
+        return found
+
+    def history(self, interest_id: int, days: int = 120) -> list[dict]:
+        """Strength per week (with the same decay as the live score)."""
+        from datetime import UTC, datetime, timedelta
+
+        rows = self.db.query(
+            "SELECT at, amount FROM interest_events WHERE interest_id = ? ORDER BY at", (interest_id,)
+        )
+        now = datetime.now(UTC)
+        out = []
+        for w in range(days // 7, -1, -1):
+            t = now - timedelta(days=7 * w)
+            score = sum(
+                decayed(r["amount"], r["at"], t) for r in rows if datetime.fromisoformat(r["at"]) <= t
+            )
+            out.append({"week": t.date().isoformat(), "score": round(score, 2)})
+        return out
 
     def set_status(self, interest_id: int, status: str) -> None:
         assert status in ("guess", "confirmed", "rejected")

@@ -52,6 +52,11 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
             try:
                 if state["sylvie"] is None:
                     state["sylvie"] = Sylvie.build(cfg)
+                from learning.promote import load_state
+
+                saved = load_state(cfg).get("settings", {})
+                if "search_enabled" in saved:
+                    cfg.setdefault("search", {})["enabled"] = saved["search_enabled"]
                 if warm:
                     state["sylvie"].warm()
                     from learning.scheduler import Scheduler
@@ -474,6 +479,150 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
         except ValueError as e:
             raise HTTPException(400, str(e)) from e
         return {"ok": True}
+
+    # ---------- dashboard ----------
+    def _dir_size(path: Path) -> int:
+        total = 0
+        if path.exists():
+            for f in path.rglob("*"):
+                try:
+                    if f.is_file() and not f.is_symlink():
+                        total += f.stat().st_size
+                except OSError:
+                    pass
+        return total
+
+    @app.get("/api/dashboard")
+    def dashboard():
+        s = S()
+        from learning.promote import load_state
+
+        hf = Path.home() / ".cache" / "huggingface" / "hub"
+        return {
+            "privacy": {
+                "server": f"{host}:{port} (this Mac only)",
+                "web_search": bool(cfg.get_path("search.enabled", True)),
+                "voice": bool(cfg.get_path("voice.enabled", True)),
+                "audio_kept": False,
+                "paired_devices": len([d for d in s.devices.list() if not d.revoked_at]),
+                "phone_gateway_hosts": cfg.get_path("phone.allowed_hosts", []) or [],
+            },
+            "storage_gb": {
+                "sylvie_data": round(_dir_size(cfg.data_dir) / 1e9, 2),
+                "models": round(_dir_size(hf) / 1e9, 1),
+            },
+            "counts": {
+                "conversations": len(s.convs.list(limit=100000)),
+                "facts": len(s.memory.list()),
+                "preferences": len(s.prefs.list()),
+                "training_ready": len(s.learning.examples()),
+                "training_staged": len(s.learning.examples(status="staged")),
+            },
+            "schedule": s.scheduler.status() if s.scheduler else None,
+            "versions": load_state(cfg).get("adapters", {}),
+        }
+
+    @app.post("/api/settings/search")
+    def set_search(body: dict = Body(...)):
+        """Privacy switch: web search on/off (kept across restarts in state.json)."""
+        from learning.promote import load_state, save_state
+
+        on = bool(body.get("enabled"))
+        cfg.setdefault("search", {})["enabled"] = on
+        st = load_state(cfg)
+        st.setdefault("settings", {})["search_enabled"] = on
+        save_state(cfg, st)
+        return {"enabled": on}
+
+    @app.get("/api/traces")
+    def traces(limit: int = 40):
+        rows = S().db.query(
+            "SELECT id, conversation_id, mode, channel, created_at, trace, substr(content, 1, 80) preview FROM messages "
+            "WHERE role = 'assistant' AND trace IS NOT NULL ORDER BY id DESC LIMIT ?",
+            (limit,),
+        )
+        return [{**dict(r), "trace": json.loads(r["trace"])} for r in rows]
+
+    @app.get("/api/profile/interests/{iid}/history")
+    def interest_history(iid: int):
+        return S().interests.history(iid)
+
+    @app.get("/api/overnight")
+    def overnight():
+        s = S()
+        out = []
+        for b in s.learning.staged_batches():
+            p = cfg.data_dir / "overnight" / f"{b['batch']}.json"
+            summary = json.loads(p.read_text()) if p.exists() else {}
+            out.append({**b, "stats": summary.get("stats"), "spot_check": summary.get("spot_check", [])})
+        return out
+
+    @app.post("/api/overnight/{batch}")
+    def overnight_decide(batch: str, body: dict = Body(...)):
+        decision = body.get("decision")
+        if decision not in ("approve", "reject"):
+            raise HTTPException(400)
+        S().learning.set_batch_status(
+            batch,
+            "ready" if decision == "approve" else "rejected",
+            [int(i) for i in body.get("exclude_ids") or []],
+        )
+        return {"ok": True}
+
+    @app.get("/api/versions")
+    def versions():
+        from learning.promote import load_state
+        from learning.train import adapters_root, model_short
+
+        model = cfg.get_path("llm.model")
+        root = adapters_root(cfg, model)
+        items = []
+        for d in sorted(root.glob("v[0-9][0-9][0-9]")) if root.exists() else []:
+            meta = json.loads((d / "meta.json").read_text()) if (d / "meta.json").exists() else {}
+            items.append({"version": d.name, "created": meta.get("created"), "ok": meta.get("ok"),
+                          "losses": meta.get("losses"), "dataset": (meta.get("dataset") or {}).get("counts")})  # fmt: skip
+        reports = []
+        for f in sorted((cfg.data_dir / "evals").glob("*.json"), reverse=True)[:20]:
+            try:
+                r = json.loads(f.read_text())
+                reports.append(
+                    {"file": f.name, "label": r["label"], "date": r["date"], "summary": r["summary"]}
+                )
+            except (OSError, ValueError, KeyError):
+                pass
+        entry = load_state(cfg).get("adapters", {}).get(model_short(model), {})
+        return {
+            "model": model,
+            "active": entry.get("active"),
+            "versions": items,
+            "evals": reports,
+            "ab": S().ab.summary(),
+        }
+
+    @app.post("/api/versions/{version}/promote")
+    def version_promote(version: str):
+        from learning.promote import promote
+
+        try:
+            promote(cfg, cfg.get_path("llm.model"), version)
+        except FileNotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+        S().llm.unload()  # reloads with the new adapter on the next request
+        return {"ok": True, "active": version}
+
+    @app.post("/api/versions/rollback")
+    def version_rollback():
+        from learning.promote import rollback
+
+        active = rollback(cfg, cfg.get_path("llm.model"))
+        S().llm.unload()
+        return {"ok": True, "active": active}
+
+    @app.get("/dashboard")
+    def dashboard_page(request: Request):
+        if not tokens_equal(request.cookies.get(COOKIE), token):
+            return HTMLResponse(LOCKED_PAGE, status_code=401)
+        return FileResponse(UI_DIR / "dashboard.html")
 
     @app.get("/api/knowledge")
     def knowledge():

@@ -175,3 +175,5 @@ body.panel .panel-bar { display: flex; justify-content: flex-end; gap: 6px; padd
 .corr b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .corr .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
 .corr .row button { padding: 4px 10px; }
+
+#open-dashboard { text-decoration: none; }

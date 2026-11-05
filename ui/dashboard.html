@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sylvie Dashboard</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+  <div class="dash">
+    <nav class="dnav">
+      <a href="/" class="back">← Chat</a>
+      <h1>Sylvie</h1>
+      <button data-s="about" class="active">About Lea</button>
+      <button data-s="memory">Memory</button>
+      <button data-s="learning">Corrections &amp; nights</button>
+      <button data-s="versions">Versions</button>
+      <button data-s="actions">Actions</button>
+      <button data-s="privacy">Privacy</button>
+      <button data-s="speed">Speed</button>
+    </nav>
+    <main id="dmain"></main>
+  </div>
+  <script src="/static/markdown.js"></script>
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>
