@@ -78,3 +78,26 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 
 ### T14 — Warm-up runs a realistic dummy turn
 - **Why:** measured: the first real question after start paid 1.5 s of one-time GPU kernel compilation unless the warm-up used the same path (cached system prompt + ~150 new tokens). Now the first question is as fast as later ones.
+
+### T15 — Actions run through AppleScript with values as arguments
+- **What:** Spotify/Calendar/Reminders/Mail are controlled with AppleScript; every value is passed via `on run argv`, never pasted into script text (no injection from email subjects or web pages). Sending email and running Shortcuts need a read-back + a clear "yes" that **code** checks (not the model) + an unlocked Mac (checked with `ioreg`, no permission needed). Creating events/reminders can be undone.
+- **Alternatives:** EventKit via PyObjC (more deps, needs entitlements), Gmail API (OAuth tokens to manage; decision 5 default is Apple Mail).
+
+### T16 — Phone access through `tailscale serve` + per-device tokens
+- **What:** the server keeps listening on 127.0.0.1 only (rule 2); Tailscale forwards encrypted tailnet traffic to it. `/phone/*` endpoints accept only paired-device tokens (only hashes stored, revocable) and refuse browsers; the local token doesn't work there and device tokens don't open the local API. First client: a "Hey Siri, Sylvie" Shortcut (works on Watch/AirPods/CarPlay). The iPhone app comes next.
+
+### T17 — Teacher and training data
+- **What:** the teacher is Sylvie's own model in thinking mode + `core/prompts/rubric.md`. Training examples carry source + license and the store refuses anything that isn't `lea`, `sylvie-local:*` or `open-dataset:*`. Lea's own edits weigh 2×, accepted teacher answers 1.5×.
+- **No DPO yet:** mlx-lm 0.32 supports LoRA/DoRA/full fine-tuning but not DPO, so training uses the *chosen* answers (SFT, prompt masked). Bad/good pairs are kept so DPO can be added when available.
+
+### T18 — Open data: OpenAssistant oasst2 (Apache 2.0)
+- **Why:** human-written (plan: avoid model collapse), multilingual with lots of Spanish and some French, permissive license. Used only filtered to EN/ES/FR, best-ranked replies. Not named in the plan → listed in LICENSES.md; Lea can veto.
+
+### T19 — Overnight loop design
+- **What:** one big model in memory at a time (Sylvie's model ↔ Gemma judge, swapped per batch). The judge sees a shuffled criteria order each time (rubric rotation); code applies a length penalty (>150 words) and verifies checkable answers itself. A rewrite is kept only if it gains ≥ 2 points after the penalty, isn't much longer, and fixes any checkable error. Kept pairs are **staged** and become trainable only after Lea's morning spot-check.
+
+### T20 — Adapter versions live in the data folder; the active one in `state.json`
+- **Why:** promoting/rolling back shouldn't edit `config.yaml` in the repo. `<data>/adapters/<model>/v001…`, each with `meta.json` (dataset manifest, settings, losses).
+
+### T21 — Dashboard as a separate page (`/dashboard`) of the same web UI
+- **Why:** same look, no extra toolkit; also opens in the Mac app's chat window.
