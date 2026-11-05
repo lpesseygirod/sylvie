@@ -62,6 +62,8 @@ def train(
     batch_size: int = 1,
     max_seq_length: int = 1024,
     version: str | None = None,
+    segment: int = 100,
+    seed: int = 0,
 ) -> Path:
     cfg = load_config()
     root = adapters_root(cfg, model_id)
@@ -69,30 +71,46 @@ def train(
     version = version or next_version(root)
     out = root / version
     out.mkdir()
-    args = [
-        "/usr/bin/time", "-l",  # reports peak memory
-        sys.executable, "-m", "mlx_lm", "lora",
-        "--model", model_id, "--train", "--data", str(build_dir), "--adapter-path", str(out),
-        "--fine-tune-type", "lora", "--mask-prompt", "--num-layers", str(num_layers),
-        "--batch-size", str(batch_size), "--iters", str(iters), "--learning-rate", str(learning_rate),
-        "--max-seq-length", str(max_seq_length), "--grad-checkpoint",
-        "--steps-per-report", "10", "--steps-per-eval", str(max(20, iters // 4)), "--save-every", str(max(50, iters // 2)),
-    ]  # fmt: skip
+    # Train in segments, each a fresh process resuming from the last adapter. Measured: one long
+    # 300-step run on the 9B hit a Metal out-of-memory error at the end (memory builds up over a long
+    # run), while short runs were fine. Segments also mean an interrupted night loses little.
     env = {**os.environ, "HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1"}
     t0 = time.time()
-    p = subprocess.run(args, capture_output=True, text=True, env=env)
-    log = p.stdout + p.stderr
+    logs, returncode, done = [], 0, 0
+    seg = 0
+    while done < iters:
+        n = min(segment, iters - done)
+        args = [
+            "/usr/bin/time", "-l",  # reports peak memory
+            sys.executable, "-m", "mlx_lm", "lora",
+            "--model", model_id, "--train", "--data", str(build_dir), "--adapter-path", str(out),
+            "--fine-tune-type", "lora", "--mask-prompt", "--num-layers", str(num_layers),
+            "--batch-size", str(batch_size), "--iters", str(n), "--learning-rate", str(learning_rate),
+            "--max-seq-length", str(max_seq_length), "--grad-checkpoint", "--seed", str(seed + seg),
+            "--steps-per-report", "10", "--steps-per-eval", str(n), "--save-every", str(n),
+        ]  # fmt: skip
+        if seg > 0:
+            args += ["--resume-adapter-file", str(out / "adapters.safetensors")]
+        p = subprocess.run(args, capture_output=True, text=True, env=env)
+        logs.append(f"===== segment {seg + 1}: steps {done + 1}-{done + n} =====\n" + p.stdout + p.stderr)
+        returncode = p.returncode
+        if returncode != 0:
+            break
+        done += n
+        seg += 1
+    log = "\n".join(logs)
     (out / "train.log").write_text(log)
     manifest = json.loads((Path(build_dir) / "manifest.json").read_text())
     meta = {
         "version": version, "base_model": model_id, "created": datetime.now().isoformat(timespec="seconds"),
-        "minutes": round((time.time() - t0) / 60, 1), "ok": p.returncode == 0,
+        "minutes": round((time.time() - t0) / 60, 1), "ok": returncode == 0, "steps_done": done,
         "settings": {"iters": iters, "num_layers": num_layers, "learning_rate": learning_rate, "batch_size": batch_size,
-                     "max_seq_length": max_seq_length, "type": "lora (qlora on 4-bit base)", "mask_prompt": True},
+                     "max_seq_length": max_seq_length, "type": "lora (qlora on 4-bit base)", "mask_prompt": True,
+                     "segment": segment},
         "dataset": manifest, "losses": parse_losses(log),
     }  # fmt: skip
     (out / "meta.json").write_text(json.dumps(meta, indent=1, ensure_ascii=False))
-    if p.returncode != 0:
+    if returncode != 0:
         raise RuntimeError(f"training failed, see {out / 'train.log'}")
     return out
 
