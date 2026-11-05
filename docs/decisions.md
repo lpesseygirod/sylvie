@@ -110,3 +110,18 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **Finding:** Qwen3.5/3.8 mix normal attention with linear "Gated DeltaNet" layers. LoRA training memory grows steeply with sequence length: on the 9B a single ~1,300-token sample pushed the process past 40 GB (Metal out-of-memory), even with gradient checkpointing.
 - **What:** training builds drop examples over ~1,600 characters (not truncated — a truncated answer teaches broken endings), sequences ≤ 512 tokens, LoRA on 8 layers, training in resumable 100-step segments. Result on the 9B: ~200 tokens/s, stable.
 - **Cost:** long answers are under-represented in training. Most of Sylvie's style is in short answers anyway; revisit when mlx-lm gets memory-efficient training kernels for these layers.
+
+### T24 — QLoRA on the 27B: fits, barely (measured 2026-11-05)
+- **Measured:** 20 steps on `Qwen3.8-27B-4bit`, LoRA on 8 layers, 512-token sequences, gradient checkpointing: works, ~20 tokens/s, **peak memory footprint 34.8 GB** (of 36 GB). A 300-step fine-tune ≈ 45–60 min.
+- **Default (Lea can change):** fine-tune the 27B itself with these settings, only at night via the scheduler, in 100-step segments (an out-of-memory error then loses at most one segment).
+- **Options for Lea:**
+  1. Keep the default (recommended).
+  2. More headroom: 4 LoRA layers or 384-token sequences (slightly weaker learning).
+  3. Let the GPU use more memory (Lea runs it herself; resets at reboot): `sudo sysctl iogpu.wired_limit_mb=30720`.
+  4. Train only on the 9B (much faster, 10 GB) and keep the 27B unadapted — not recommended: the 27B is the one Lea talks to.
+
+### T25 — First 9B fine-tune: the regression check works
+- 9B base vs 9B+v004 (oasst2 only): math 8→10/10, but tools 7→4/9, style 4→3/6, multilingual 10→9/10 → flagged as regressions, so it could never be promoted. Cause: no tool-calling data in the mix. Fix: nightly skill practice (T26) adds verified tool-use and reasoning examples.
+
+### T26 — Training questions come from open datasets, never from Claude's templates
+- The eval sets use my templates (evaluation only, never trained on — the dataset builder blocks overlaps). For *training*, checkable questions come from **GSM8K (MIT)** and chat from **oasst2 (Apache 2.0)**; all answers come from Sylvie's own model and are verified by code where possible.
