@@ -80,6 +80,23 @@ class LLM:
     def load(self) -> None:
         self._executor.submit(self._load_sync).result()
 
+    def unload(self) -> None:
+        """Frees the model's memory (for heavy overnight jobs). The next request reloads it."""
+
+        def _job():
+            import gc
+
+            import mlx.core as mx
+
+            with self._load_lock:
+                self.model = None
+                self.tokenizer = None
+                self._prompt_cache = None
+            gc.collect()
+            mx.clear_cache()
+
+        self._executor.submit(_job).result()
+
     @property
     def loaded(self) -> bool:
         return self.model is not None
@@ -304,6 +321,9 @@ class FakeLLM:
         return "OK"
 
     def warm(self, system_prompt, tools=None):
+        pass
+
+    def unload(self):
         pass
 
     def stream(

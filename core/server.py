@@ -54,6 +54,10 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
                     state["sylvie"] = Sylvie.build(cfg)
                 if warm:
                     state["sylvie"].warm()
+                    from learning.scheduler import Scheduler
+
+                    state["sylvie"].scheduler = Scheduler(state["sylvie"])
+                    state["sylvie"].scheduler.start()
                 state["ready"] = True
                 log.info("Sylvie ready")
             except Exception as e:
@@ -131,6 +135,11 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
     @app.get("/api/health")
     def health():
         return {"ready": state["ready"], "error": state["error"]}
+
+    @app.get("/api/schedule")
+    def schedule():
+        sch = S().scheduler
+        return sch.status() if sch else {"running": None, "reason_if_idle": "scheduler off"}
 
     @app.get("/api/conversations")
     def conversations(search: str | None = None):

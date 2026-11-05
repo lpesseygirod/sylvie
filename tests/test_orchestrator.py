@@ -25,6 +25,11 @@ def make(tmp_path, replies, osa=None, locked=False):
 
     cfg = Config(dict(load_config()))
     cfg["search"] = {**cfg["search"], "enabled": False}
+    cfg["paths"] = {
+        **cfg["paths"],
+        "data_dir": str(tmp_path / "data"),
+        "adapters_dir": str(tmp_path / "adapters"),
+    }
     db = Database(tmp_path / "s.db", dim=256)
     runner = ActionRunner(
         cfg, ActionLog(db), osa=osa or FakeOSA(), run_cmd=lambda a: FakeProc(), is_locked=lambda: locked

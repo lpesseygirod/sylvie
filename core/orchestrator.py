@@ -130,6 +130,7 @@ class Sylvie:
         self.ab = ABTests(db)
         self.teacher = Teacher(self, self.learning)
         self.bg = BackgroundWorker(idle_seconds=idle_seconds)
+        self.scheduler = None  # set by the server (learning/scheduler.py)
         self._stops: dict[str, threading.Event] = {}
         self._stt = None
 
@@ -204,6 +205,8 @@ class Sylvie:
     ) -> Iterator[dict]:
         trace = Trace()
         self.bg.turn_started()
+        if self.scheduler is not None and self.scheduler.preempt():
+            yield {"type": "status", "text": "One moment, waking up…"}
         stop = threading.Event()
         cid = None
         try:

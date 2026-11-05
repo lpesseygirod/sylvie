@@ -74,6 +74,15 @@ phone:
   # (decision 8, default — Lea can change). Empty = phone access off.
   allowed_hosts: []
 
+schedule:
+  enabled: true
+  window_start: "01:00"         # heavy jobs only at night…
+  window_end: "07:00"
+  idle_minutes: 30              # …when Lea hasn't used Sylvie for this long…
+  max_hours_per_night: 5        # …plugged in (never on battery), within this cap
+  finetune_every_days: 10       # plan: every 1–2 weeks, promoted only if better
+  interest_research: weekly     # decision 10 — default, Lea can change (off | weekly | daily)
+
 privacy:
   log_conversations: true
   delete_audio_after_transcription: true
