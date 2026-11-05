@@ -55,10 +55,19 @@ class LLM:
 
     # ---------- loading ----------
     def _adapter_path(self) -> str | None:
-        if not self.adapter:
-            return None
-        p = Path(self.cfg.get_path("paths.adapters_dir")).expanduser() / self.adapter
-        return str(p) if p.exists() else None
+        """An explicit adapter (name like "v001" or a path), else the promoted one, else none."""
+        from learning.promote import active_adapter
+        from learning.train import adapters_root
+
+        if self.adapter:
+            p = Path(self.adapter).expanduser()
+            if not p.is_absolute():
+                p = adapters_root(self.cfg, self.model_id) / self.adapter
+            if not (p / "adapters.safetensors").exists():
+                raise FileNotFoundError(f"adapter not found: {p}")
+            return str(p)
+        active = active_adapter(self.cfg, self.model_id)
+        return str(active) if active else None
 
     def _load_sync(self) -> None:
         with self._load_lock:
