@@ -362,6 +362,35 @@ def main() -> None:
         night.pool.model.unload()
     print("summary:", night.morning_summary(), flush=True)
 
+    # Fine-tune when due (every ~10 days with enough approved new examples); Lea decides promotion.
+    from learning.cycle import due, run_cycle
+    from learning.train import train
+
+    model_id = cfg.get_path("learning.finetune_model") or cfg.get_path("llm.model")
+    ok, why = due(cfg, night.store, model_id)
+    print("fine-tune:", why, flush=True)
+    if ok and not night.stop and time.time() < end:
+        from evals.run import run as run_eval
+
+        sets = [
+            "math",
+            "finance",
+            "multilingual",
+            "tools",
+            "general",
+            "style",
+            "memory",
+            "lea_questions",
+            "conversations",
+        ]
+        res = run_cycle(
+            cfg, night.store, sylvie.ab, model_id,
+            cfg.data_dir / "datasets" / "open" / "oasst2" / "2023-11-05_oasst2_ready.trees.jsonl.gz",
+            train_fn=lambda m, b: train(m, b, iters=cfg.get_path("learning.iters", 300)),
+            eval_fn=lambda label, adapter: run_eval(label, sets, adapter=adapter, model=model_id),
+        )  # fmt: skip
+        print("cycle:", json.dumps(res["comparison"]), flush=True)
+
 
 if __name__ == "__main__":
     main()

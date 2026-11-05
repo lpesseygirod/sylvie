@@ -126,3 +126,39 @@ def test_parse_losses_new_table_format():
     out = parse_losses(log)
     assert out["train_first"] == [1.078] and out["train_last"] == [0.9] and out["val"] == [1.187, 1.02]
     assert out["peak_mem_gb"] == 21.47
+
+
+def test_cycle_due_and_run(tmp_path):
+    from datetime import UTC, datetime, timedelta
+
+    from core.db import Database
+    from learning.ab import ABTests
+    from learning.cycle import due, run_cycle
+
+    cfg = Config({"paths": {"data_dir": str(tmp_path), "adapters_dir": str(tmp_path / "adapters")},
+                  "schedule": {"finetune_every_days": 10}, "learning": {"min_new_examples": 2}})  # fmt: skip
+    db = Database(tmp_path / "c.db", dim=8)
+    store, ab = LearningStore(db), ABTests(db)
+    assert not due(cfg, store, "org/M")[0]  # no examples yet
+    for i in range(2):
+        store.add_example(
+            [{"role": "user", "content": f"how do I cook rice {i}"}], "Rinse it…", "lea", "own", "general"
+        )
+    assert due(cfg, store, "org/M") == (True, "due")
+
+    def train_fn(model, build_dir):
+        out = tmp_path / "adapters" / "M" / "v001"
+        out.mkdir(parents=True)
+        (out / "meta.json").write_text(json.dumps({"created": datetime.now().isoformat()}))
+        return out
+
+    def eval_fn(label, adapter):
+        answer = "new answer" if adapter else "old answer"
+        return {
+            "summary": {"style": {"accuracy": 0.5}},
+            "results": [{"id": "s1", "set": "style", "prompt": "hey", "answer": answer}],
+        }
+
+    res = run_cycle(cfg, store, ab, "org/M", None, train_fn, eval_fn)
+    assert res["adapter"] == "v001" and res["comparison"]["regressions"] == [] and res["ab_pairs"] == 1
+    assert not due(cfg, store, "org/M", now=datetime.now(UTC) + timedelta(days=3))[0]  # just trained
