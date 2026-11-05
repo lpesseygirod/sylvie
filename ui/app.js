@@ -315,7 +315,13 @@
         if (ev.text) { p.status.hidden = false; p.status.textContent = ev.text; notifyNative({ type: "status", text: ev.text }); }
         break;
       case "tool": {
-        const label = { web_search: "🔎 Searched the web", open_url: "🌐 Opened a page", calculator: "🧮 Calculated", search_documents: "📄 Searched your documents" }[ev.name] || ev.name;
+        const label = {
+          web_search: "🔎 Searched the web", open_url: "🌐 Opened a page", calculator: "🧮 Calculated",
+          search_documents: "📄 Searched your documents", music: "🎵 Spotify", play_music: "🎵 Spotify",
+          calendar_events: "📅 Checked your calendar", create_event: "📅 Added to calendar", create_reminder: "☑️ Reminder",
+          set_timer: "⏰ Timer", open_app: "🖥 Opened app", open_in_browser: "🌐 Opened in browser",
+          run_shortcut: "⚡️ Shortcut", read_emails: "✉️ Read emails", draft_email: "✉️ Draft", send_email: "✉️ Email",
+        }[ev.name] || ev.name;
         p.tools.appendChild(el("span", "chip", esc(label + (ev.args && ev.args.query ? `: ${ev.args.query}` : ""))));
         if (p.text && !p.text.endsWith("\n")) p.text += "\n\n";
         break;
@@ -327,6 +333,23 @@
         if (ev.kind === "preference") p.notices.appendChild(el("div", "notice", "✓ Saved preference: " + esc(ev.item.preference)));
         if (ev.kind === "forgot") p.notices.appendChild(el("div", "notice", "🗑 Forgot: " + esc(ev.items.map((f) => f.text).join("; "))));
         break;
+      case "action": {
+        if (ev.status === "pending") {
+          const card = el("div", "confirm-card", `<div>⚠️ ${esc(ev.summary)}</div>
+            <div class="row"><button class="btn-ghost" data-v="no">No</button><button class="btn-primary" data-v="yes">Yes, do it</button></div>`);
+          card.onclick = (e) => {
+            const b = e.target.closest("button");
+            if (!b || S.streaming) return;
+            card.querySelectorAll("button").forEach((x) => (x.disabled = true));
+            send(b.dataset.v);
+          };
+          p.notices.appendChild(card);
+        } else {
+          const label = { done: "✓ Done", failed: "✗ Not done", cancelled: "Cancelled", undone: "↩ Undone" }[ev.status] || ev.status;
+          p.notices.appendChild(el("div", "notice", esc(label + (ev.result ? ": " + ev.result : ""))));
+        }
+        break;
+      }
       case "error":
         p.bubble.insertAdjacentHTML("beforeend", `<p class="error">${esc(ev.text)}</p>`);
         break;

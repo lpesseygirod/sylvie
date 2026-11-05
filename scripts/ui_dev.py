@@ -12,8 +12,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import subprocess  # noqa: E402
+
 import uvicorn  # noqa: E402
 
+from actions.log import ActionLog  # noqa: E402
+from actions.osa import FakeOSA  # noqa: E402
+from actions.runner import ActionRunner  # noqa: E402
 from core.config import Config, load_config  # noqa: E402
 from core.db import Database  # noqa: E402
 from core.llm import FakeLLM, GenChunk, GenStats  # noqa: E402
@@ -50,8 +55,16 @@ class SlowFake(FakeLLM):
         last = messages[-1]["content"] if messages else ""
         if "JSON" in last or "Answer with JSON" in last:
             text = '{"facts": [], "interests": [], "style": [], "is_preference": false}'
+        elif messages[-1]["role"] == "tool" and "NOT DONE YET" in last:
+            text = "I'll send this to prof@uni.es: “Can we meet Monday at 10?” Shall I send it?"
         elif messages[-1]["role"] == "tool":
             text = DEMO
+        elif messages[-1]["role"] == "user" and "email" in last.lower():
+            text = (
+                "Sure.\n<tool_call>\n<function=send_email>\n<parameter=to>\nprof@uni.es\n</parameter>\n"
+                "<parameter=subject>\nMeeting\n</parameter>\n<parameter=body>\nCan we meet Monday at 10?\n</parameter>\n"
+                "</function>\n</tool_call>"
+            )
         elif "search" in last.lower():
             text = "Let me look.\n<tool_call>\n<function=web_search>\n<parameter=query>\nNPV formula\n</parameter>\n</function>\n</tool_call>"
         else:
@@ -71,7 +84,16 @@ def main():
     cfg = Config(dict(load_config()))
     cfg["server"] = {**cfg["server"], "port": PORT, "allowed_origins": [f"http://127.0.0.1:{PORT}"]}
     tmp = Path(tempfile.mkdtemp(prefix="sylvie-ui-dev-"))
-    s = Sylvie(cfg, SlowFake(), HashEmbedder(256), Database(tmp / "dev.db", dim=256), idle_seconds=1)
+    db = Database(tmp / "dev.db", dim=256)
+    # Fake AppleScript and commands: the dev server can never control Lea's real apps.
+    runner = ActionRunner(
+        cfg,
+        ActionLog(db),
+        osa=FakeOSA({"outgoing message": "sent"}),
+        run_cmd=lambda a: subprocess.CompletedProcess(a, 0, "", ""),
+        is_locked=lambda: False,
+    )
+    s = Sylvie(cfg, SlowFake(), HashEmbedder(256), db, idle_seconds=1, actions=runner)
     s.memory.add("Lea studies Computer Science and BBA in Madrid", key="lea.studies", category="studies")
     s.interests.bump("Formula 1", 3)
     s.style.observe("mixes_languages", "Mixes Spanish and English in the same message", "vale, let's go")

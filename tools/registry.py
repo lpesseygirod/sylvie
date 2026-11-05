@@ -59,6 +59,9 @@ class ToolContext:
     private_terms: list[str] = field(default_factory=list)
     allowed_urls: set[str] = field(default_factory=set)
     sources: list[dict] = field(default_factory=list)
+    actions: object | None = None  # actions.runner.ActionRunner
+    conversation_id: str | None = None
+    read_untrusted: bool = False  # set once outside content (web, files, email) entered this turn
 
 
 @dataclass
@@ -66,6 +69,7 @@ class ToolResult:
     content: str
     sources: list[dict] = field(default_factory=list)
     ok: bool = True
+    pending: dict | None = None  # an action waiting for Lea's "yes"
 
 
 def available_tools(ctx: ToolContext) -> list[dict]:
@@ -74,6 +78,8 @@ def available_tools(ctx: ToolContext) -> list[dict]:
         tools = [WEB_SEARCH, OPEN_URL] + tools
     if ctx.docs is not None and ctx.docs.stats()["chunks"] > 0:
         tools.append(SEARCH_DOCS)
+    if ctx.actions is not None:
+        tools += ctx.actions.tool_defs()
     return tools
 
 
@@ -106,8 +112,25 @@ def _number_sources(ctx: ToolContext, sources: list[dict]) -> list[dict]:
     return out
 
 
+UNTRUSTED_TOOLS = {"web_search", "open_url", "search_documents", "read_emails", "calendar_events"}
+
+
 def execute(call, ctx: ToolContext) -> ToolResult:
+    result = _execute(call, ctx)
+    if call.name in UNTRUSTED_TOOLS:
+        ctx.read_untrusted = True
+    return result
+
+
+def _execute(call, ctx: ToolContext) -> ToolResult:
     args = call.arguments
+    if ctx.actions is not None and ctx.actions.handles(call.name):
+        out = ctx.actions.call(call.name, args, ctx.conversation_id, after_untrusted=ctx.read_untrusted)
+        pending = None
+        if out.pending_id:
+            rec = ctx.actions.log.get(out.pending_id)
+            pending = {"id": out.pending_id, "name": call.name, "summary": rec.summary if rec else ""}
+        return ToolResult(out.content, ok=out.ok, pending=pending)
     if call.name == "calculator":
         return ToolResult(calculate(args["expression"]))
     if call.name == "web_search":

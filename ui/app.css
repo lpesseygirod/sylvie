@@ -157,3 +157,7 @@ body.panel .panel-bar { display: flex; justify-content: flex-end; gap: 6px; padd
   #sidebar { position: fixed; z-index: 10; height: 100vh; box-shadow: var(--shadow); }
   #app:not(.side-open) #sidebar { display: none; }
 }
+
+.confirm-card { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin: 6px 0; font-size: 14px; }
+.confirm-card .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+.confirm-card button:disabled { opacity: .5; }

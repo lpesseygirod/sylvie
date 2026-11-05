@@ -63,6 +63,12 @@ voice:
   voices: {en: "Samantha", es: "Mónica", fr: "Thomas"}   # default — Lea can change (decision 9)
   wake_greeting: {en: "Hello Lea", es: "Hola Lea", fr: "Bonjour Lea"}
 
+actions:
+  # Allowlist: only these can ever be called. Remove one to switch it off; [] turns all actions off.
+  enabled: [music, play_music, calendar_events, create_event, create_reminder, set_timer,
+            open_app, open_in_browser, run_shortcut, read_emails, draft_email, send_email]
+  mail_from: ""          # empty = Mail's default account (decision 5, default — Lea can change)
+
 privacy:
   log_conversations: true
   delete_audio_after_transcription: true

@@ -11,12 +11,25 @@ from knowledge.embeddings import HashEmbedder
 TOOL_CALL = "One sec.\n<tool_call>\n<function=calculator>\n<parameter=expression>\n0.17*2340\n</parameter>\n</function>\n</tool_call>"
 
 
-def make(tmp_path, replies):
+class FakeProc:
+    def __init__(self, returncode=0, stderr=""):
+        self.returncode, self.stderr, self.stdout = returncode, stderr, ""
+
+
+def make(tmp_path, replies, osa=None, locked=False):
+    """A Sylvie with a scripted model, a throwaway DB and a FAKE AppleScript runner:
+    tests never control Lea's real apps."""
+    from actions.log import ActionLog
+    from actions.osa import FakeOSA
+    from actions.runner import ActionRunner
+
     cfg = Config(dict(load_config()))
     cfg["search"] = {**cfg["search"], "enabled": False}
-    return Sylvie(
-        cfg, FakeLLM(replies), HashEmbedder(256), Database(tmp_path / "s.db", dim=256), idle_seconds=0
+    db = Database(tmp_path / "s.db", dim=256)
+    runner = ActionRunner(
+        cfg, ActionLog(db), osa=osa or FakeOSA(), run_cmd=lambda a: FakeProc(), is_locked=lambda: locked
     )
+    return Sylvie(cfg, FakeLLM(replies), HashEmbedder(256), db, idle_seconds=0, actions=runner)
 
 
 def run(s, text, cid=None, **kw):

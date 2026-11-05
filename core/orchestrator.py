@@ -13,6 +13,9 @@ import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
+from actions.confirm import is_clear_yes, is_undo
+from actions.log import ActionLog
+from actions.runner import ActionRunner
 from core.config import Config, load_config
 from core.context import history_messages, maybe_summarize, system_with_summary
 from core.conversations import Conversations
@@ -106,7 +109,7 @@ class BackgroundWorker:
 
 
 class Sylvie:
-    def __init__(self, cfg: Config, llm, embedder, db: Database, idle_seconds: float = 8.0):
+    def __init__(self, cfg: Config, llm, embedder, db: Database, idle_seconds: float = 8.0, actions=None):
         self.cfg = cfg
         self.llm = llm
         self.embedder = embedder
@@ -117,6 +120,7 @@ class Sylvie:
         self.style = StyleStore(db)
         self.interests = InterestStore(db, embedder)
         self.docs = DocsIndex(db, embedder)
+        self.actions = actions if actions is not None else ActionRunner(cfg, ActionLog(db))
         self.bg = BackgroundWorker(idle_seconds=idle_seconds)
         self._stops: dict[str, threading.Event] = {}
         self._stt = None
@@ -143,12 +147,14 @@ class Sylvie:
             preferences_text=self.prefs.as_prompt(),
         )
 
-    def tool_context(self, user_text: str = "") -> ToolContext:
+    def tool_context(self, user_text: str = "", conversation_id: str | None = None) -> ToolContext:
         return ToolContext(
             cfg=self.cfg,
             docs=self.docs,
             user_text=user_text,
             private_terms=[self.cfg.get_path("user.name", "Lea")],
+            actions=self.actions if self.cfg.get_path("actions.enabled") != [] else None,
+            conversation_id=conversation_id,
         )
 
     def speech_to_text(self):
@@ -230,6 +236,43 @@ class Sylvie:
                         "Lea asked you to forget something, but you had nothing saved matching it. Say so briefly."
                     )
 
+            # 1b. An action waiting for Lea's "yes" (decided by code, never by the model), or "undo that"
+            pending = self.actions.log.pending(cid)
+            if pending is not None:
+                if is_clear_yes(text):
+                    out = self.actions.confirm(pending.id, channel=channel)
+                    notes.append(
+                        f"Lea said yes to: {pending.summary}. Result: {out.content} Tell her in a few words."
+                    )
+                    yield {
+                        "type": "action",
+                        "status": "done" if out.ok else "failed",
+                        "id": pending.id,
+                        "result": out.content,
+                    }
+                else:
+                    self.actions.cancel(pending.id)
+                    notes.append(
+                        f"Lea did not confirm this, so it was cancelled and NOT done: {pending.summary}. "
+                        "Mention that in a few words, then answer her message."
+                    )
+                    yield {"type": "action", "status": "cancelled", "id": pending.id}
+            elif is_undo(text):
+                last = next(
+                    (
+                        a
+                        for a in self.actions.log.recent(20)
+                        if a.conversation_id == cid and a.status == "done" and a.undo
+                    ),
+                    None,
+                )
+                if last is not None:
+                    out = self.actions.undo(last.id)
+                    notes.append(
+                        f"Lea asked to undo the last action ({last.name}). Result: {out.content} Confirm briefly."
+                    )
+                    yield {"type": "action", "status": "undone" if out.ok else "failed", "id": last.id}
+
             # 2. "No Sylvie, I prefer…" → saved and applied right now
             system_prompt = conv.get("system_prompt")
             with trace.stage("preference"):
@@ -285,7 +328,7 @@ class Sylvie:
                 {"role": "system", "content": system_with_summary(system_prompt, conv.get("summary"))}
             ]
             messages += history_messages(rows)
-            tctx = self.tool_context(text)
+            tctx = self.tool_context(text, cid)
             tools = available_tools(tctx)
             display_parts: list[str] = []
             invalid_calls = 0
@@ -366,6 +409,8 @@ class Sylvie:
                     else:
                         content = result.content
                         yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
+                        if result.pending:
+                            yield {"type": "action", "status": "pending", **result.pending}
                         if result.sources:
                             yield {"type": "sources", "sources": tctx.sources}
                     messages.append({"role": "tool", "content": content})

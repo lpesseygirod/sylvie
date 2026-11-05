@@ -324,6 +324,15 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
         S().prefs.update(pid, text=body.get("text"), active=body.get("active"))
         return {"ok": True}
 
+    @app.get("/api/actions")
+    def actions_log(limit: int = 100):
+        return [a.to_dict() for a in S().actions.log.recent(limit)]
+
+    @app.post("/api/actions/{aid}/undo")
+    def action_undo(aid: int):
+        out = S().actions.undo(aid)
+        return {"ok": out.ok, "result": out.content}
+
     @app.get("/api/knowledge")
     def knowledge():
         s = S()
