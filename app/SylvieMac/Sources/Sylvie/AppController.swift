@@ -76,6 +76,7 @@ final class AppController: ObservableObject {
         }
         let api = APIClient(token: token, port: port)
         self.api = api
+        speaker.api = api
         guard await api.isReady() else {
             state = .offline
             detail = "Start it with `make run` (or install the background service)."

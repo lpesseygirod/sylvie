@@ -12,6 +12,16 @@ final class SylvieCoreTests: XCTestCase {
         XCTAssertNil(p.feed(line: ": comment"))
     }
 
+    func testWAVRoundTrip() {
+        let wav = WAV.encode(samples: [0, 0.5, -0.5, 1.5], sampleRate: 24000)
+        let decoded = WAV.decode(wav)
+        XCTAssertEqual(decoded?.sampleRate, 24000)
+        XCTAssertEqual(decoded?.samples.count, 4)
+        XCTAssertEqual(decoded?.samples[1] ?? 0, 0.5, accuracy: 0.001)
+        XCTAssertEqual(decoded?.samples[3] ?? 0, 1.0, accuracy: 0.001)
+        XCTAssertNil(WAV.decode(Data("not a wav".utf8)))
+    }
+
     func testWAVHeader() {
         let wav = WAV.encode(samples: [0, 0.5, -0.5, 1.5])
         XCTAssertEqual(wav.count, 44 + 8)

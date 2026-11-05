@@ -37,6 +37,7 @@ open:
 download:
 	HF_HUB_OFFLINE=0 $(UV) hf download mlx-community/Qwen3.8-27B-4bit
 	HF_HUB_OFFLINE=0 $(UV) hf download mlx-community/Qwen3-Embedding-0.6B-8bit
+	HF_HUB_OFFLINE=0 $(UV) hf download mlx-community/Kokoro-82M-bf16 --include "config.json" "kokoro-v1_0.safetensors" "README.md" "voices/*.safetensors"
 
 SEARX := $(HOME)/Library/Application Support/Sylvie/services
 

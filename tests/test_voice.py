@@ -90,3 +90,61 @@ def test_voice_turn_with_silence(tmp_path):
     s._stt = Silent()
     ev = list(voice_turn(s, b""))
     assert [e["type"] for e in ev] == ["transcript", "done"] and not s.llm.calls
+
+
+# ---------- Kokoro (voice/g2p.py, voice/tts.py) ----------
+def test_english_phonemes_map_to_kokoro_set():
+    from voice.g2p import map_english, map_other
+
+    assert map_english("hˈe^ɪ ðɚ") == "hˈA ðəɹ"  # diphthong letters, r-colored schwa
+    assert map_english("bˈʌɾɚ") == "bˈʌTəɹ"  # American flap
+    assert map_other("t^ʃˈe-ɾo") == "ʧˈeɾo"
+
+
+def test_long_phoneme_strings_are_cut_at_pauses():
+    from voice.tts import chunk_phonemes
+
+    ps = ("abc def, " * 80).strip()
+    parts = chunk_phonemes(ps, limit=100)
+    assert all(len(p) <= 100 for p in parts)
+    assert all(p.endswith(",") for p in parts[:-1])
+    assert "".join(parts).replace(" ", "") == ps.replace(" ", "")
+
+
+def test_wav_output_is_16_bit_mono():
+    from voice.tts import to_wav
+
+    data = to_wav(np.array([0.0, 0.5, -2.0], dtype=np.float32), 24000)
+    with wave.open(io.BytesIO(data)) as w:
+        assert (w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()) == (1, 2, 24000, 3)
+
+
+class FakeTTS:
+    def __init__(self):
+        self.calls = []
+
+    def synthesize(self, text, language="en"):
+        from voice.tts import Speech, to_wav
+
+        self.calls.append((text, language))
+        return Speech(to_wav(np.zeros(10, dtype=np.float32), 24000), 0.0, 1.0)
+
+
+def test_speak_endpoint(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from core.server import create_app
+    from tests.test_orchestrator import make
+    from tests.test_server import AUTH, BASE, TOKEN
+
+    s = make(tmp_path, [])
+    s.cfg["voice"]["tts"] = "kokoro"
+    s._tts = FakeTTS()
+    with TestClient(create_app(sylvie=s, token=TOKEN, warm=False), base_url=BASE) as c:
+        assert c.post("/api/voice/speak", json={"text": "Hola", "language": "es"}).status_code == 401
+        r = c.post("/api/voice/speak", json={"text": "Hola Lea.", "language": "es"}, headers=AUTH)
+        assert r.status_code == 200 and r.headers["content-type"] == "audio/wav" and r.content[:4] == b"RIFF"
+        assert s._tts.calls == [("Hola Lea.", "es")]
+        assert c.post("/api/voice/speak", json={"text": ""}, headers=AUTH).status_code == 400
+        s.cfg["voice"]["tts"] = "system"  # Lea switched back: the app uses its own voice
+        assert c.post("/api/voice/speak", json={"text": "Hi"}, headers=AUTH).status_code == 404

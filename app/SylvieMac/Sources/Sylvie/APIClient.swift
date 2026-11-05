@@ -63,6 +63,17 @@ final class APIClient {
         }
     }
 
+    /// One sentence as WAV from Sylvie's Kokoro voice, or nil (system voice selected, or any error).
+    func speak(_ text: String, language: String) async -> Data? {
+        var req = request("/api/voice/speak", method: "POST")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 15
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["text": text, "language": language])
+        guard let (data, resp) = try? await session.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return data
+    }
+
     func stop(conversationId: String) {
         let req = request("/api/chat/\(conversationId)/stop", method: "POST")
         session.dataTask(with: req).resume()

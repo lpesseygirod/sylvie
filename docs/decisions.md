@@ -49,7 +49,7 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 | 6 | Spotify | Start with app control (AppleScript); Web API later only if Lea wants search/Connect | default — Lea can change |
 | 7 | Overnight judge | **Gemma 4 31B-it 4-bit MLX** (different family, Apache 2.0, checked 2026-11-05), loaded only at night | default — Lea can change |
 | 8 | iPhone tunnel | Tailscale (easier; coordination server sees metadata only, not content). WireGuard documented as the fully self-run alternative. | default — Lea can change |
-| 9 | Voice per language | Kokoro defaults: EN `af_heart`, ES `ef_dora`, FR `ff_siwis` | default — Lea can change |
+| 9 | Voice per language | Kokoro: EN `af_heart`, ES `ef_dora`, FR `ff_siwis` (`config.yaml → voice.kokoro_voices`) | default — Lea can change |
 | 10 | Proactivity | Only when the topic comes up; max 1 aside per conversation | default — Lea can change |
 | 11 | Offline mini Sylvie on iPhone | No (for now) | default — Lea can change |
 | 12 | Room listener | "Hey Siri, Sylvie" only for now | default — Lea can change |
@@ -63,7 +63,7 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **What:** each conversation stores the system prompt it started with; new facts learned mid-conversation are already in the history. It's rebuilt only when Lea states a new preference (so it applies immediately).
 - **Why:** the prompt cache only works if the beginning of the prompt doesn't change. Rebuilding it after every new fact would make every turn re-read the whole conversation (seconds instead of ~0.3 s).
 
-### T11 — Speech output: macOS/iOS system voices for now (Kokoro blocked by GPL dependencies)
+### T11 — Speech output: macOS/iOS system voices for now (Kokoro blocked by GPL dependencies) — superseded by T27 on the Mac
 - **What:** Sylvie speaks with the system voices (AVSpeechSynthesizer) on the device that plays the audio. Defaults: Samantha (EN), Mónica (ES), Thomas (FR) — decision 9, Lea can change in `config.yaml`. For nicer voices, Lea can download "Premium"/"Enhanced" voices in System Settings → Accessibility → Spoken Content.
 - **Why:** Kokoro's Spanish and French pronunciation needs **espeak-ng (GPL-3.0)**, and its English path pulls a GPL phonemizer and **num2words (LGPL)**. The plan forbids adding GPL components without Lea. System voices are free, local, instant, and cover all three languages.
 - **Alternatives:** Kokoro with espeak-ng (better voices; needs Lea's OK on GPL — private local use is allowed by the GPL, but it's her call). Listed in LEA-TODO.
@@ -125,3 +125,10 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 
 ### T26 — Training questions come from open datasets, never from Claude's templates
 - The eval sets use my templates (evaluation only, never trained on — the dataset builder blocks overlaps). For *training*, checkable questions come from **GSM8K (MIT)** and chat from **oasst2 (Apache 2.0)**; all answers come from Sylvie's own model and are verified by code where possible.
+
+### T27 — Kokoro voices on the Mac (Lea approved the GPL parts, 2026-11-06)
+- **What:** Sylvie's spoken answers come from Kokoro-82M on MLX (`voice/tts.py`), one sentence at a time. The Mac app asks `POST /api/voice/speak` for each sentence as it arrives (so the next one is ready while the current one plays) and plays it through the echo-cancelling pipeline. If that fails, or `voice.tts: system`, the app speaks with the macOS voice as before. The iPhone Shortcut still uses Siri's voice.
+- **Pronunciation:** espeak-ng for all three languages (`voice/g2p.py`, mappings adapted from misaki, Apache 2.0). Not misaki's own English pipeline: its package excludes Python 3.13 and needs spaCy + PyTorch, which is a lot to add for slightly better English.
+- **Names:** espeak reads "Lea" as "Lee". Default respellings: EN "Lea" → "Leia" (LAY-a), FR → "Léa", ES "Sylvie" → "Silvi" (`voice.respell`) — guesses, Lea can change them.
+- **Measured:** load 0.3 s; first sentence per language compiles (~4 s at startup, done in warm-up). Then 60–500 ms per sentence (4–5 s of audio), so about 10× faster than real time. Running at the same time as the 27B writing an answer: no slowdown of the 27B (200 tokens in 9.6 s vs 10.1 s alone), Kokoro ~0.5 s per sentence. Whisper transcribed the EN/ES/FR test sentences back correctly.
+- **Licenses:** Kokoro Apache 2.0, mlx-audio MIT; phonemizer-fork and espeak-ng GPL-3.0 (approved by Lea; private use). See `docs/LICENSES.md`.

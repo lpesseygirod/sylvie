@@ -59,8 +59,15 @@ knowledge:
 voice:
   enabled: true
   stt_model: mlx-community/whisper-large-v3-turbo
-  # Speech output uses macOS/iOS system voices on the device (see docs/decisions.md, T11).
-  voices: {en: "Samantha", es: "Mónica", fr: "Thomas"}   # default — Lea can change (decision 9)
+  # Speech output: "kokoro" (Kokoro-82M on this Mac, decision T27) or "system" (macOS/iOS voices, T11).
+  # The Mac app falls back to the system voice if Kokoro isn't available. The iPhone Shortcut uses Siri's voice.
+  tts: kokoro
+  tts_model: mlx-community/Kokoro-82M-bf16
+  kokoro_voices: {en: af_heart, es: ef_dora, fr: ff_siwis}   # default — Lea can change (decision 9)
+  speed: 1.0
+  # How names should sound (espeak reads "Lea" as "Lee"). Default — Lea can change.
+  respell: {en: {Lea: Leia}, es: {Sylvie: Silvi}, fr: {Lea: Léa}}
+  voices: {en: "Samantha", es: "Mónica", fr: "Thomas"}   # system voices (fallback and iPhone)
   wake_greeting: {en: "Hello Lea", es: "Hola Lea", fr: "Bonjour Lea"}
 
 actions:

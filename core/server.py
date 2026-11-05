@@ -17,7 +17,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Body, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 
 from core.auth import get_or_create_token, tokens_equal
@@ -243,6 +250,19 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
                 gen.close()
 
         return StreamingResponse(sse(), media_type="text/event-stream", headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/voice/speak")
+    def speak(body: dict = Body(...)):
+        """Body: {text, language}. One sentence as WAV, spoken by Kokoro. 404 when speech is set to
+        the system voice (or Kokoro failed to load) — the client then speaks with its own voice."""
+        tts = S().text_to_speech()
+        if tts is None:
+            raise HTTPException(404, "system voice")
+        text = str(body.get("text", "")).strip()
+        if not text or len(text) > 1000:
+            raise HTTPException(400, "text must be 1–1000 characters")
+        sp = tts.synthesize(text, str(body.get("language", "en")))
+        return Response(sp.wav, media_type="audio/wav", headers={"Cache-Control": "no-store"})
 
     @app.post("/api/chat/{cid}/stop")
     def stop(cid: str):

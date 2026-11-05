@@ -133,6 +133,7 @@ class Sylvie:
         self.scheduler = None  # set by the server (learning/scheduler.py)
         self._stops: dict[str, threading.Event] = {}
         self._stt = None
+        self._tts = None
 
     @classmethod
     def build(cls, cfg: Config | None = None) -> Sylvie:
@@ -175,6 +176,22 @@ class Sylvie:
             )
         return self._stt
 
+    def text_to_speech(self):
+        """Kokoro on this Mac, or None when speech is spoken by the device's system voice."""
+        if self.cfg.get_path("voice.tts", "system") != "kokoro":
+            return None
+        if self._tts is None:
+            from voice.tts import TextToSpeech
+
+            v = self.cfg.get_path("voice", {}) or {}
+            self._tts = TextToSpeech(
+                v.get("tts_model", "mlx-community/Kokoro-82M-bf16"),
+                voices=v.get("kokoro_voices"),
+                speed=v.get("speed", 1.0),
+                respell=v.get("respell"),
+            )
+        return self._tts
+
     def warm(self) -> None:
         """Load models and pre-read the system prompt so the first answer is fast.
         Whisper warms up first: measured, warming it after the LLM made the first question ~1.3 s slower."""
@@ -185,6 +202,15 @@ class Sylvie:
             stt.load()
             # One throwaway transcription compiles Whisper's GPU kernels (first run is ~4 s).
             stt.transcribe(np.sin(np.linspace(0, 2000, 16000)).astype(np.float32) * 0.1, language="en")
+            tts = self.text_to_speech()
+            if tts:
+                try:
+                    tts.load()
+                    tts.warm()  # first sentence per language compiles kernels (~4 s in total)
+                except Exception as e:  # missing model/espeak: the app falls back to the system voice
+                    log.warning("Kokoro unavailable, using system voices: %s", e)
+                    self._tts = None
+                    self.cfg["voice"]["tts"] = "system"
         self.llm.load()
         self.embedder.embed_one("warm up")
         self.llm.warm(self.current_system_prompt(), available_tools(self.tool_context()))

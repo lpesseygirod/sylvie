@@ -10,7 +10,7 @@ Every model, dataset and dependency with its license. Checked against Hugging Fa
 | mlx-community/Qwen3-Embedding-0.6B-8bit | embeddings | Apache 2.0 | 2026-11-05 |
 | mlx-community/Qwen3.5-9B-4bit | learning sandbox (Phase 4) | Apache 2.0 (Qwen) — re-check before download | planned |
 | mlx-community/gemma-4-31b-it-4bit (base: google/gemma-4-31B-it) | overnight judge (Phase 5) | Apache 2.0 | 2026-11-05 |
-| mlx-community/Kokoro-82M-bf16 | voice (Phase 2) | Apache 2.0 | 2026-11-05 |
+| mlx-community/Kokoro-82M-bf16 | voice (Sylvie's spoken answers, T27) | Apache 2.0 | 2026-11-06 (in use) |
 | mlx-community/whisper-large-v3-turbo | speech to text (Phase 2) | MIT (OpenAI Whisper); HF card has no license field — confirm before Phase 2 | 2026-11-05 |
 
 ## Datasets
@@ -37,6 +37,12 @@ Not named in the plan (the plan asks for "open datasets whose license allows it"
 | python-multipart | Apache 2.0 | no — file uploads |
 | httpx | BSD-3 | no — HTTP client |
 | pytest, ruff (dev) | MIT | no — tests and lint |
+| mlx-audio | MIT | yes (Kokoro on MLX) |
+| phonemizer-fork | **GPL-3.0 — approved by Lea 2026-11-06** | no — text → phonemes for Kokoro |
+| espeakng-loader (bundles the espeak-ng library and data) | loader MIT-style (no PyPI license field); **espeak-ng GPL-3.0 — approved by Lea 2026-11-06** | no — pronunciation for EN/ES/FR |
+| `voice/g2p.py` phoneme mappings, adapted from misaki (hexgrad/misaki) | Apache 2.0 (credited in the file) | yes (Kokoro's own G2P) |
+
+New transitive packages from mlx-audio/phonemizer (attrs, babel, cloudpickle, csvw, dlinfo, isodate, joblib, jsonschema, language-tags, miniaudio, pyparsing, python-dateutil, rdflib, referencing, rfc3986, rpds-py, segments, sounddevice, termcolor, tzdata, uritemplate): all MIT, BSD or Apache 2.0 (checked 2026-11-06).
 
 ## Services (separate programs, not linked into Sylvie)
 
@@ -44,4 +50,4 @@ Not named in the plan (the plan asks for "open datasets whose license allows it"
 |---|---|---|---|
 | SearXNG (github.com/searxng/searxng) | local web search | **AGPL-3.0 — flagged** | Named in the plan. Runs as its own process; Sylvie only calls its HTTP API on 127.0.0.1. AGPL obligations apply when you offer a *modified* SearXNG to others over a network — not to private local use. Lea installs it herself (`scripts/install_searxng.sh`). |
 
-Nothing else GPL, non-commercial or unclear so far.
+GPL in Sylvie: only phonemizer-fork and espeak-ng, approved by Lea on 2026-11-06 for private use on her Mac (T27). If Sylvie is ever shared or distributed, these need another look. Nothing non-commercial or unclear.
