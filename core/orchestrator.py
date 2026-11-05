@@ -32,6 +32,7 @@ from lea_profile.notice import confirm_question, notice
 from lea_profile.preferences import PreferenceStore, detect_preference
 from lea_profile.style import StyleStore
 from lea_profile.summary import profile_text
+from learning.ab import ABTests
 from learning.store import LearningStore
 from learning.teacher import Teacher, is_wrong_feedback
 from memory.extract import REMEMBER_RE, run_extraction
@@ -126,6 +127,7 @@ class Sylvie:
         self.actions = actions if actions is not None else ActionRunner(cfg, ActionLog(db))
         self.learning = LearningStore(db)
         self.devices = Devices(db)
+        self.ab = ABTests(db)
         self.teacher = Teacher(self, self.learning)
         self.bg = BackgroundWorker(idle_seconds=idle_seconds)
         self._stops: dict[str, threading.Event] = {}

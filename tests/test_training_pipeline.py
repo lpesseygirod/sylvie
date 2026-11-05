@@ -97,3 +97,25 @@ def test_gate():
 def test_parse_losses():
     log = "Iter 10: Train loss 2.31, ...\nIter 20: Val loss 2.10, ...\nIter 20: Train loss 1.80, Peak mem 9.5 GB"
     assert parse_losses(log) == {"train_first": [2.31], "train_last": [1.8], "val": [2.1], "peak_mem_gb": 9.5}
+
+
+def test_blind_ab_hides_labels_and_counts_wins(tmp_path):
+    from core.db import Database
+    from learning.ab import ABTests
+
+    ab = ABTests(Database(tmp_path / "ab.db", dim=8))
+    old = {
+        "results": [
+            {"id": f"s{i}", "set": "style", "prompt": f"q{i}", "answer": f"old {i}"} for i in range(6)
+        ]
+    }
+    new = {
+        "results": [
+            {"id": f"s{i}", "set": "style", "prompt": f"q{i}", "answer": f"new {i}"} for i in range(6)
+        ]
+    }
+    assert ab.create_round(old, new, "r1", seed=1) == 6
+    while (p := ab.next_pair()) is not None:
+        assert "left_is" not in p  # the UI never learns which is which
+        ab.choose(p["id"], "left" if p["left"].startswith("new") else "right")  # Lea always prefers "new"
+    assert ab.summary() == {"pending": 0, "decided": 6, "new_wins": 6, "old_wins": 0, "ties": 0}

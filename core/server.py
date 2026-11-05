@@ -446,6 +446,26 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
             request, conversation_id=_phone_conversation(S(), conversation_id), channel="phone"
         )
 
+    # ---------- blind A/B ----------
+    @app.get("/ab")
+    def ab_page(request: Request):
+        if not tokens_equal(request.cookies.get(COOKIE), token):
+            return HTMLResponse(LOCKED_PAGE, status_code=401)
+        return FileResponse(UI_DIR / "ab.html")
+
+    @app.get("/api/ab/next")
+    def ab_next():
+        s = S()
+        return {"pair": s.ab.next_pair(), "summary": s.ab.summary()}
+
+    @app.post("/api/ab/{pid}")
+    def ab_choose(pid: int, body: dict = Body(...)):
+        try:
+            S().ab.choose(pid, str(body.get("choice")))
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        return {"ok": True}
+
     @app.get("/api/knowledge")
     def knowledge():
         s = S()
