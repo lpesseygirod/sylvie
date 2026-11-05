@@ -81,6 +81,11 @@ class LearningStore:
     def __init__(self, db: Database):
         self.db = db
         self.db.conn.executescript(SCHEMA)
+        cols = {r["name"] for r in self.db.query("PRAGMA table_info(training_examples)")}
+        if "status" not in cols:
+            # ready = may be trained on; staged = overnight output waiting for Lea's morning spot-check
+            self.db.execute("ALTER TABLE training_examples ADD COLUMN status TEXT NOT NULL DEFAULT 'ready'")
+            self.db.execute("ALTER TABLE training_examples ADD COLUMN batch TEXT")
 
     # ---------- corrections ----------
     def _row(self, r) -> Correction:
@@ -137,14 +142,16 @@ class LearningStore:
         rejected: str | None = None,
         weight: float = 1.0,
         correction_id: int | None = None,
+        status: str = "ready",
+        batch: str | None = None,
     ) -> int:
         if not source.startswith(ALLOWED_SOURCE_PREFIXES):
             raise DisallowedSource(f"source '{source}' is not allowed in training data (plan rule 4)")
         if tag not in ("personal", "general"):
             raise ValueError("tag must be personal or general")
         return self.db.execute(
-            "INSERT INTO training_examples(kind, messages, chosen, rejected, tag, source, license, weight, correction_id, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO training_examples(kind, messages, chosen, rejected, tag, source, license, weight, correction_id, created_at, status, batch) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 "preference" if rejected else "sft",
                 json.dumps(messages, ensure_ascii=False),
@@ -156,17 +163,43 @@ class LearningStore:
                 weight,
                 correction_id,
                 utcnow(),
+                status,
+                batch,
             ),
         ).lastrowid
 
-    def examples(self, tag: str | None = None) -> list[dict]:
-        sql, params = "SELECT * FROM training_examples", ()
+    def examples(self, tag: str | None = None, status: str | None = "ready") -> list[dict]:
+        sql, where, params = "SELECT * FROM training_examples", [], []
         if tag:
-            sql, params = sql + " WHERE tag = ?", (tag,)
+            where.append("tag = ?")
+            params.append(tag)
+        if status:
+            where.append("status = ?")
+            params.append(status)
+        if where:
+            sql += " WHERE " + " AND ".join(where)
         return [
             {**dict(r), "messages": json.loads(r["messages"])}
             for r in self.db.query(sql + " ORDER BY id", params)
         ]
+
+    def staged_batches(self) -> list[dict]:
+        rows = self.db.query(
+            "SELECT batch, count(*) n, min(created_at) created FROM training_examples "
+            "WHERE status = 'staged' GROUP BY batch ORDER BY created"
+        )
+        return [dict(r) for r in rows]
+
+    def set_batch_status(self, batch: str, status: str, exclude_ids: list[int] | None = None) -> None:
+        """Lea's morning decision: approve a batch (→ ready) except the examples she rejected."""
+        assert status in ("ready", "rejected")
+        for i in exclude_ids or []:
+            self.db.execute(
+                "UPDATE training_examples SET status = 'rejected' WHERE id = ? AND batch = ?", (i, batch)
+            )
+        self.db.execute(
+            "UPDATE training_examples SET status = ? WHERE batch = ? AND status = 'staged'", (status, batch)
+        )
 
     def stats(self) -> dict:
         rows = self.db.query("SELECT tag, source, count(*) n FROM training_examples GROUP BY tag, source")
