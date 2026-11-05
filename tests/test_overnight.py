@@ -84,3 +84,19 @@ def test_rubric_rotation_changes_order():
     random.Random(1).shuffle(a)
     random.Random(2).shuffle(b)
     assert a != b
+
+
+def test_identity_batch_is_local_and_staged(tmp_path):
+    from learning.identity import generate
+
+    db = Database(tmp_path / "i.db", dim=8)
+    store = LearningStore(db)
+    llm = FakeLLM(
+        ['["hola Sylvie", "who are you?"]', "¡Hola Lea!", "I'm Sylvie, your assistant on your Mac."]
+    )
+    batch, n = generate(llm, store, "You are Sylvie.", n=2, model_name="Qwen")
+    assert n == 2 and batch.startswith("identity-")
+    ex = store.examples(status="staged")
+    assert [e["messages"][0]["role"] for e in ex] == ["user", "user"]  # no system prompt stored
+    assert all(e["source"] == "sylvie-local:Qwen" for e in ex)
+    assert "system" in [m["role"] for m in llm.calls[1]["messages"]]  # but the persona guided the answer
