@@ -274,6 +274,17 @@ class Sylvie:
                         messages, tools=use_tools, thinking=r.thinking, effort=r.effort, stop=stop
                     ):
                         if chunk.done:
+                            if chunk.stats:
+                                trace.llm_rounds.append(
+                                    {
+                                        "prompt": chunk.stats.prompt_tokens,
+                                        "cached": chunk.stats.cached_tokens,
+                                        "prefill_ms": round(chunk.stats.prefill_s * 1000),
+                                        "ttft_ms": round(chunk.stats.time_to_first_token * 1000),
+                                        "generated": chunk.stats.generation_tokens,
+                                        "tok_s": round(chunk.stats.generation_tps, 1),
+                                    }
+                                )
                             break
                         for kind, s in sp.feed(chunk.text):
                             if kind == "text":
@@ -366,6 +377,7 @@ class Sylvie:
     def _learn(self, message: str, reply: str, source: str, stop: threading.Event) -> None:
         if len(message.strip()) < 4:
             return
+        before = self.current_system_prompt()
         existing = recall(self.db, self.embedder, message, k=8)
         ex = run_extraction(_Stoppable(self.llm, stop), message, reply, existing)
         if stop.is_set():
@@ -384,6 +396,10 @@ class Sylvie:
             self.convs.log_event(
                 "learned", {"source": source, "facts": ex.facts, "interests": ex.interests, "style": ex.style}
             )
+        after = self.current_system_prompt()
+        if after != before and not stop.is_set():
+            # The next new conversation will start with this prompt: read it into the cache now.
+            self.llm.warm(after, available_tools(self.tool_context()))
 
 
 class _Stoppable:

@@ -33,4 +33,10 @@ None yet.
 | httpx | BSD-3 | no — HTTP client |
 | pytest, ruff (dev) | MIT | no — tests and lint |
 
-Nothing GPL, non-commercial or unclear so far.
+## Services (separate programs, not linked into Sylvie)
+
+| Service | Use | License | Note |
+|---|---|---|---|
+| SearXNG (github.com/searxng/searxng) | local web search | **AGPL-3.0 — flagged** | Named in the plan. Runs as its own process; Sylvie only calls its HTTP API on 127.0.0.1. AGPL obligations apply when you offer a *modified* SearXNG to others over a network — not to private local use. Lea installs it herself (`scripts/install_searxng.sh`). |
+
+Nothing else GPL, non-commercial or unclear so far.

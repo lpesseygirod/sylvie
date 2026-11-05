@@ -22,6 +22,7 @@ from core.config import Config, load_config
 class GenStats:
     prompt_tokens: int = 0
     cached_tokens: int = 0
+    prefill_s: float = 0.0
     generation_tokens: int = 0
     prompt_tps: float = 0.0
     generation_tps: float = 0.0
@@ -158,6 +159,7 @@ class LLM:
             t0 = time.perf_counter()
             tokens = self.tokenizer.encode(prompt, add_special_tokens=False)
             cache, rest, reused = self._cached_prefill(tokens, use_cache=use_cache)
+            stats.prefill_s = time.perf_counter() - t0
             last = None
             for resp in stream_generate(
                 self.model, self.tokenizer, rest, max_tokens=max_tokens, sampler=sampler, prompt_cache=cache
@@ -235,6 +237,11 @@ class LLM:
             tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
             # _cached_prefill snapshots everything but the last token, so add a throwaway one.
             self._cached_prefill(tokens + [tokens[-1]])
+            # One tiny throwaway generation compiles the GPU kernels (the first run is ~2x slower).
+            from mlx_lm import stream_generate
+
+            for _ in stream_generate(self.model, self.tokenizer, tokens[-8:], max_tokens=4):
+                pass
 
         self._executor.submit(_job).result()
 

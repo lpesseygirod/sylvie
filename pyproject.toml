@@ -40,3 +40,6 @@ dev = [
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Body", "fastapi.File"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/profile_turn.py" = ["B023"]  # lambdas are called immediately inside the loop

@@ -87,3 +87,28 @@ def test_chunking():
     text = ("Sentence number one. " * 200).strip()
     chunks = chunk_text(text, size=500, overlap=100)
     assert all(len(c) <= 500 for c in chunks) and len(chunks) > 5
+
+
+def test_docs_index_and_search_documents_tool(tmp_path):
+    from core.db import Database
+    from knowledge.docs_index import DocsIndex
+    from knowledge.embeddings import HashEmbedder
+
+    folder = tmp_path / "course"
+    folder.mkdir()
+    (folder / "finance.md").write_text(
+        "# Corporate finance\n\nThe WACC is the weighted average cost of capital."
+    )
+    (folder / "biology.txt").write_text("Mitochondria are the powerhouse of the cell.")
+    (folder / "image.png").write_bytes(b"\x89PNG")
+    db = Database(tmp_path / "d.db", dim=256)
+    idx = DocsIndex(db, HashEmbedder(256))
+    assert idx.index_folders([str(folder)]) == {"files": 2, "chunks": 2, "errors": 0}
+    assert idx.index_folders([str(folder)])["chunks"] == 0  # unchanged files are skipped
+    ctx = ToolContext(cfg=CFG, docs=idx)
+    r = execute(ToolCall("search_documents", {"query": "what is the WACC"}), ctx)
+    assert "finance.md" in r.content and "<untrusted>" in r.content and r.sources[0]["n"] == 1
+    (folder / "biology.txt").unlink()
+    idx.index_folders([str(folder)])
+    assert idx.stats() == {"documents": 1, "chunks": 1}
+    assert (folder / "finance.md").exists()  # the index never touches Lea's files

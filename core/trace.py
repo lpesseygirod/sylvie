@@ -11,6 +11,7 @@ class Trace:
         self.start = time.perf_counter()
         self.stages: dict[str, float] = {}
         self.marks: dict[str, float] = {}
+        self.llm_rounds: list[dict] = []  # token stats per model call (prompt, cached, generated)
 
     @contextmanager
     def stage(self, name: str):
@@ -32,4 +33,5 @@ class Trace:
             "stages_ms": {k: round(v * 1000, 1) for k, v in self.stages.items()},
             "marks_ms": {k: round(v * 1000, 1) for k, v in self.marks.items()},
             "total_ms": round(self.total() * 1000, 1),
+            "llm": self.llm_rounds,
         }
