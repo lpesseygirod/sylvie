@@ -54,3 +54,11 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 | 11 | Offline mini Sylvie on iPhone | No (for now) | default — Lea can change |
 | 12 | Room listener | "Hey Siri, Sylvie" only for now | default — Lea can change |
 | 13 | Keep Mac awake lid closed | Lea's choice; instructions in LEA-TODO (pmset or Amphetamine) | waiting for Lea |
+
+### T9 — `profile/` is named `lea_profile/`
+- **What:** the plan's `profile/` package (the Lea model) lives in `lea_profile/`.
+- **Why:** a top-level package called `profile` shadows Python's standard-library `profile` module (used by `cProfile`), which breaks profiling tools in confusing ways.
+
+### T10 — The system prompt is frozen per conversation
+- **What:** each conversation stores the system prompt it started with; new facts learned mid-conversation are already in the history. It's rebuilt only when Lea states a new preference (so it applies immediately).
+- **Why:** the prompt cache only works if the beginning of the prompt doesn't change. Rebuilding it after every new fact would make every turn re-read the whole conversation (seconds instead of ~0.3 s).

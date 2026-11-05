@@ -98,7 +98,7 @@ class LLM:
         return len(self.tokenizer.encode(text, add_special_tokens=False))
 
     # ---------- generation ----------
-    def _cached_prefill(self, tokens: list[int]):
+    def _cached_prefill(self, tokens: list[int], use_cache: bool = True):
         """Reuse the longest cached prefix of `tokens`, process the rest except the last token,
         and snapshot the cache. Returns (cache, remaining_tokens, reused_count).
 
@@ -113,7 +113,9 @@ class LLM:
 
         if self._prompt_cache is None:
             self._prompt_cache = LRUPromptCache(max_size=self.cfg.get_path("llm.prompt_cache_entries", 6))
-        cache, rest = self._prompt_cache.fetch_nearest_cache(self.model_id, tokens)
+        cache, rest = (
+            self._prompt_cache.fetch_nearest_cache(self.model_id, tokens) if use_cache else (None, [])
+        )
         if cache is None or not rest:
             cache, rest = make_prompt_cache(self.model), tokens
         reused = len(tokens) - len(rest)
@@ -122,14 +124,23 @@ class LLM:
         for i in range(0, len(body), step):
             self.model(mx.array(body[i : i + step])[None], cache=cache)
             mx.eval([c.state for c in cache])
-        if body:
+        if body and use_cache:
             self._prompt_cache.insert_cache(self.model_id, tokens[:-1], copy.deepcopy(cache))
         return cache, rest[-1:], reused
 
     def _generate_into(
-        self, q: queue.Queue, prompt: str, max_tokens: int, thinking: bool, stop: threading.Event | None
+        self,
+        q: queue.Queue,
+        prompt: str,
+        max_tokens: int,
+        thinking: bool,
+        stop: threading.Event | None,
+        use_cache: bool = True,
     ):
         try:
+            if stop is not None and stop.is_set():  # cancelled while waiting in the queue
+                q.put(GenChunk(done=True, stats=GenStats(finish_reason="stopped")))
+                return
             self._load_sync()
             import mlx.core as mx
             from mlx_lm import stream_generate
@@ -146,7 +157,7 @@ class LLM:
             stats = GenStats()
             t0 = time.perf_counter()
             tokens = self.tokenizer.encode(prompt, add_special_tokens=False)
-            cache, rest, reused = self._cached_prefill(tokens)
+            cache, rest, reused = self._cached_prefill(tokens, use_cache=use_cache)
             last = None
             for resp in stream_generate(
                 self.model, self.tokenizer, rest, max_tokens=max_tokens, sampler=sampler, prompt_cache=cache
@@ -174,10 +185,15 @@ class LLM:
             q.put(_DONE)
 
     def stream_prompt(
-        self, prompt: str, max_tokens: int = 1024, thinking: bool = False, stop: threading.Event | None = None
+        self,
+        prompt: str,
+        max_tokens: int = 1024,
+        thinking: bool = False,
+        stop: threading.Event | None = None,
+        use_cache: bool = True,
     ) -> Iterator[GenChunk]:
         q: queue.Queue = queue.Queue()
-        self._executor.submit(self._generate_into, q, prompt, max_tokens, thinking, stop)
+        self._executor.submit(self._generate_into, q, prompt, max_tokens, thinking, stop, use_cache)
         while True:
             item = q.get()
             if item is _DONE:
@@ -194,6 +210,7 @@ class LLM:
         effort: str = "low",
         max_tokens: int | None = None,
         stop: threading.Event | None = None,
+        use_cache: bool = True,
     ) -> Iterator[GenChunk]:
         if self.tokenizer is None:
             self.load()
@@ -201,14 +218,42 @@ class LLM:
         if max_tokens is None:
             key = "llm.max_tokens_thinking" if thinking else "llm.max_tokens_fast"
             max_tokens = self.cfg.get_path(key, 1024)
-        yield from self.stream_prompt(prompt, max_tokens=max_tokens, thinking=thinking, stop=stop)
+        yield from self.stream_prompt(
+            prompt, max_tokens=max_tokens, thinking=thinking, stop=stop, use_cache=use_cache
+        )
 
-    def complete(self, messages: list[dict], thinking: bool = False, max_tokens: int = 512, **kw) -> str:
-        """Whole answer as a string, thinking removed. Used by background jobs."""
+    def warm(self, system_prompt: str, tools: list[dict] | None = None) -> None:
+        """Pre-reads the system prompt (+ tool definitions) into the cache, so the first turn
+        of a new conversation doesn't pay for it. Runs on the generation thread."""
+
+        def _job():
+            self._load_sync()
+            full = self.render(
+                [{"role": "system", "content": system_prompt}, {"role": "user", "content": "x"}], tools=tools
+            )
+            prefix = full[: full.rindex("<|im_start|>user")]
+            tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
+            # _cached_prefill snapshots everything but the last token, so add a throwaway one.
+            self._cached_prefill(tokens + [tokens[-1]])
+
+        self._executor.submit(_job).result()
+
+    def complete(
+        self,
+        messages: list[dict],
+        thinking: bool = False,
+        max_tokens: int = 512,
+        use_cache: bool = False,
+        **kw,
+    ) -> str:
+        """Whole answer as a string, thinking removed. Used by background jobs, which skip the
+        prompt cache so they don't push out the snapshots of Lea's conversations."""
         from core.toolcall import StreamSplitter
 
         sp = StreamSplitter(thinking=thinking)
-        for chunk in self.stream(messages, thinking=thinking, max_tokens=max_tokens, **kw):
+        for chunk in self.stream(
+            messages, thinking=thinking, max_tokens=max_tokens, use_cache=use_cache, **kw
+        ):
             sp.feed(chunk.text)
         sp.flush()
         return sp.visible_text.strip()
@@ -237,7 +282,12 @@ class FakeLLM:
             return r(messages) if callable(r) else r
         return "OK"
 
-    def stream(self, messages, tools=None, thinking=False, effort="low", max_tokens=None, stop=None):
+    def warm(self, system_prompt, tools=None):
+        pass
+
+    def stream(
+        self, messages, tools=None, thinking=False, effort="low", max_tokens=None, stop=None, use_cache=True
+    ):
         self.calls.append({"messages": messages, "tools": tools, "thinking": thinking})
         text = self._next(messages)
         if thinking and "</think>" not in text:
