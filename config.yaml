@@ -69,6 +69,11 @@ actions:
             open_app, open_in_browser, run_shortcut, read_emails, draft_email, send_email]
   mail_from: ""          # empty = Mail's default account (decision 5, default — Lea can change)
 
+phone:
+  # Hostnames the phone gateway answers on, e.g. ["lea-mac.tail1234.ts.net"] once Tailscale is set up
+  # (decision 8, default — Lea can change). Empty = phone access off.
+  allowed_hosts: []
+
 privacy:
   log_conversations: true
   delete_audio_after_transcription: true

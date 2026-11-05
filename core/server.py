@@ -70,14 +70,30 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
             raise HTTPException(503, "Sylvie is starting")
         return state["sylvie"]
 
+    phone_hosts = set(cfg.get_path("phone.allowed_hosts", []) or [])
+
     @app.middleware("http")
     async def security(request: Request, call_next):
-        if request.headers.get("host", "") not in allowed_hosts:
+        path = request.url.path
+        host = request.headers.get("host", "")
+        if path.startswith("/phone/"):
+            # The phone gateway: reached through the private tunnel (tailscale serve → 127.0.0.1).
+            # Only paired-device tokens work here; browsers are refused.
+            if host not in allowed_hosts | phone_hosts:
+                return JSONResponse({"error": "bad host"}, status_code=403)
+            if request.headers.get("origin"):
+                return JSONResponse({"error": "browsers not allowed"}, status_code=403)
+            auth = request.headers.get("authorization", "")
+            device = S().devices.authenticate(auth[7:] if auth.lower().startswith("bearer ") else None)
+            if device is None:
+                return JSONResponse({"error": "unknown device"}, status_code=401)
+            request.state.device = device
+            return await call_next(request)
+        if host not in allowed_hosts:
             return JSONResponse({"error": "bad host"}, status_code=403)
         origin = request.headers.get("origin")
         if origin and origin not in allowed_origins:
             return JSONResponse({"error": "origin not allowed"}, status_code=403)
-        path = request.url.path
         if path.startswith("/api/"):
             auth = request.headers.get("authorization", "")
             bearer = auth[7:] if auth.lower().startswith("bearer ") else None
@@ -360,6 +376,75 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
     def action_undo(aid: int):
         out = S().actions.undo(aid)
         return {"ok": out.ok, "result": out.content}
+
+    # ---------- devices (pairing is done from the Mac, with the local token) ----------
+    @app.get("/api/devices")
+    def devices_list():
+        return [d.to_dict() for d in S().devices.list()]
+
+    @app.post("/api/devices")
+    def devices_pair(body: dict = Body(...)):
+        """Returns the new device's token ONCE (it isn't stored, only its hash)."""
+        name = str(body.get("name", "")).strip() or "iPhone"
+        return {"name": name, "token": S().devices.pair(name)}
+
+    @app.delete("/api/devices/{did}")
+    def devices_revoke(did: int):
+        S().devices.revoke(did)
+        return {"ok": True}
+
+    # ---------- phone gateway ----------
+    def _phone_conversation(s, given: str | None) -> str | None:
+        """One Sylvie everywhere: without an id, continue the most recent conversation if it was
+        active in the last 5 minutes (from any device)."""
+        if given:
+            return given
+        recent = s.convs.list(limit=1)
+        if recent:
+            from datetime import UTC, datetime
+
+            age = (datetime.now(UTC) - datetime.fromisoformat(recent[0]["updated_at"])).total_seconds()
+            if age < 300:
+                return recent[0]["id"]
+        return None
+
+    @app.get("/phone/ping")
+    def phone_ping():
+        return {"ok": True, "ready": state["ready"]}
+
+    @app.post("/phone/ask")
+    def phone_ask(body: dict = Body(...)):
+        """For the "Hey Siri, Sylvie" Shortcut: text in, short spoken answer + full answer out."""
+        from voice.speech import SentenceStreamer
+
+        s = S()
+        text = str(body.get("text", "")).strip()
+        if not text:
+            raise HTTPException(400, "empty message")
+        cid = _phone_conversation(s, body.get("conversation_id"))
+        answer, sources, conv = "", [], cid
+        for ev in s.turn(text, conversation_id=cid, channel="phone"):
+            if ev["type"] == "meta":
+                conv = ev["conversation_id"]
+            elif ev["type"] == "text":
+                answer += ev["text"]
+            elif ev["type"] == "sources":
+                sources = ev["sources"]
+        speaker = SentenceStreamer()
+        spoken = speaker.feed(answer) + speaker.flush()
+        return {
+            "conversation_id": conv,
+            "spoken": " ".join(spoken) or answer[:300],
+            "answer": answer,
+            "sources": sources,
+        }
+
+    @app.post("/phone/voice")
+    async def phone_voice(request: Request, conversation_id: str | None = None):
+        """For the iPhone app: WAV in, streamed transcript/answer/speak events out."""
+        return await voice(
+            request, conversation_id=_phone_conversation(S(), conversation_id), channel="phone"
+        )
 
     @app.get("/api/knowledge")
     def knowledge():

@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test
+.PHONY: setup check lint test bench chat run open download search index app app-test pair
 
 setup:
 	uv sync
@@ -51,3 +51,6 @@ app:
 
 app-test:
 	swift test --package-path app/SylvieMac --scratch-path "$(HOME)/Library/Caches/SylvieBuild"
+
+pair:
+	$(UV) python scripts/pair_device.py $(NAME)

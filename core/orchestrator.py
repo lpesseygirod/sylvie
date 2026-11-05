@@ -20,6 +20,7 @@ from core.config import Config, load_config
 from core.context import history_messages, maybe_summarize, system_with_summary
 from core.conversations import Conversations
 from core.db import Database
+from core.devices import Devices
 from core.lang import guess_language, phrase
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
 from core.router import route
@@ -124,6 +125,7 @@ class Sylvie:
         self.docs = DocsIndex(db, embedder)
         self.actions = actions if actions is not None else ActionRunner(cfg, ActionLog(db))
         self.learning = LearningStore(db)
+        self.devices = Devices(db)
         self.teacher = Teacher(self, self.learning)
         self.bg = BackgroundWorker(idle_seconds=idle_seconds)
         self._stops: dict[str, threading.Event] = {}
@@ -171,10 +173,8 @@ class Sylvie:
         return self._stt
 
     def warm(self) -> None:
-        """Load models and pre-read the system prompt so the first answer is fast."""
-        self.llm.load()
-        self.embedder.embed_one("warm up")
-        self.llm.warm(self.current_system_prompt(), available_tools(self.tool_context()))
+        """Load models and pre-read the system prompt so the first answer is fast.
+        Whisper warms up first: measured, warming it after the LLM made the first question ~1.3 s slower."""
         if self.cfg.get_path("voice.enabled", True):
             import numpy as np
 
@@ -182,6 +182,9 @@ class Sylvie:
             stt.load()
             # One throwaway transcription compiles Whisper's GPU kernels (first run is ~4 s).
             stt.transcribe(np.sin(np.linspace(0, 2000, 16000)).astype(np.float32) * 0.1, language="en")
+        self.llm.load()
+        self.embedder.embed_one("warm up")
+        self.llm.warm(self.current_system_prompt(), available_tools(self.tool_context()))
 
     def stop(self, conversation_id: str) -> None:
         ev = self._stops.get(conversation_id)

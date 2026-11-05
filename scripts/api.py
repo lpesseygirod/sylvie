@@ -73,3 +73,12 @@ elif cmd == "VOICE":
             elif ev["type"] == "done":
                 print(f"first sentence ready after {first_speak or 0:.2f}s (audio upload → speakable text)")
                 print("trace:", ev.get("trace"))
+elif cmd == "POST":
+    body = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
+    print(
+        json.dumps(
+            httpx.post(BASE + sys.argv[2], json=body, headers=H, timeout=60).json(),
+            indent=1,
+            ensure_ascii=False,
+        )
+    )
