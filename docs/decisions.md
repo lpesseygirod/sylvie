@@ -105,3 +105,8 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 ### T22 — Prompt cache priorities (bug found by the eval)
 - **Problem:** the baseline eval showed time-to-first-word growing from 0.2 s to 3–10 s. Cause: the prompt cache kept 6 snapshots and evicted the oldest — the shared system-prompt snapshot — so after 6 conversations every new chat re-read ~2,000 tokens.
 - **Fix:** the warm-up snapshot is stored as a "system" entry (evicted last); the cache is capped at 3 GB. Measured after the fix: 12 fresh conversations in a row all start in ~0.22 s.
+
+### T23 — Training settings for these hybrid-attention models (measured)
+- **Finding:** Qwen3.5/3.8 mix normal attention with linear "Gated DeltaNet" layers. LoRA training memory grows steeply with sequence length: on the 9B a single ~1,300-token sample pushed the process past 40 GB (Metal out-of-memory), even with gradient checkpointing.
+- **What:** training builds drop examples over ~1,600 characters (not truncated — a truncated answer teaches broken endings), sequences ≤ 512 tokens, LoRA on 8 layers, training in resumable 100-step segments. Result on the 9B: ~200 tokens/s, stable.
+- **Cost:** long answers are under-represented in training. Most of Sylvie's style is in short answers anyway; revisit when mlx-lm gets memory-efficient training kernels for these layers.
