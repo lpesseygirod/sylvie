@@ -41,7 +41,8 @@ search:
   safe_search: 0
   autocomplete: ""
 outgoing:
-  request_timeout: 4.0
+  request_timeout: 7.0          # first connection to each engine takes ~2.4 s here (DNS + TLS)
+  max_request_timeout: 9.0
 EOF
   chmod 600 "$SETTINGS"
 fi

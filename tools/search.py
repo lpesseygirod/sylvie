@@ -30,7 +30,7 @@ def searxng(base_url: str, query: str, max_results: int = 5, language: str | Non
     if language:
         params["language"] = language
     try:
-        r = httpx.get(f"{base_url.rstrip('/')}/search", params=params, timeout=8.0)
+        r = httpx.get(f"{base_url.rstrip('/')}/search", params=params, timeout=10.0)  # SearXNG allows its engines 7 s
         r.raise_for_status()
     except httpx.HTTPError as e:
         raise SearchUnavailable(f"SearXNG not reachable at {base_url}: {e}") from e
