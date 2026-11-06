@@ -105,7 +105,8 @@ def practice(
     model_name: str = "local",
 ) -> int:
     rows = db.query(
-        "SELECT content FROM messages WHERE role = 'user' AND length(content) BETWEEN 8 AND 300 ORDER BY id DESC LIMIT 40"
+        "SELECT content FROM messages WHERE role = 'user' AND length(content) BETWEEN 8 AND 300 "
+        "AND conversation_id IN (SELECT id FROM conversations WHERE deleted_at IS NULL) ORDER BY id DESC LIMIT 40"
     )
     if len(rows) < 5:
         return 0  # not enough of Lea's own messages yet to imitate her

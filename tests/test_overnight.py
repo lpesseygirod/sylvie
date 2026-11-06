@@ -128,3 +128,17 @@ def test_overnight_main_runs_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(ov, "ModelPool", lambda cfg: Pool(FakeLLM(), FakeLLM()))
     monkeypatch.setattr(sys, "argv", ["overnight", "--max-minutes", "0"])
     ov.main()  # no data files, no time: every step must still run without crashing
+
+
+def test_deleted_chats_are_never_used_for_practice(tmp_path):
+    from core.conversations import Conversations
+    from learning.overnight import past_chat_questions
+
+    db = Database(tmp_path / "d.db", dim=8)
+    convs = Conversations(db)
+    kept, gone = convs.create()["id"], convs.create()["id"]
+    convs.add_message(kept, "user", "How do I keep my sourdough starter alive in winter?")
+    convs.add_message(gone, "user", "Write me a packing list for a weekend in Lisbon please.")
+    convs.delete(gone)
+    qs = [i.question for i in past_chat_questions(db, random.Random(0), 10)]
+    assert qs == ["How do I keep my sourdough starter alive in winter?"]

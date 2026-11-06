@@ -624,7 +624,8 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
     def traces(limit: int = 40):
         rows = S().db.query(
             "SELECT id, conversation_id, mode, channel, created_at, trace, substr(content, 1, 80) preview FROM messages "
-            "WHERE role = 'assistant' AND trace IS NOT NULL ORDER BY id DESC LIMIT ?",
+            "WHERE role = 'assistant' AND trace IS NOT NULL "
+            "AND conversation_id IN (SELECT id FROM conversations WHERE deleted_at IS NULL) ORDER BY id DESC LIMIT ?",
             (limit,),
         )
         return [{**dict(r), "trace": json.loads(r["trace"])} for r in rows]
