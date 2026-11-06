@@ -278,10 +278,10 @@ class ActionRunner:
         rec = self.log.get(action_id)
         if rec is None or rec.status != "pending":
             return ActionOutcome("There's nothing waiting for confirmation.", ok=False)
-        if channel != "phone" and self.is_locked():
+        if channel == "voice" and self.is_locked():  # a typed yes means Lea is at the unlocked Mac
             self.log.update(action_id, "cancelled", result="Mac locked")
             return ActionOutcome(
-                "Not done: the Mac is locked. For safety, Lea must unlock it before Sylvie sends anything.",
+                "Not done: the Mac is locked. For safety, a yes by voice only works while it's unlocked.",
                 ok=False,
             )
         out = self._execute(rec.name, rec.args)

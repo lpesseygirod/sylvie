@@ -71,7 +71,7 @@ def test_locked_mac_blocks_sending(tmp_path):
     osa = FakeOSA()
     s = make(tmp_path, [SEND, "Shall I?", extraction(), "It's locked.", extraction()], osa=osa, locked=True)
     cid = list(s.turn("email my professor"))[0]["conversation_id"]
-    ev = list(s.turn("yes", conversation_id=cid))
+    ev = list(s.turn("yes", conversation_id=cid, channel="voice"))  # a yes by voice while locked
     assert any(e["type"] == "action" and e["status"] == "failed" for e in ev)
     assert sent_calls(osa) == []
 
@@ -278,3 +278,19 @@ def test_unknown_shortcut_is_reported_not_confirmed(tmp_path):
     assert not out.ok and "no Shortcut called 'make spotify'" in out.content and "Spotify" in out.content
     ok = s.actions.call("run_shortcut", {"name": "spotify"}, None)
     assert ok.pending_id and "Spotify" in s.actions.log.get(ok.pending_id).summary  # real one, exact name
+
+
+@pytest.mark.parametrize(
+    "text", ["yes", "Sylvie, yes", "Yes please, go ahead", "Sí, claro, hazlo", "vale", "Okay, do it",
+             "oui vas-y", "Yes. Run it."],
+)  # fmt: skip
+def test_any_clear_yes_counts(text):
+    assert is_clear_yes(text)
+
+
+@pytest.mark.parametrize(
+    "text", ["yes but change the subject", "no", "wait", "sí, pero mejor mañana", "Try to make it work",
+             "yes and also delete my other files please now"],
+)  # fmt: skip
+def test_not_a_clear_yes(text):
+    assert not is_clear_yes(text)
