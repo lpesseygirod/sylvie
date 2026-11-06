@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
-from actions import scripts
+from actions import scripts, shell
 from actions.confirm import screen_is_locked
 from actions.log import ActionLog
 from actions.osa import OSAError, OSARunner
@@ -112,6 +112,16 @@ TOOLS = {
         {"name": STR},
         ["name"],
     ),
+    "run_command": _fn(
+        "run_command",
+        "Run a command in Lea's Terminal (zsh, as her, from her home folder, no keyboard input) when that's "
+        "the best way to do what she asks: look at files or the system, open things, install or change "
+        "something. Read-only commands run at once; anything that changes, deletes, installs or sends is "
+        "read back to Lea for a yes first. Never use sudo. Give the exact command and, in 'why', what it does "
+        "in plain words.",
+        {"command": STR, "why": STR},
+        ["command", "why"],
+    ),
     "read_emails": _fn(
         "read_emails",
         "Read Lea's most recent emails (sender, subject, start of the text) to summarize them.",
@@ -198,8 +208,10 @@ class ActionRunner:
         is_locked=screen_is_locked,
         has_spotify: Callable[[], bool] | None = None,
         spotify_search: Callable[[str], tuple[str, str] | None] | None = None,
+        shell_runner: Callable | None = None,
     ):
         self.has_spotify = has_spotify or spotify_installed
+        self.shell_runner = shell_runner or subprocess.run
         self.spotify_search = spotify_search or _web_api_search
         self.cfg = cfg
         self.log = log
@@ -242,7 +254,11 @@ class ActionRunner:
         err = self._check(name, args)
         if err:
             return ActionOutcome(f"Error: {err}", ok=False)
-        if name in NEEDS_YES:
+        needs_yes = name in NEEDS_YES or (
+            name == "run_command"
+            and (after_untrusted or not shell.is_read_only(str(args.get("command", ""))))
+        )
+        if needs_yes:
             summary = self._summary(name, args)
             if after_untrusted:
                 summary += (
@@ -303,6 +319,10 @@ class ActionRunner:
     def _check(self, name: str, a: dict) -> str | None:
         if name in ("send_email", "draft_email") and not EMAIL_RE.match(str(a.get("to", "")).strip()):
             return "'to' must be one valid email address."
+        if name == "run_command":
+            why = shell.never_reason(str(a.get("command", "")))
+            if why:
+                return f"Refused: Sylvie never runs this ({why}). Tell Lea plainly; she can do it herself if she really wants."
         if name == "run_shortcut":
             names = self.shortcut_names()
             if names is not None:
@@ -335,6 +355,8 @@ class ActionRunner:
             body = str(a["body"])
             preview = body if len(body) < 400 else body[:400] + "…"
             return f'Send an email to {a["to"]}, subject "{a["subject"]}": "{preview}"'
+        if name == "run_command":
+            return f"Run in Terminal: {a['command']}  ({a.get('why', '')})"
         if name == "run_shortcut":
             return f'Run the Shortcut "{a["name"]}"'
         return f"{name} {a}"
@@ -443,6 +465,9 @@ class ActionRunner:
                     "Opened it in the browser." if p.returncode == 0 else "Couldn't open it.",
                     ok=p.returncode == 0,
                 )
+            if name == "run_command":
+                ok, out = shell.run(str(a["command"]), runner=self.shell_runner)
+                return ActionOutcome(out, ok=ok)
             if name == "run_shortcut":
                 p = self.run_cmd(["shortcuts", "run", str(a["name"])])
                 return ActionOutcome(
