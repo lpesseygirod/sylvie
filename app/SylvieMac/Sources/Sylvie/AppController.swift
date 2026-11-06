@@ -83,6 +83,7 @@ final class AppController: ObservableObject {
     private var lastLevelSent = Date.distantPast
     private var autoHide: DispatchWorkItem?
     private var ignoreMicUntil = Date.distantPast
+    private let ducker = MusicDucker()
     private var turnDone = false  // the server sent "done": once speech ends, listen for a follow-up
     private var spokeThisTurn = false
 
@@ -443,6 +444,10 @@ final class AppController: ObservableObject {
     // MARK: Orb everywhere: menu bar glyph, panel, voice mode
 
     private func stateChanged(from old: VoiceState) {
+        switch state {  // music down while Sylvie listens or talks, back up afterwards
+        case .listening, .thinking, .speaking: ducker.duck()
+        default: ducker.restore()
+        }
         forwardState()
         updateGlyphTimer()
         menuIcon = Self.glyph(state.orb, time: Date().timeIntervalSince(glyphStart))

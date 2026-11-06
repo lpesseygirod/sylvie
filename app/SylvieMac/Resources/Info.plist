@@ -13,6 +13,8 @@
     <key>LSUIElement</key><true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Sylvie listens for “Sylvie” and for your questions. Audio stays on your Mac and is deleted right after transcription.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Sylvie turns Spotify down while she listens to you, and back up afterwards.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Sylvie uses on-device speech recognition to notice when you say “Sylvie”. Nothing is sent to Apple.</string>
     <key>NSAppTransportSecurity</key>
