@@ -13,13 +13,21 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from pathlib import Path
 
 from core.toolcall import StreamSplitter
 from evals.run import number_candidates
 from tools.registry import CALCULATOR, ToolContext, execute
 
-SYSTEM = "You are Sylvie, Lea's assistant. Use the calculator for arithmetic. Answer briefly and give the final number."
+SYSTEM = (
+    "You are Sylvie, Lea's assistant. Use the calculator for arithmetic. Answer briefly and give the "
+    'final number. Start with the working or the answer itself, never with a preamble like "Let me calculate".'
+)
+# Answers that still open with filler aren't kept: training on them would teach the habit (T29).
+FILLER = re.compile(
+    r"^\s*(let me|let's|i'll|sure|okay|ok|great|alright|déjame|vamos a|je vais|voyons)\b", re.I
+)
 
 
 def gsm8k(path: Path, rng: random.Random, n: int) -> list[dict]:
@@ -61,7 +69,11 @@ def tool_example(llm, item: dict, cfg) -> dict | None:
     for c in calls:
         convo.append({"role": "tool", "content": execute(c, ctx).content})
     final = _gen(llm, [msgs[0]] + convo, tools=[CALCULATOR])
-    if final.tool_calls or not correct(final.visible_text, item["answer"]):
+    if (
+        final.tool_calls
+        or not correct(final.visible_text, item["answer"])
+        or FILLER.match(final.visible_text)
+    ):
         return None
     return {"messages": convo, "chosen": final.visible_text.strip(), "tools": [CALCULATOR]}
 
@@ -69,7 +81,11 @@ def tool_example(llm, item: dict, cfg) -> dict | None:
 def reasoning_example(llm, item: dict) -> dict | None:
     msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": item["question"]}]
     sp = _gen(llm, msgs, thinking=True, max_tokens=2000)
-    if not sp.thinking_text.strip() or not correct(sp.visible_text, item["answer"]):
+    if (
+        not sp.thinking_text.strip()
+        or not correct(sp.visible_text, item["answer"])
+        or FILLER.match(sp.visible_text)
+    ):
         return None
     return {
         "messages": [{"role": "user", "content": item["question"]}],

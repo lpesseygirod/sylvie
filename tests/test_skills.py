@@ -55,3 +55,11 @@ def test_verified_examples_can_wait_for_lea_instead(tmp_path):
     llm = FakeLLM([CALL, "She sold 72 clips.", "48 + 24 = 72</think>72 clips."])
     practice_skills(llm, store, cfg, data(tmp_path), n=2, batch="b", model_name="Q", seed=0)
     assert len(store.examples(status="staged")) == 2 and store.examples() == []
+
+
+def test_answers_opening_with_filler_are_not_kept(tmp_path):
+    store = LearningStore(Database(tmp_path / "s.db", dim=8))
+    cfg = Config({"search": {"enabled": False}})
+    llm = FakeLLM([CALL, "Let me calculate this. She sold 72 clips.", "48 + 24 = 72</think>Sure! 72 clips."])
+    kept = practice_skills(llm, store, cfg, data(tmp_path), n=2, batch="b", model_name="Q", seed=0)
+    assert kept == {"tools": 0, "reasoning": 0, "tried": 2}
