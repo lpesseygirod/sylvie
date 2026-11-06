@@ -266,7 +266,9 @@ final class AppController: ObservableObject {
                 heardSpeech = true
             case .speechEnded, .maxLengthReached:
                 finishRecording()
+                return  // later events in this batch (e.g. a "no speech" timeout) belong to the old recording
             case .noSpeechTimeout:
+                guard recordingActive else { return }
                 wakeLog.notice("no speech after listening; back to waiting for the name")
                 recordingActive = false
                 state = .idle
