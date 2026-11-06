@@ -206,3 +206,45 @@ def test_background_learning_pauses_before_transcription(tmp_path):
     list(voice_turn(s, b""))
     assert seen["busy"] is True  # background work was told to stop before Whisper ran
     assert not s.bg.busy.is_set()  # and resumes afterwards (empty transcript: no turn follows)
+
+
+def test_fillers_when_sylvie_is_quiet_too_long():
+    import time
+
+    from voice.loop import with_fillers
+
+    def slow():
+        time.sleep(0.25)
+        yield {"type": "status", "mode": "fast"}
+        time.sleep(0.5)
+        yield {"type": "speak", "text": "Here it is.", "language": "es"}
+        yield {"type": "done"}
+
+    ev = list(with_fillers(slow(), "es", first_after=0.1, again_after=0.3))
+    spoken = [e["text"] for e in ev if e["type"] == "speak"]
+    assert spoken[0] == "Un momento…" and "Sigo con ello…" in spoken and spoken[-1] == "Here it is."
+    assert ev[-1]["type"] == "done"
+
+
+def test_no_filler_when_the_answer_is_quick():
+    from voice.loop import with_fillers
+
+    def quick():
+        yield {"type": "speak", "text": "Paris.", "language": "en"}
+        yield {"type": "done"}
+
+    ev = list(with_fillers(iter(quick()), "en", first_after=1.0, again_after=1.0))
+    assert [e["text"] for e in ev if e["type"] == "speak"] == ["Paris."]
+
+
+def test_errors_inside_the_turn_still_reach_the_caller():
+    import pytest
+
+    from voice.loop import with_fillers
+
+    def broken():
+        yield {"type": "status"}
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        list(with_fillers(broken(), "en", first_after=1.0))

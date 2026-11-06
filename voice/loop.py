@@ -7,10 +7,57 @@ written.
 
 from __future__ import annotations
 
+import queue
+import threading
+import time
 from collections.abc import Iterator
 
-from core.lang import guess_language
+from core.lang import PHRASES, guess_language
 from voice.speech import DocFilter, SentenceStreamer
+
+# Lea (2026-11-06): when an answer takes a while, say a little sentence so she knows Sylvie is on it.
+FIRST_FILLER_S = 2.5  # nothing spoken yet after this → "One moment…"
+STILL_WORKING_S = 12.0  # then, while still quiet → "Still on it…" (at most twice)
+_DONE = object()
+
+
+def with_fillers(events: Iterator[dict], lang: str, first_after: float = FIRST_FILLER_S,
+                 again_after: float = STILL_WORKING_S) -> Iterator[dict]:  # fmt: skip
+    """Passes `events` through; adds a short spoken filler whenever Sylvie has been silent too long."""
+    q: queue.Queue = queue.Queue()
+
+    def pump():
+        try:
+            for ev in events:
+                q.put(ev)
+        except Exception as e:  # surfaced to the caller below
+            q.put(e)
+        q.put(_DONE)
+
+    threading.Thread(target=pump, daemon=True, name="sylvie-voice-turn").start()
+    last_spoken, said_first, stills = time.monotonic(), False, 0
+    while True:
+        wait = (again_after if said_first else first_after) - (time.monotonic() - last_spoken)
+        try:
+            ev = q.get(timeout=max(wait, 0.01))
+        except queue.Empty:
+            if said_first and stills >= 2:
+                last_spoken = time.monotonic()
+                continue
+            key = "still" if said_first else "moment"
+            stills += said_first
+            said_first = True
+            last_spoken = time.monotonic()
+            yield {"type": "speak", "text": PHRASES[key].get(lang, PHRASES[key]["en"]), "language": lang,
+                   "filler": True}  # fmt: skip
+            continue
+        if ev is _DONE:
+            return
+        if isinstance(ev, Exception):
+            raise ev
+        if ev["type"] == "speak":
+            last_spoken, said_first = time.monotonic(), True
+        yield ev
 
 
 def voice_turn(
@@ -33,9 +80,13 @@ def voice_turn(
         yield {"type": "done", "message_id": None, "conversation_id": conversation_id, "empty": True}
         return
     lang = tr.language
+    yield from with_fillers(_answer(sylvie, tr.text, lang, conversation_id, channel), lang)
+
+
+def _answer(sylvie, text: str, lang: str, conversation_id: str | None, channel: str) -> Iterator[dict]:
     speaker = SentenceStreamer()
     docs = DocFilter()  # documents Sylvie writes go to the screen, not the speaker
-    for ev in sylvie.turn(tr.text, conversation_id=conversation_id, channel=channel):
+    for ev in sylvie.turn(text, conversation_id=conversation_id, channel=channel):
         if ev["type"] == "status" and ev.get("text"):
             yield ev
             yield {"type": "speak", "text": ev["text"], "language": lang, "filler": True}

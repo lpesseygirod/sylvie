@@ -23,6 +23,8 @@ _WORDS = {
 PHRASES = {
     "checking": {"en": "Let me check…", "es": "Déjame mirar…", "fr": "Je regarde…"},
     "thinking": {"en": "Let me think…", "es": "Déjame pensar…", "fr": "Je réfléchis…"},
+    "moment": {"en": "One moment…", "es": "Un momento…", "fr": "Un instant…"},
+    "still": {"en": "Still on it…", "es": "Sigo con ello…", "fr": "J'y suis toujours…"},
 }
 
 
