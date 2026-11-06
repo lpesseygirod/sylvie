@@ -121,3 +121,58 @@ def quick_reply(text: str, cfg, rng: random.Random | None = None) -> str | None:
         return None
     name = cfg.get_path("user.name", "Lea")
     return (rng or random).choice(options).format(name=name)
+
+
+# Answers that open with "Hola Lea." / "Hello Lea!" when Lea didn't greet (the 9B does it constantly).
+_OPENING = re.compile(
+    r"^\s*[¡!]?\s*(hola|hello|hi|hey|bonjour|salut|coucou|buenas|good (morning|afternoon|evening)|"
+    r"buenos d[ií]as|buenas (tardes|noches)|bonsoir)(\s*,?\s*(lea|sylvie))?\s*[.!,]+\s*",
+    re.I,
+)
+
+
+def greets(text: str) -> bool:
+    """Lea's message opens with a greeting ("Hi Sylvie, …"): then greeting back is fine."""
+    return bool(_OPENING.match(text)) or match(text) is not None
+
+
+class GreetingStripper:
+    """Drops a greeting at the very start of an answer while streaming (it waits for the first ~40
+    characters or the first sentence end, then passes everything through unchanged)."""
+
+    def __init__(self, active: bool):
+        self.active, self.done, self.buf, self.removed = active, not active, "", ""
+
+    def _cut(self, text: str) -> str:
+        out = text
+        for _ in range(2):  # "Hello Lea. Good afternoon." → both
+            m = _OPENING.match(out)
+            if not m or not out[m.end() :].strip():
+                break  # never remove the whole answer
+            out = out[m.end() :]
+        if out != text:
+            self.removed = text[: len(text) - len(out)]
+            out = out[:1].upper() + out[1:]
+        return out
+
+    def feed(self, chunk: str) -> str:
+        if self.done:
+            return chunk
+        self.buf += chunk
+        if len(self.buf) < 60 and len(re.findall(r"[.!?\n]\s*\S", self.buf)) < 2:
+            return ""  # ~0.2 s of text: enough to see "Hello Lea. Good afternoon." as a whole
+        self.done = True
+        return self._cut(self.buf)
+
+    def flush(self) -> str:
+        if self.done:
+            return ""
+        self.done = True
+        return self._cut(self.buf)
+
+    def clean(self, text: str) -> str:
+        """The same cut on the saved answer."""
+        if self.removed and text.startswith(self.removed):
+            rest = text[len(self.removed) :]
+            return rest[:1].upper() + rest[1:]
+        return text

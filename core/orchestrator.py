@@ -24,7 +24,7 @@ from core.devices import Devices
 from core.intent import ACTION_NOTE, CLAIM_NUDGE, claims_done, looks_like_action
 from core.lang import guess_language, phrase
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
-from core.quick import quick_reply
+from core.quick import GreetingStripper, greets, quick_reply
 from core.router import route
 from core.settings import INTENT_NOTE as SETTING_NOTE
 from core.settings import looks_like_setting_request
@@ -546,6 +546,7 @@ class Sylvie:
 
             called_tools = False
             nudged = False
+            greeting = GreetingStripper(active=not greets(text))
             for round_no in range(MAX_TOOL_ROUNDS + 1):
                 # Tools are dropped on the last round, or after a second malformed call (retry once).
                 use_tools = (
@@ -573,6 +574,9 @@ class Sylvie:
                             break
                         for kind, s in sp.feed(chunk.text):
                             if kind == "text":
+                                s = greeting.feed(s)  # no "Hola Lea." opener unless she greeted
+                                if not s:
+                                    continue
                                 trace.mark("first_token")
                             yield {"type": kind, "text": s}
                         if sp.in_tool and not announced:
@@ -581,8 +585,14 @@ class Sylvie:
                             trace.mark("first_status")
                             yield {"type": "status", "text": phrase("checking", text)}
                     for kind, s in sp.flush():
+                        if kind == "text":
+                            s = greeting.feed(s)
+                            if not s:
+                                continue
                         yield {"type": kind, "text": s}
-                visible = sp.visible_text.strip()
+                    if rest := greeting.flush():
+                        yield {"type": "text", "text": rest}
+                visible = greeting.clean(sp.visible_text.strip())
                 calls = sp.tool_calls if use_tools and not stop.is_set() else []
                 if not calls and not visible and sp.raw.strip() and not stop.is_set() and use_tools:
                     # Everything went into a tool call that never closed or didn't parse, so Lea

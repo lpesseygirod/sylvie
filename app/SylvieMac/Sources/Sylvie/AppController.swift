@@ -237,9 +237,11 @@ final class AppController: ObservableObject {
         recordingActive = true
         state = .listening
         wake.listensForStop = false
-        // Greet only if Lea paused after "Sylvie" — if she's already talking, don't interrupt her.
+        // Greet only if Lea paused after "Sylvie" — if she's already talking, don't interrupt her —
+        // and only the first time in a while (Lea: not "hello" every time; the chime says "I'm listening").
+        let firstInAWhile = Date().timeIntervalSince(lastTurnAt) > 30 * 60
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-            guard greet, let self, self.recordingActive, !self.heardSpeech else { return }
+            guard greet, firstInAWhile, let self, self.recordingActive, !self.heardSpeech else { return }
             let greetings = ["en": "Hello Lea", "es": "Hola Lea", "fr": "Bonjour Lea"]
             self.speaker.say(greetings[self.lastLanguage] ?? "Hello Lea", language: self.lastLanguage)
         }

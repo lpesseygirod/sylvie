@@ -47,3 +47,29 @@ def test_greeting_plus_question_still_uses_the_model(tmp_path):
     s = make(tmp_path, ["Mañana sol.", "{}"])
     run(s, "hola, ¿qué tiempo hará mañana?")
     assert s.llm.calls
+
+
+def test_greeting_openers_are_dropped_when_lea_did_not_greet():
+    from core.quick import GreetingStripper
+
+    def run_through(text, active=True):
+        g = GreetingStripper(active)
+        out = "".join(g.feed(text[i : i + 4]) for i in range(0, len(text), 4)) + g.flush()
+        return out, g.clean(text)
+
+    assert (
+        run_through("Hola Lea. Mañana tienes clase a las diez.") == ("Mañana tienes clase a las diez.",) * 2
+    )
+    assert run_through("Hello Lea. Good afternoon. The capital is Canberra.")[0] == "The capital is Canberra."
+    assert run_through("Hola, Lea. ¿Qué tal?", active=False)[0] == "Hola, Lea. ¿Qué tal?"  # she greeted
+    assert run_through("Hola Lea.")[0] == "Hola Lea."  # never removes the whole answer
+    assert run_through("Holanda está en Europa.")[0] == "Holanda está en Europa."
+
+
+def test_turn_answer_has_no_greeting_opener(tmp_path):
+    s = make(tmp_path, ["¡Hola Lea! Mañana hace sol en Madrid.", "{}"])
+    ev = run(s, "¿Qué tiempo hará mañana en Madrid?")
+    text = "".join(e["text"] for e in ev if e["type"] == "text")
+    assert text == "Mañana hace sol en Madrid."
+    saved = [m for m in s.convs.messages(ev[0]["conversation_id"]) if m["role"] == "assistant"][-1]
+    assert saved["content"] == "Mañana hace sol en Madrid."
