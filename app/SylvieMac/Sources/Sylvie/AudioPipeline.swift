@@ -54,9 +54,11 @@ final class AudioPipeline {
         input.removeTap(onBus: 0)  // a failed earlier start may have left one (installing twice crashes)
         input.installTap(onBus: 0, bufferSize: 1024, format: inFormat) { [weak self] buffer, _ in
             guard let self else { return }
-            self.onBuffer?(buffer)
             if let samples = self.convertToSpeech(buffer) {
                 self.onSamples?(samples)
+                // The recognizer always gets 16 kHz mono: with echo cancellation on, the raw buffers
+                // have 9 channels and it silently heard nothing (measured 2026-11-06).
+                if let mono = self.monoBuffer(samples) { self.onBuffer?(mono) }
             }
         }
         engine.prepare()
@@ -76,6 +78,15 @@ final class AudioPipeline {
         player.stop()
         engine.stop()
         running = false
+    }
+
+    private func monoBuffer(_ samples: [Float]) -> AVAudioPCMBuffer? {
+        guard !samples.isEmpty,
+              let b = AVAudioPCMBuffer(pcmFormat: speechFormat, frameCapacity: AVAudioFrameCount(samples.count)),
+              let ch = b.floatChannelData?[0] else { return nil }
+        b.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { ch.update(from: $0.baseAddress!, count: samples.count) }
+        return b
     }
 
     private func convertToSpeech(_ buffer: AVAudioPCMBuffer) -> [Float]? {

@@ -84,6 +84,7 @@ final class AppController: ObservableObject {
     private var autoHide: DispatchWorkItem?
     private var ignoreMicUntil = Date.distantPast
     private let ducker = MusicDucker()
+    private var startingAudio = false
     private var turnDone = false  // the server sent "done": once speech ends, listen for a follow-up
     private var spokeThisTurn = false
 
@@ -154,7 +155,10 @@ final class AppController: ObservableObject {
     }
 
     private func startAudio() async {
-        guard state != .muted else { return }
+        // Startup and the 10 s check could both start the mic at once (measured 2026-11-06).
+        guard state != .muted, !startingAudio else { return }
+        startingAudio = true
+        defer { startingAudio = false }
         let micOK = await AVCaptureDevice.requestAccess(for: .audio)
         let speechOK = await withCheckedContinuation { cont in
             SFSpeechRecognizer.requestAuthorization { cont.resume(returning: $0 == .authorized) }
