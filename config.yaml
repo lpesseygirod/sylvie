@@ -94,7 +94,7 @@ voice:
 
 actions:
   # Allowlist: only these can ever be called. Remove one to switch it off; [] turns all actions off.
-  enabled: [music, play_music, calendar_events, create_event, create_reminder, set_timer,
+  enabled: [music, play_music, save_playlist, calendar_events, create_event, create_reminder, set_timer,
             open_app, open_in_browser, run_shortcut, read_emails, draft_email, send_email]
   mail_from: ""          # empty = Mail's default account (decision 5, default — Lea can change)
 

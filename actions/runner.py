@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 import subprocess
 import threading
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -65,9 +66,17 @@ TOOLS = {
     ),
     "play_music": _fn(
         "play_music",
-        "Play something on Spotify. Pass a spotify: URI to play it directly, or words (song, artist, playlist) to open the search in Spotify.",
+        "Play something on Spotify. For one of Lea's saved playlists pass its name (e.g. 'study'); a "
+        "spotify: URI or open.spotify.com link plays directly; other words open Spotify's search.",
         {"query": STR},
         ["query"],
+    ),
+    "save_playlist": _fn(
+        "save_playlist",
+        "Remember one of Lea's Spotify playlists (or albums) by name, so 'play my <name> playlist' starts it "
+        "directly. link: the Spotify share link (https://open.spotify.com/playlist/...) or a spotify: URI.",
+        {"name": STR, "link": STR},
+        ["name", "link"],
     ),
     "calendar_events": _fn(
         "calendar_events",
@@ -132,6 +141,27 @@ class ActionOutcome:
     undo: dict | None = None
 
 
+SPOTIFY_LINK = re.compile(
+    r"open\.spotify\.com/(?:intl-[a-z]{2}/)?(playlist|album|track|artist|show)/([A-Za-z0-9]+)"
+)
+
+
+def spotify_uri(text: str) -> str | None:
+    """A spotify: URI from a share link or a URI; None for anything else."""
+    t = text.strip()
+    if re.fullmatch(r"spotify:(playlist|album|track|artist|show):[A-Za-z0-9]+", t):
+        return t
+    m = SPOTIFY_LINK.search(t)
+    return f"spotify:{m.group(1)}:{m.group(2)}" if m else None
+
+
+def _playlist_key(name: str) -> str:
+    n = unicodedata.normalize("NFKD", name.lower())
+    n = "".join(c for c in n if not unicodedata.combining(c))
+    n = re.sub(r"\b(my|mi|ma|mon|the|la|el|le|playlist|lista|liste)\b", " ", n)
+    return re.sub(r"[^a-z0-9]+", " ", n).strip() or "music"
+
+
 class ActionRunner:
     def __init__(
         self, cfg, log: ActionLog, osa=None, run_cmd: Callable | None = None, is_locked=screen_is_locked
@@ -144,6 +174,14 @@ class ActionRunner:
         )
         self.is_locked = is_locked
         self.timers: dict[int, threading.Timer] = {}
+
+    def _saved_playlist(self, query: str) -> str | None:
+        saved = self.cfg.get_path("music.playlists") or {}
+        key = _playlist_key(query)
+        if key in saved:
+            return saved[key]
+        hits = [uri for name, uri in saved.items() if name in key or key in name]
+        return hits[0] if len(hits) == 1 else None
 
     def tool_defs(self) -> list[dict]:
         enabled = self.cfg.get_path("actions.enabled") or list(TOOLS)
@@ -220,6 +258,8 @@ class ActionRunner:
     def _check(self, name: str, a: dict) -> str | None:
         if name in ("send_email", "draft_email") and not EMAIL_RE.match(str(a.get("to", "")).strip()):
             return "'to' must be one valid email address."
+        if name == "save_playlist" and not spotify_uri(str(a.get("link", ""))):
+            return "link must be a Spotify share link (open.spotify.com/...) or a spotify: URI."
         if name == "create_event" and not ISO_RE.match(str(a.get("start", ""))):
             return "start must look like 2026-11-05T15:30."
         if name == "create_reminder" and a.get("due") and not ISO_RE.match(str(a["due"])):
@@ -254,8 +294,16 @@ class ActionRunner:
                     )
                 res = self.osa.run(scripts.SPOTIFY_COMMAND, cmd, str(a.get("volume", 50)))
                 return ActionOutcome(f"Done ({cmd}). Spotify: {res}")
+            if name == "save_playlist":
+                from core.settings import save_override
+
+                uri = spotify_uri(str(a["link"]))
+                key = _playlist_key(str(a["name"]))
+                save_override(self.cfg, f"music.playlists.{key}", uri)
+                return ActionOutcome(f"Saved '{key}' → {uri}. Say 'play my {key} playlist' to start it.")
             if name == "play_music":
                 q = str(a["query"]).strip()
+                q = spotify_uri(q) or self._saved_playlist(q) or q
                 if q.startswith("spotify:"):
                     return ActionOutcome(
                         "Playing: " + self.osa.run(scripts.SPOTIFY_PLAY_URI, q) + " (on this Mac)."

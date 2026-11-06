@@ -140,20 +140,25 @@ def apply_saved(cfg, state: dict) -> None:
         _set_path(cfg, path, value)
 
 
-def change(sylvie, name: str, value: str) -> str:
-    """Validates, applies right away, saves. Returns a sentence for Sylvie to confirm."""
+def save_override(cfg, path: str, value) -> None:
+    """Sets a config value now and keeps it across restarts (state.json → settings.overrides)."""
     from learning.promote import load_state, save_state
 
+    _set_path(cfg, path, value)
+    st = load_state(cfg)
+    st.setdefault("settings", {}).setdefault("overrides", {})[path] = value
+    save_state(cfg, st)
+
+
+def change(sylvie, name: str, value: str) -> str:
+    """Validates, applies right away, saves. Returns a sentence for Sylvie to confirm."""
     s = SETTINGS.get(name)
     if s is None:
         raise BadValue(f"'{name}' can't be changed by asking. Settings you can change: {', '.join(SETTINGS)}")
     new = s.parse(value)
     cfg = sylvie.cfg
     old = cfg.get_path(s.path)
-    _set_path(cfg, s.path, new)
-    st = load_state(cfg)
-    st.setdefault("settings", {}).setdefault("overrides", {})[s.path] = new
-    save_state(cfg, st)
+    save_override(cfg, s.path, new)
 
     # Make it take effect now.
     if s.path.startswith("voice."):

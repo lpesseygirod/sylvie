@@ -130,3 +130,31 @@ def test_applescript_values_are_arguments_not_code(tmp_path):
     list(s.turn("remind me"))
     script, args = osa.calls[0]
     assert tricky in args and "rm -rf" not in script
+
+
+def test_spotify_links_become_uris():
+    from actions.runner import spotify_uri
+
+    assert (
+        spotify_uri("https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6?si=abc")
+        == "spotify:playlist:37i9dQZF1DX8NTLI2TtZa6"
+    )
+    assert spotify_uri("https://open.spotify.com/intl-es/album/1A2b3C") == "spotify:album:1A2b3C"
+    assert spotify_uri("spotify:playlist:XYZ") == "spotify:playlist:XYZ"
+    assert spotify_uri("lofi beats") is None
+
+
+def test_saved_playlist_plays_by_name(tmp_path):
+    osa = FakeOSA({"play track": "Lofi Song — Someone"})
+    s = make(tmp_path, [], osa=osa)
+    out = s.actions.call(
+        "save_playlist",
+        {"name": "mi playlist de estudio", "link": "https://open.spotify.com/playlist/ABC123"},
+        None,
+    )
+    assert out.ok and s.cfg.get_path("music.playlists.de estudio") == "spotify:playlist:ABC123"
+    played = s.actions.call("play_music", {"query": "estudio"}, None)
+    assert "Playing: Lofi Song" in played.content
+    assert any("spotify:playlist:ABC123" in args for _, args in osa.calls)
+    bad = s.actions.call("save_playlist", {"name": "x", "link": "not a link"}, None)
+    assert not bad.ok
