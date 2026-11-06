@@ -25,6 +25,8 @@ def make(tmp_path, replies, osa=None, locked=False):
 
     cfg = Config(dict(load_config()))
     cfg["search"] = {**cfg["search"], "enabled": False}
+    # Tests exercise the confirmation flow, whatever Lea chose in config.yaml (she chose "never").
+    cfg["actions"] = {**cfg["actions"], "confirm": "delete_or_send"}
     cfg["paths"] = {
         **cfg["paths"],
         "data_dir": str(tmp_path / "data"),

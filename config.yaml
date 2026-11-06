@@ -98,7 +98,7 @@ actions:
             open_app, open_in_browser, run_shortcut, run_command, read_emails, draft_email, send_email]
   # run_command: Terminal commands (Lea, 2026-11-06). sudo, disk erasing, wiping folders, Keychain
   # passwords and curl|sh never run. Remove it here to switch off.
-  confirm: delete_or_send   # Lea, 2026-11-06: ask only before deleting or sending (changes | never also possible)
+  confirm: never   # Lea, 2026-11-06: "never ask" (delete_or_send | changes are the other options)
   mail_from: ""          # empty = Mail's default account (decision 5, default — Lea can change)
 
 phone:

@@ -73,3 +73,13 @@ def test_ask_only_to_delete_or_send(tmp_path, cmd, asks):
     assert s.actions.needs_yes(
         "run_command", {"command": cmd}, after_untrusted=True
     )  # always after web/email
+
+
+def test_never_ask_mode(tmp_path):
+    s = make(tmp_path, [])
+    s.cfg["actions"]["confirm"] = "never"
+    for name, args in [("run_command", {"command": "rm ~/Downloads/old.zip"}), ("send_email", {"to": "a@b.c"}),
+                       ("run_shortcut", {"name": "Spotify"})]:  # fmt: skip
+        assert not s.actions.needs_yes(name, args, after_untrusted=False)
+    # text from a web page or email still can't make her run things on its own
+    assert s.actions.needs_yes("run_command", {"command": "ls"}, after_untrusted=True)
