@@ -183,6 +183,39 @@ def _web_api_search(query: str) -> tuple[str, str] | None:
     return spotify_api.search_uri(query, creds)
 
 
+def find_on_spotify(cfg, query: str, searx=None) -> tuple[str, str] | None:
+    """A spotify: URI for a song/playlist/album/artist named in words. Uses the Spotify key if Lea set
+    one up; otherwise searches the web (Lea's local SearXNG) for its open.spotify.com page, which needs
+    no key (Lea, 2026-11-06: "why can't she just play the music?")."""
+    try:
+        return _web_api_search(query)
+    except SpotifyNotSetUp:
+        pass
+    from actions.spotify_api import kind_for
+    from tools.search import searxng
+
+    kind = kind_for(query)
+    words = re.sub(
+        r"\b(playlist|lista|album|álbum|artist|artista|songs by|canciones de)\b", " ", query, flags=re.I
+    )
+    results = (searx or searxng)(
+        cfg.get_path("search.searxng_url", "http://127.0.0.1:8888"),
+        f"{words.strip()} site:open.spotify.com",
+        max_results=8,
+    )
+    found = []
+    for r in results:
+        m = SPOTIFY_LINK.search(r.get("url", ""))
+        if m:
+            title = re.sub(
+                r"\s*[-|]\s*(Spotify|song and lyrics.*|Song, Lyrics.*)$", "", r.get("title", ""), flags=re.I
+            )
+            found.append((m.group(1), f"spotify:{m.group(1)}:{m.group(2)}", title.strip()))
+    best = next((f for f in found if f[0] == kind), None) or next((f for f in found if f[0] == "track"), None)
+    best = best or (found[0] if found else None)
+    return (best[1], best[2]) if best else None
+
+
 def spotify_installed() -> bool:
     from pathlib import Path
 
@@ -212,7 +245,7 @@ class ActionRunner:
     ):
         self.has_spotify = has_spotify or spotify_installed
         self.shell_runner = shell_runner or subprocess.run
-        self.spotify_search = spotify_search or _web_api_search
+        self.spotify_search = spotify_search or (lambda q: find_on_spotify(self.cfg, q))
         self.cfg = cfg
         self.log = log
         self.osa = osa or OSARunner()
@@ -221,6 +254,24 @@ class ActionRunner:
         )
         self.is_locked = is_locked
         self.timers: dict[int, threading.Timer] = {}
+
+    def needs_yes(self, name: str, args: dict, after_untrusted: bool) -> bool:
+        """actions.confirm (Lea's choice): 'delete_or_send' (default since 2026-11-06), 'changes' (also
+        anything that changes something) or 'never'. After outside content was read in the turn, a
+        command or Shortcut always needs her yes: text in a web page or email must not make Sylvie act."""
+        mode = self.cfg.get_path("actions.confirm", "delete_or_send")
+        cmd = str(args.get("command", ""))
+        if name in ("run_command", "run_shortcut") and after_untrusted:
+            return True
+        if mode == "never":
+            return False
+        if name == "send_email":
+            return True
+        if name == "run_command":
+            return shell.deletes_or_sends(cmd) if mode == "delete_or_send" else not shell.is_read_only(cmd)
+        if name == "run_shortcut":
+            return mode == "changes"
+        return name in NEEDS_YES
 
     def shortcut_names(self) -> list[str] | None:
         """Lea's Shortcuts (None if they can't be listed: then the name isn't checked)."""
@@ -254,10 +305,7 @@ class ActionRunner:
         err = self._check(name, args)
         if err:
             return ActionOutcome(f"Error: {err}", ok=False)
-        needs_yes = name in NEEDS_YES or (
-            name == "run_command"
-            and (after_untrusted or not shell.is_read_only(str(args.get("command", ""))))
-        )
+        needs_yes = self.needs_yes(name, args, after_untrusted)
         if needs_yes:
             summary = self._summary(name, args)
             if after_untrusted:

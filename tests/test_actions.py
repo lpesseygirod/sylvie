@@ -277,7 +277,7 @@ def test_unknown_shortcut_is_reported_not_confirmed(tmp_path):
     out = s.actions.call("run_shortcut", {"name": "make spotify"}, None)
     assert not out.ok and "no Shortcut called 'make spotify'" in out.content and "Spotify" in out.content
     ok = s.actions.call("run_shortcut", {"name": "spotify"}, None)
-    assert ok.pending_id and "Spotify" in s.actions.log.get(ok.pending_id).summary  # real one, exact name
+    assert ok.ok and 'Shortcut "Spotify"' in ok.content  # runs at once now, with its exact name
 
 
 @pytest.mark.parametrize(
@@ -294,3 +294,30 @@ def test_any_clear_yes_counts(text):
 )  # fmt: skip
 def test_not_a_clear_yes(text):
     assert not is_clear_yes(text)
+
+
+def test_play_by_name_without_a_key_uses_web_search(tmp_path):
+    from actions.runner import find_on_spotify
+
+    def searx(url, q, max_results):
+        assert "site:open.spotify.com" in q
+        return [
+            {"url": "https://open.spotify.com/album/A1", "title": "Fireball - Single"},
+            {
+                "url": "https://open.spotify.com/intl-es/track/T1",
+                "title": "Fireball (feat. John Ryan) - Pitbull - Spotify",
+            },
+        ]
+
+    s = make(tmp_path, [])
+    import actions.runner as r
+
+    original = r._web_api_search
+    r._web_api_search = lambda q: (_ for _ in ()).throw(r.SpotifyNotSetUp())
+    try:
+        assert find_on_spotify(s.cfg, "Fireball Pitbull", searx=searx) == (
+            "spotify:track:T1",
+            "Fireball (feat. John Ryan) - Pitbull",
+        )
+    finally:
+        r._web_api_search = original

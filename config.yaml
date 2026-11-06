@@ -96,8 +96,9 @@ actions:
   # Allowlist: only these can ever be called. Remove one to switch it off; [] turns all actions off.
   enabled: [music, play_music, save_playlist, calendar_events, create_event, create_reminder, set_timer,
             open_app, open_in_browser, run_shortcut, run_command, read_emails, draft_email, send_email]
-  # run_command: Terminal commands (Lea, 2026-11-06). Read-only ones run at once; changes need her yes;
-  # sudo, disk erasing, wiping folders, Keychain passwords and curl|sh never run. Remove it here to switch off.
+  # run_command: Terminal commands (Lea, 2026-11-06). sudo, disk erasing, wiping folders, Keychain
+  # passwords and curl|sh never run. Remove it here to switch off.
+  confirm: delete_or_send   # Lea, 2026-11-06: ask only before deleting or sending (changes | never also possible)
   mail_from: ""          # empty = Mail's default account (decision 5, default — Lea can change)
 
 phone:

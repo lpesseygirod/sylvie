@@ -103,6 +103,26 @@ def is_read_only(command: str) -> bool:
     return True
 
 
+# Deleting or sending: the things that can't be undone. With Lea's "ask only to delete or send"
+# setting (actions.confirm, 2026-11-06), only these need her yes.
+DELETES_OR_SENDS = re.compile(
+    r"(^|[\s;&|(])(rm|rmdir|unlink|shred|srm|trash|truncate|killall|kill|pkill|osascript|mail|sendmail|scp|"
+    r"sftp|ftp|ssh)\b"
+    r"|\bfind\b[^|;&]*\s-(delete|exec)"
+    r"|\bgit\s+(push|clean|reset\s+--hard|checkout\s+--|restore|branch\s+-D|stash\s+drop)"
+    r"|\b(brew|pip3?|npm)\s+(uninstall|remove|rm)"
+    r"|\bdefaults\s+delete|\blaunchctl\s+(remove|bootout|unload)"
+    r"|\b(curl|wget|http)\b[^|;&]*\s(-X\s*(POST|PUT|DELETE|PATCH)|-d\b|--data|-F\b|--form|-T\b|--upload-file)"
+    r"|\brsync\b[^|;&]*\S+:\S*"
+    r"|(?<![0-9&>])>(?!>)\s*[~/\w]",  # '> file' overwrites a file ('>>' only adds to it)
+    re.I,
+)
+
+
+def deletes_or_sends(command: str) -> bool:
+    return bool(DELETES_OR_SENDS.search(command))
+
+
 def run(command: str, cwd: Path | None = None, runner=subprocess.run) -> tuple[bool, str]:
     """Runs it in zsh as Lea; returns (exit ok, output)."""
     try:

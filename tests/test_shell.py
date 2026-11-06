@@ -56,3 +56,20 @@ def test_flow_read_only_runs_changes_need_yes_dangerous_refused(tmp_path):
     assert not refused.ok and "never runs" in refused.content
     careful = s.actions.call("run_command", {"command": "ls", "why": "x"}, "c1", after_untrusted=True)
     assert careful.pending_id  # after reading a web page or email, even 'ls' needs a yes
+
+
+@pytest.mark.parametrize(
+    "cmd,asks",
+    [("brew install wget", False), ("defaults write com.apple.dock autohide -bool true", False),
+     ("mkdir ~/Projects/new", False), ("mv a.txt b.txt", False), ("echo note >> ~/notes.txt", False),
+     ("rm ~/Downloads/old.zip", True), ("find ~/Downloads -name '*.dmg' -delete", True),
+     ("echo hi > ~/notes.txt", True), ("killall Safari", True), ("git push", True),
+     ("curl -X POST https://x.example -d a=1", True), ("brew uninstall wget", True),
+     ("osascript -e 'tell app \"Messages\" to send \"hi\"'", True)],
+)  # fmt: skip
+def test_ask_only_to_delete_or_send(tmp_path, cmd, asks):
+    s = make(tmp_path, [])
+    assert s.actions.needs_yes("run_command", {"command": cmd}, after_untrusted=False) is asks
+    assert s.actions.needs_yes(
+        "run_command", {"command": cmd}, after_untrusted=True
+    )  # always after web/email
