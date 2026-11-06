@@ -7,6 +7,7 @@ jobs take turns).
 
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 import time
@@ -16,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from core.config import Config, load_config
+
+log = logging.getLogger("sylvie.llm")
 
 
 @dataclass
@@ -284,6 +287,27 @@ class LLM:
 
         self._executor.submit(_job).result()
 
+    def complete_many(self, conversations: list[list[dict]], max_tokens: int = 400) -> list[str]:
+        """Several independent prompts answered together: one model, generating in parallel
+        (the "helper Sylvies" of tools/research.py). Falls back to one by one if batching fails."""
+        from core.toolcall import StreamSplitter
+
+        if self.tokenizer is None:
+            self.load()
+        prompts = [self.render(m, thinking=False) for m in conversations]
+        try:
+            texts = self._executor.submit(_batch_texts, self, prompts, max_tokens).result()
+        except Exception:
+            log.exception("batched generation failed; answering one by one")
+            return [self.complete(m, max_tokens=max_tokens) for m in conversations]
+        out = []
+        for t in texts:
+            sp = StreamSplitter(thinking=False)
+            sp.feed(t)
+            sp.flush()
+            out.append(sp.visible_text.strip())
+        return out
+
     def complete(
         self,
         messages: list[dict],
@@ -303,6 +327,22 @@ class LLM:
             sp.feed(chunk.text)
         sp.flush()
         return sp.visible_text.strip()
+
+
+def _batch_texts(llm, prompts: list[str], max_tokens: int) -> list[str]:
+    """Runs on the generation thread: several prompts through one model at once (mlx-lm batching)."""
+    import mlx.core as mx
+    from mlx_lm.generate import batch_generate
+    from mlx_lm.sample_utils import make_sampler
+
+    llm._load_sync()
+    sampler = make_sampler(
+        temp=llm.cfg.get_path("llm.temperature", 0.7), top_p=llm.cfg.get_path("llm.top_p", 0.8), top_k=20
+    )
+    tokens = [llm.tokenizer.encode(p, add_special_tokens=False) for p in prompts]
+    out = batch_generate(llm.model, llm.tokenizer, tokens, max_tokens=max_tokens, sampler=sampler)
+    mx.clear_cache()
+    return out.texts
 
 
 class FakeLLM:
@@ -333,6 +373,9 @@ class FakeLLM:
 
     def unload(self):
         pass
+
+    def complete_many(self, conversations, max_tokens=400):
+        return [self.complete(m, max_tokens=max_tokens) for m in conversations]
 
     def stream(
         self, messages, tools=None, thinking=False, effort="low", max_tokens=None, stop=None, use_cache=True

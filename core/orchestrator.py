@@ -207,6 +207,7 @@ class Sylvie:
             private_terms=[self.cfg.get_path("user.name", "Lea")],
             actions=self.actions if self.cfg.get_path("actions.enabled") != [] else None,
             conversation_id=conversation_id,
+            llm=self.llm if self.cfg.get_path("search.research", True) else None,
         )
 
     def speech_to_text(self):
@@ -568,6 +569,8 @@ class Sylvie:
                     first = calls[0]
                     self.bg.submit("shortcut", lambda ev, c=first: self._note_lookup(text, c))
                 for call in calls:
+                    if call.name == "research":
+                        yield {"type": "status", "text": phrase("research", text)}
                     result = self._run_tool(call, tools, tctx, trace)
                     if result is None:  # invalid call
                         invalid_calls += 1

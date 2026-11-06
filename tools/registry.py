@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from tools.calc import calculate
 from tools.fetch import BlockedURL, fetch_page
+from tools.research import research
 from tools.search import SearchUnavailable, web_search
 
 
@@ -43,6 +44,14 @@ CALCULATOR = _fn(
     {"expression": {"type": "string"}},
     ["expression"],
 )
+RESEARCH = _fn(
+    "research",
+    "Research a broad or multi-part question (comparisons, pros and cons, planning a trip, 'what are my options'): "
+    "it splits the question into parts, searches them in parallel and returns notes with sources. Slower than "
+    "web_search (~20-40 s), so use web_search for a single fact. Never include Lea's name or personal details.",
+    {"question": {"type": "string", "description": "the whole question to research, generic wording"}},
+    ["question"],
+)
 OPEN_URL = _fn(
     "open_url",
     "Open and read a web page. Only for URLs Lea gave you or URLs from this turn's search results.",
@@ -62,6 +71,7 @@ class ToolContext:
     actions: object | None = None  # actions.runner.ActionRunner
     conversation_id: str | None = None
     read_untrusted: bool = False  # set once outside content (web, files, email) entered this turn
+    llm: object | None = None  # for tools that think (research); the turn's model, idle while tools run
 
 
 @dataclass
@@ -76,6 +86,8 @@ def available_tools(ctx: ToolContext) -> list[dict]:
     tools = [CALCULATOR]
     if ctx.cfg.get_path("search.enabled", True):
         tools = [WEB_SEARCH, OPEN_URL] + tools
+        if ctx.llm is not None:
+            tools.append(RESEARCH)
     if ctx.docs is not None and ctx.docs.stats()["chunks"] > 0:
         tools.append(SEARCH_DOCS)
     if ctx.actions is not None:
@@ -112,7 +124,7 @@ def _number_sources(ctx: ToolContext, sources: list[dict]) -> list[dict]:
     return out
 
 
-UNTRUSTED_TOOLS = {"web_search", "open_url", "search_documents", "read_emails", "calendar_events"}
+UNTRUSTED_TOOLS = {"web_search", "open_url", "search_documents", "read_emails", "calendar_events", "research"}
 
 
 def execute(call, ctx: ToolContext) -> ToolResult:
@@ -161,6 +173,29 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
             for s in reversed(sources):
                 text = text.replace(f"[{s['n']}] ", f"[{s['n'] + offset}] ", 1)
         return ToolResult(text, numbered)
+    if call.name == "research":
+        if ctx.llm is None:
+            return ToolResult("Research isn't available here; use web_search instead.", ok=False)
+
+        def search(query: str):
+            try:
+                return web_search(
+                    query,
+                    base_url=ctx.cfg.get_path("search.searxng_url"),
+                    max_results=ctx.cfg.get_path("search.max_results", 5),
+                    pages_to_open=2,
+                    private_terms=ctx.private_terms,
+                )
+            except SearchUnavailable:
+                return "Web search is unavailable right now.", []
+
+        text, sources, _ = research(args["question"], ctx.llm, search, start=len(ctx.sources))
+        for s in sources:
+            ctx.allowed_urls.add(s["url"])
+            ctx.sources.append(s)
+        if not sources:
+            text += "\n\n(No web results came back: tell Lea you couldn't research it and answer from what you know.)"
+        return ToolResult(text, sources)
     if call.name == "open_url":
         url = str(args["url"]).strip()
         if url not in ctx.allowed_urls and url not in ctx.user_text:
