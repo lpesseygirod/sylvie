@@ -100,3 +100,31 @@ def test_identity_batch_is_local_and_staged(tmp_path):
     assert [e["messages"][0]["role"] for e in ex] == ["user", "user"]  # no system prompt stored
     assert all(e["source"] == "sylvie-local:Qwen" for e in ex)
     assert "system" in [m["role"] for m in llm.calls[1]["messages"]]  # but the persona guided the answer
+
+
+# ---------- the real entry point, with stand-in models ----------
+def test_questions_come_from_the_open_datasets(tmp_path):
+    o, _ = night(tmp_path, [], [], [])
+    del o.questions  # use the real method
+    gsm = tmp_path / "datasets" / "open" / "gsm8k" / "train.jsonl"
+    gsm.parent.mkdir(parents=True)
+    gsm.write_text(json.dumps({"question": "What is 2 + 3?", "answer": "5"}) + "\n")
+    items = o.questions(3)
+    assert [i.source for i in items] == ["checkable"] and items[0].expected == 5.0
+
+
+def test_overnight_main_runs_end_to_end(tmp_path, monkeypatch):
+    """Catches crashes in main() itself (two slipped through before: a wrong import and a stale call)."""
+    import sys
+
+    import core.orchestrator
+    import learning.overnight as ov
+    from tests.test_orchestrator import make
+
+    s = make(tmp_path, [])
+    s.cfg["paths"]["data_dir"] = str(tmp_path / "data")
+    monkeypatch.setattr(ov, "load_config", lambda: s.cfg)
+    monkeypatch.setattr(core.orchestrator.Sylvie, "build", classmethod(lambda cls, cfg=None: s))
+    monkeypatch.setattr(ov, "ModelPool", lambda cfg: Pool(FakeLLM(), FakeLLM()))
+    monkeypatch.setattr(sys, "argv", ["overnight", "--max-minutes", "0"])
+    ov.main()  # no data files, no time: every step must still run without crashing

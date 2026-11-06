@@ -204,11 +204,10 @@ class Overnight:
         self.stats = {"questions": 0, "rewritten": 0, "kept": 0, "batches": 0}
 
     def questions(self, n: int) -> list[Item]:
-        open_path = (
-            self.cfg.data_dir / "datasets" / "open" / "oasst2" / "2023-11-05_oasst2_ready.trees.jsonl.gz"
-        )
+        open_dir = self.cfg.data_dir / "datasets" / "open"
+        open_path = open_dir / "oasst2" / "2023-11-05_oasst2_ready.trees.jsonl.gz"
         items = (
-            checkable_questions(self.rng, n // 3)
+            checkable_questions(open_dir / "gsm8k" / "train.jsonl", self.rng, n // 3)
             + oasst_questions(open_path, self.rng, n // 3)
             + past_chat_questions(self.db, self.rng, n - 2 * (n // 3))
         )
