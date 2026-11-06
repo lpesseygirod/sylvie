@@ -13,6 +13,7 @@ from core.jsonutil import extract_json
 
 EXTRACT_PROMPT = """You maintain the memory of Sylvie, Lea's personal assistant. Read Lea's latest message \
 (and Sylvie's reply for context) and return what is worth remembering long-term, as JSON only.
+{note}
 
 Return exactly this shape:
 {{"facts": [{{"key": "lea.<short_snake_case>", "fact": "<one sentence about Lea, in English>", "category": "<identity|studies|work|projects|people|places|preferences|other>", "sensitive": false}}],
@@ -87,8 +88,10 @@ def parse_extraction(raw: str, message: str) -> Extraction:
     return Extraction(facts, _strs("interests"), _strs("interests_removed"), style)
 
 
-def run_extraction(llm, message: str, reply: str, existing: list) -> Extraction:
+def run_extraction(llm, message: str, reply: str, existing: list, note: str = "") -> Extraction:
     existing_text = "\n".join(f"{f.key or '-'}: {f.text}" for f in existing) or "(none)"
-    prompt = EXTRACT_PROMPT.format(existing=existing_text, message=message[:4000], reply=reply[:1500])
+    prompt = EXTRACT_PROMPT.format(
+        note=note, existing=existing_text, message=message[:4000], reply=reply[:1500] or "(none)"
+    )
     raw = llm.complete([{"role": "user", "content": prompt}], max_tokens=600)
     return parse_extraction(raw, message)

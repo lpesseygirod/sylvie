@@ -44,7 +44,7 @@ Lea's message:
 {message}
 </message>
 
-Answer with JSON only:
+{note}Answer with JSON only:
 {{"is_preference": true|false,
  "preference": "<the rule as a short instruction to Sylvie, in English, e.g. 'Keep answers short.'>",
  "replaces": [<ids of current preferences this one contradicts or updates>],
@@ -73,13 +73,20 @@ class PreferenceStore:
             for r in rows
         ]
 
-    def add(self, text: str, source_quote: str | None = None, replaces: list[int] | None = None) -> int:
+    def add(
+        self,
+        text: str,
+        source_quote: str | None = None,
+        replaces: list[int] | None = None,
+        scope: str = "style",
+        active: bool = True,
+    ) -> int:
         with self.db.transaction() as c:
             for pid in replaces or []:
                 c.execute("UPDATE preferences SET active = 0 WHERE id = ?", (int(pid),))
             cur = c.execute(
-                "INSERT INTO preferences(text, source_quote, created_at) VALUES (?, ?, ?)",
-                (text.strip(), source_quote, utcnow()),
+                "INSERT INTO preferences(text, scope, source_quote, active, created_at) VALUES (?, ?, ?, ?, ?)",
+                (text.strip(), scope, source_quote, int(active), utcnow()),
             )
             return cur.lastrowid
 
@@ -100,15 +107,26 @@ def maybe_preference(message: str) -> bool:
     return bool(TRIGGER_RE.search(message))
 
 
-def detect_preference(llm, store: PreferenceStore, message: str) -> dict | None:
-    """Returns {"id", "preference", "ack"} if a lasting preference was saved, else None."""
+CLAUDE_NOTE = (
+    "Note: this message was written to Claude Code, a coding assistant, not to Sylvie. Only count a \
+preference about how answers should be written that would suit any assistant (length, tone, language, \
+format, how much to explain). Instructions about the coding work, permissions, or when to ask or stop \
+are NOT preferences for Sylvie.\n\n"
+)
+
+
+def detect_preference(llm, store: PreferenceStore, message: str, source: str = "chat") -> dict | None:
+    """Returns {"id", "preference", "ack"} if a lasting preference was saved, else None.
+    From Claude Code (source="claude") it's saved switched off, for Lea to approve, and never
+    replaces one of hers."""
     if not maybe_preference(message):
         return None
+    from_claude = source == "claude"
     current = "\n".join(f"{p.id}: {p.text}" for p in store.list()) or "(none)"
-    raw = llm.complete(
-        [{"role": "user", "content": CLASSIFY_PROMPT.format(current=current, message=message[:2000])}],
-        max_tokens=200,
+    prompt = CLASSIFY_PROMPT.format(
+        current=current, message=message[:2000], note=CLAUDE_NOTE if from_claude else ""
     )
+    raw = llm.complete([{"role": "user", "content": prompt}], max_tokens=200)
     data = extract_json(raw)
     if (
         not isinstance(data, dict)
@@ -117,7 +135,13 @@ def detect_preference(llm, store: PreferenceStore, message: str) -> dict | None:
     ):
         return None
     replaces = [int(x) for x in data.get("replaces") or [] if str(x).isdigit()]
-    pid = store.add(str(data["preference"]), source_quote=message[:300], replaces=replaces)
+    if from_claude:
+        text = str(data["preference"]).strip().lower()
+        if any(p.text.strip().lower() == text for p in store.list(include_inactive=True)):
+            return None  # already suggested (or already hers)
+        pid = store.add(str(data["preference"]), source_quote=message[:300], scope="claude", active=False)
+    else:
+        pid = store.add(str(data["preference"]), source_quote=message[:300], replaces=replaces)
     return {
         "id": pid,
         "preference": str(data["preference"]).strip(),

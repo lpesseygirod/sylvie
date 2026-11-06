@@ -128,6 +128,7 @@ class Scheduler:
             if job is None:
                 return
             log.info("starting heavy job %s", job.name)
+            self.s.bg.interrupt()  # background learning lets go of the model first (it's re-queued)
             self.s.unload_models()  # frees ~21 GB (LLM, Whisper, Kokoro, embeddings) for the job
             env = {**os.environ, "HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1"}
             logf = open(self.s.cfg.data_dir / "logs" / f"{job.name}.log", "a")  # noqa: SIM115

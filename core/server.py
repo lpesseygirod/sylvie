@@ -72,6 +72,10 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
                     if saved.get("learning_paused"):
                         state["sylvie"].scheduler.enabled = False
                     state["sylvie"].scheduler.start()
+                    from memory.claude_history import ClaudeHistory
+
+                    state["sylvie"].claude_history = ClaudeHistory(state["sylvie"])
+                    state["sylvie"].claude_history.start()
                 state["ready"] = True
                 log.info("Sylvie ready")
             except Exception as e:

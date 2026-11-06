@@ -44,6 +44,11 @@ from tools.registry import ToolContext, available_tools, execute, validate
 log = logging.getLogger("sylvie")
 
 MAX_TOOL_ROUNDS = 4
+CLAUDE_NOTE = (
+    "This message was written to Claude Code, a coding assistant on Lea's Mac, not to Sylvie, and there "
+    "is no reply. Instructions about the coding task itself (what to build, run, fix or commit) are not "
+    "facts about Lea and not style."
+)
 LANG_NAMES = {"en": "English", "es": "Spanish", "fr": "French"}
 MAX_ATTACHMENT_CHARS = 20000
 
@@ -72,6 +77,7 @@ class BackgroundWorker:
         self.last_activity = 0.0
         self.busy = threading.Event()
         self.current: _Job | None = None
+        self.hold = lambda: False  # True while a night job has the models unloaded
         self._thread = threading.Thread(target=self._run, daemon=True, name="sylvie-bg")
         self._thread.start()
 
@@ -88,6 +94,15 @@ class BackgroundWorker:
         self.last_activity = time.time()
         self.busy.clear()
 
+    def interrupt(self, timeout: float = 30) -> None:
+        """Stop the running job (it's re-queued) and wait until it has let go of the model."""
+        job = self.current
+        if job is not None:
+            job.stop.set()
+        end = time.time() + timeout
+        while self.current is not None and time.time() < end:
+            time.sleep(0.05)
+
     def drain(self, timeout: float = 120) -> None:
         """Tests/CLI: wait until the queue is empty."""
         end = time.time() + timeout
@@ -97,7 +112,7 @@ class BackgroundWorker:
     def _run(self) -> None:
         while True:
             job = self.q.get()
-            while self.busy.is_set() or time.time() - self.last_activity < self.idle_seconds:
+            while self.busy.is_set() or time.time() - self.last_activity < self.idle_seconds or self.hold():
                 time.sleep(0.2)
             job.stop.clear()
             self.current = job
@@ -131,6 +146,8 @@ class Sylvie:
         self.teacher = Teacher(self, self.learning)
         self.bg = BackgroundWorker(idle_seconds=idle_seconds)
         self.scheduler = None  # set by the server (learning/scheduler.py)
+        self.bg.hold = lambda: self.scheduler is not None and self.scheduler.proc is not None
+        self.claude_history = None  # set by the server (memory/claude_history.py)
         self._stops: dict[str, threading.Event] = {}
         self._stt = None
         self._tts = None
@@ -525,12 +542,19 @@ class Sylvie:
             return execute(call, tctx)
 
     # ---------- background learning ----------
-    def _learn(self, message: str, reply: str, source: str, stop: threading.Event) -> None:
+    def learn_from_claude(self, message: str, source: str, stop: threading.Event) -> None:
+        """One of Lea's own messages to Claude Code (memory/claude_history.py). Facts and interests
+        are learned as usual; a rule about answers is saved switched off, for Lea to approve."""
+        detect_preference(_Stoppable(self.llm, stop), self.prefs, message, source="claude")
+        if not stop.is_set():
+            self._learn(message, "", source, stop, note=CLAUDE_NOTE)
+
+    def _learn(self, message: str, reply: str, source: str, stop: threading.Event, note: str = "") -> None:
         if len(message.strip()) < 4:
             return
         before = self.current_system_prompt()
         existing = recall(self.db, self.embedder, message, k=8)
-        ex = run_extraction(_Stoppable(self.llm, stop), message, reply, existing)
+        ex = run_extraction(_Stoppable(self.llm, stop), message, reply, existing, note=note)
         if stop.is_set():
             return  # interrupted: the job is re-queued and will run again
         for f in ex.facts:

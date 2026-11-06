@@ -174,3 +174,11 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 
 ### T33 — Rule: never claim an action that didn't happen
 - In one test run the current model answered "C'est noté. Je viens de créer le rappel…" **without calling `create_reminder`**. A previous run did call it. New safety rule 5 in `core/prompts/rules.md`: never say something was done unless its tool call succeeded in this turn.
+
+### T34 — Sylvie learns from Lea's messages to Claude Code
+- Lea asked (2026-11-06) for Sylvie to see her interactions with Claude, to learn how she likes answers.
+- `memory/claude_history.py` reads `~/.claude/projects/*/*.jsonl` locally every 5 minutes, from where it stopped last time. It keeps only lines Claude Code marks as typed by a human (`origin.kind == "human"` or `turnOrigin == "human"`), and cuts out pasted text, system notes and IDE selections. It drops Claude's answers, tool output, task notifications, subagents, and briefs or relays from other Claude sessions, since those aren't Lea's words. On 2026-11-06 that came to 254 messages.
+- Each message goes through the normal background learning (facts, interests, style), told it was written to a coding assistant. Nothing is copied into conversations or training data, so rule 4 holds: no Claude-written text reaches Sylvie, only Lea's own words.
+- A rule about answers ("shorter please") is saved **switched off** (`scope = "claude"`). About Lea → Preferences labels it "Suggested from your Claude chats", and Lea turns it on if she wants it. Coding instructions like "don't ask, just do it" must not become rules for Sylvie on their own.
+- Background learning now waits while a night job has the models unloaded, and the scheduler interrupts the running background job before unloading. A long backlog could otherwise reload the 27B in the middle of training.
+- Off switch: `config.yaml → memory.claude_history.enabled`, plus `exclude_projects` to skip folders.

@@ -43,6 +43,12 @@ search:
 memory:
   recall_top_k: 6
   extract_in_background: true
+  # Learn from Lea's own messages to Claude Code (~/.claude/projects), read locally every few minutes.
+  # Only what she typed — never Claude's answers. Rules about answers arrive switched off for her to approve.
+  claude_history:
+    enabled: true
+    folder: ~/.claude/projects
+    exclude_projects: []           # folder names under ~/.claude/projects to skip
 
 persona:
   default_language: match_lea      # default — Lea can change (decision 2)

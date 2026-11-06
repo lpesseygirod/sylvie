@@ -674,7 +674,8 @@
       body.appendChild(add);
       if (!prof.preferences.length) body.appendChild(el("p", "meta", "Tell Sylvie things like “shorter please” or “no emojis” and they'll show up here."));
       for (const p of prof.preferences) {
-        body.appendChild(item(`<span class="${p.active ? "" : "inactive"}">${esc(p.text)}</span>${p.source_quote ? `<div class="meta">“${esc(p.source_quote)}”</div>` : ""}`,
+        const from = p.scope === "claude" ? `<div class="meta">${p.active ? "From your Claude chats" : "Suggested from your Claude chats · off until you turn it on"}</div>` : "";
+        body.appendChild(item(`<span class="${p.active ? "" : "inactive"}">${esc(p.text)}</span>${from}${p.source_quote ? `<div class="meta">“${esc(p.source_quote)}”</div>` : ""}`,
           btn(p.active ? "Turn off" : "Turn on", () => api(`/api/preferences/${p.id}`, { method: "PATCH", body: { active: !p.active } }))));
       }
     }
