@@ -27,15 +27,13 @@ final class AudioPipeline {
     /// Then it starts without echo cancellation instead of giving up.
     func start() throws {
         guard !running else { return }
-        do {
-            try configure(voiceProcessing: true)
-            echoCancelled = true
-        } catch {
-            wakeLog.notice("echo cancellation unavailable (\(error.localizedDescription, privacy: .public)); mic without it")
-            teardown()
-            try configure(voiceProcessing: false)
-            echoCancelled = false
-        }
+        // Echo cancellation (Apple's voice processing) doesn't work on Lea's MacBook: it either fails to
+        // start (-10875) or starts in a fault state and delivers silence ("failed to run downlink DSP",
+        // 2026-11-06), so Sylvie heard nothing. The plain mic works; Sylvie ignores the mic while she
+        // talks and turns music down while she listens (AppController, MusicDucker).
+        if engine.inputNode.isVoiceProcessingEnabled { teardown() }
+        try configure(voiceProcessing: false)
+        echoCancelled = false
         running = true
     }
 
