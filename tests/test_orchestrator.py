@@ -103,6 +103,17 @@ def test_invalid_tool_call_is_retried_then_tools_dropped(tmp_path):
     assert ev[-1]["type"] == "done"
 
 
+def test_unclosed_tool_call_is_retried_without_tools(tmp_path):
+    # Seen with the real 27B: a whole answer written inside a <tool_call> that never closed.
+    unclosed = "<tool_call>\n<function=web_search>\n- passport\n- light jacket\n" * 5
+    s = make(tmp_path, [unclosed, "Passport, a light jacket and comfy shoes.", extraction()])
+    ev = run(s, "packing list for Lisbon")
+    assert s.llm.calls[1]["tools"] is None
+    shown = "".join(e["text"] for e in ev if e["type"] == "text")
+    assert "light jacket" in shown and "tool_call" not in shown
+    assert s.convs.messages(ev[-1]["conversation_id"])[-1]["content"].startswith("Passport")
+
+
 def test_preference_is_applied_immediately_and_persisted(tmp_path):
     pref = '{"is_preference": true, "preference": "Keep answers short.", "replaces": [], "ack": "Got it, shorter."}'
     s = make(tmp_path, [pref, "Got it, shorter.", extraction(), "Ok.", extraction()])

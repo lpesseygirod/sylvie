@@ -439,6 +439,12 @@ class Sylvie:
                         yield {"type": kind, "text": s}
                 visible = sp.visible_text.strip()
                 calls = sp.tool_calls if use_tools and not stop.is_set() else []
+                if not calls and not visible and sp.raw.strip() and not stop.is_set() and use_tools:
+                    # Everything went into a tool call that never closed or didn't parse, so Lea
+                    # would get a blank answer. Retry once without tools instead.
+                    log.warning("Unusable tool call, retrying without tools: %r", sp.raw[:300])
+                    invalid_calls = 2
+                    continue
                 if not calls:
                     display_parts.append(visible)
                     final_mid = self.convs.add_message(
