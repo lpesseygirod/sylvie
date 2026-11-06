@@ -25,6 +25,8 @@ from core.lang import guess_language, phrase
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
 from core.quick import quick_reply
 from core.router import route
+from core.settings import INTENT_NOTE as SETTING_NOTE
+from core.settings import looks_like_setting_request
 from core.shortcuts import NOTE as SHORTCUT_NOTE
 from core.shortcuts import Shortcuts
 from core.toolcall import StreamSplitter, ToolCall
@@ -409,6 +411,10 @@ class Sylvie:
                             "mistake, correct it now, otherwise ask briefly what was wrong. A deeper review runs later."
                         )
                     yield {"type": "notice", "kind": "feedback", "message_id": last_answer["id"]}
+
+            # 1d. "speak faster", "use the Bella voice": make sure the change really happens (core/settings.py)
+            if looks_like_setting_request(text):
+                notes.append(SETTING_NOTE)
 
             # 1c. "Hello" / "thanks" / "bye": an instant answer, no model (core/quick.py)
             reply = None

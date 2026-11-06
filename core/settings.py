@@ -9,6 +9,7 @@ purpose. Changes take effect right away and are kept across restarts (state.json
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 # Kokoro voices by language, friendly name → voice id (names are what Lea hears in the samples).
@@ -26,6 +27,26 @@ VOICES = {
 MODELS = {"fast": "mlx-community/Qwen3.5-9B-4bit", "smart": "mlx-community/Qwen3.8-27B-4bit"}
 ON = {"on", "true", "yes", "1", "sí", "si", "oui", "enable", "enabled"}
 OFF = {"off", "false", "no", "0", "non", "disable", "disabled"}
+
+
+# A message that sounds like a settings request. Measured 2026-11-06: the 9B once answered "I set the
+# speed back to 1.0" without calling change_setting, so for these Sylvie gets an explicit reminder.
+INTENT_RE = re.compile(
+    r"\b(voice|voz|voix|speed|velocidad|vitesse|faster|slower|más (rápido|despacio|lento)|mas (rapido|despacio)|"
+    r"plus (vite|lentement)|turn (on|off)|switch (on|off|to)|activa|desactiva|enciende|apaga|active|désactive|"
+    r"web search|búsqueda|recherche|setting|ajuste|configuraci[oó]n|réglage|paramètre|modelo|model|"
+    r"night learning|aprendizaje nocturno|quick replies|shortcuts?)\b",
+    re.I,
+)
+INTENT_NOTE = (
+    "This may be a request to change one of your settings. If it is, you MUST call change_setting (or "
+    "show_settings to read them); the change only happens through that call. Never say a setting was "
+    "changed unless change_setting succeeded in this turn."
+)
+
+
+def looks_like_setting_request(text: str) -> bool:
+    return bool(INTENT_RE.search(text))
 
 
 class BadValue(ValueError):

@@ -50,3 +50,15 @@ def test_lea_asks_sylvie_to_change_her_voice(tmp_path):
     tool = next(e for e in ev if e["type"] == "tool")
     assert tool["name"] == "change_setting" and tool["ok"]
     assert s.cfg.get_path("voice.kokoro_voices.es") == "em_alex"
+
+
+def test_setting_requests_get_a_reminder_to_really_change_it(tmp_path):
+    from core.settings import looks_like_setting_request
+
+    assert looks_like_setting_request("Vuelve a hablar a velocidad normal")
+    assert looks_like_setting_request("speak slower please")
+    assert looks_like_setting_request("désactive la recherche web")
+    assert not looks_like_setting_request("¿Qué tiempo hace en Madrid?")
+    s = make(tmp_path, ["Vale.", "{}"])
+    run(s, "Vuelve a hablar a velocidad normal")
+    assert "you MUST call change_setting" in s.llm.calls[0]["messages"][-1]["content"]
