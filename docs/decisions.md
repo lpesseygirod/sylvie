@@ -156,3 +156,21 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   5. *Edit on the "Send?" card* lets Lea say what to change. Nothing is sent meanwhile.
 - **Also fixed:** in the Mac app's chat window, confirm/prompt dialogs (delete a chat, edit a fact) were silently answered "no" by WKWebView. They are now real dialogs.
 
+
+### T31 — First 27B fine-tunes: what went wrong and the safeguards (2026-11-06)
+- **v001** (300 steps, 25 min): the loss became NaN at step ~255 and **every LoRA weight became NaN**. The step-200 checkpoint had been overwritten, so nothing was usable. Marked failed; never usable.
+- **Cause (found on the third try):** Qwen's chat template adds ~290 tokens of tool instructions whenever a tool is offered, so many calculator examples (prompt ~390 tokens) were cut at 512 tokens *before their answer*. mlx-lm trains only on the last message, so those examples had **zero target tokens → loss 0/0 = NaN**, and one such step poisons every weight. (A first length check said "0 too long" because of a bug in how I counted tokens.)
+- **Safeguards now in place:**
+  1. The dataset builder tokenizes every example exactly as mlx-lm will (`learning/dataset.py: token_measure`) and drops ones over 512 tokens or with fewer than 4 target tokens. Of 77 verified practice examples, 49 fit.
+  2. Training keeps a copy after every good 100-step segment. A segment that produces NaN is rolled back and retried once at half the learning rate; a second NaN keeps the last good adapter, or fails the run if there is none (`learning/train.py`). Failed runs don't delay the next fine-tune.
+  3. Peak memory is now read from macOS "peak memory footprint", which counts GPU memory: **38.7 GB** (the old number, 12.5 GB, came from RSS and was wrong). That is above the 36 GB of RAM, so macOS swaps during training. It's slow but works; options are in T24.
+- **v002** (the rollback saved it: NaN in segment 3, retried at half rate): same as the current model on maths, multilingual, tools, general and style, but **finance 14/14 → 12/14**: it did compound interest in its head instead of with the calculator (€18,727 instead of €20,780). The gate flags it as a regression, so it can't be promoted.
+- **v003:** NaN at step 1 twice (new over-long tool examples in the validation set); failed cleanly, nothing kept. This is what exposed the real cause above.
+- **v004** (after the fixes; 509 examples: 460 oasst2 + 49 verified practice, 168 over-long dropped): clean, 33 min, val loss 1.27 → 0.90, peak 38.5 GB. Vs the current model: maths 25/25, finance 14/14, multilingual 10/10, tools 9/9, general 8/8, style 4/12 → 6/12. **No regressions** after re-scoring (one French answer was misread as Spanish by the language check; fixed in `core/lang.py`). Blind A/B (28 pairs) waiting for Lea. The undecided v002 round was withdrawn (exported to `_to_delete/`).
+
+### T32 — Practice trains the decision to use the calculator
+- **What:** mlx-lm learns only an example's last message. Our tool examples ended with the write-up after a calculator result, so the *decision to call the calculator* was never trained. That is why v002 stopped using it.
+- **Now:** each solved GSM8K problem gives a "decision" example (question → Sylvie's own calculator call, with her reasoning in thinking mode) as well as the answer example. Thinking-mode practice also has the calculator available. 34 earlier reasoning examples made without the calculator offered are set to `retired` (kept, not trained on).
+
+### T33 — Rule: never claim an action that didn't happen
+- In one test run the current model answered "C'est noté. Je viens de créer le rappel…" **without calling `create_reminder`**. A previous run did call it. New safety rule 5 in `core/prompts/rules.md`: never say something was done unless its tool call succeeded in this turn.
