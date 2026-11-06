@@ -18,6 +18,8 @@ fi
 
 uv venv --allow-existing --python 3.13 "$SRC/.venv"
 uv pip install --python "$SRC/.venv/bin/python" -r "$SRC/requirements.txt" -r "$SRC/requirements-server.txt"
+# The editable install builds without isolation, so its build tools must be in the venv first.
+uv pip install --python "$SRC/.venv/bin/python" setuptools wheel
 uv pip install --python "$SRC/.venv/bin/python" --no-build-isolation -e "$SRC"
 
 if [[ ! -f "$SETTINGS" ]]; then
