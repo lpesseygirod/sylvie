@@ -257,3 +257,13 @@ def test_without_the_key_she_says_what_is_missing(tmp_path):
     s.actions.spotify_search = missing
     out = s.actions.call("play_music", {"query": "Flowers"}, None)
     assert "make spotify" in out.content and "don't ask her to click" in out.content
+
+
+def test_what_she_plays_becomes_lea_taste(tmp_path):
+    play = "<tool_call>\n<function=play_music>\n<parameter=query>\nRosalía\n</parameter>\n</function>\n</tool_call>"
+    osa = FakeOSA({"play track": "Despechá — Rosalía"})
+    s = make(tmp_path, [play, "Puesto: Rosalía.", "{}"], osa=osa)
+    s.actions.spotify_search = lambda q: ("spotify:artist:R1", "Rosalía")
+    run(s, "Ponme algo de Rosalía")
+    s.bg.drain()
+    assert s.interests.find("music: Rosalía") is not None

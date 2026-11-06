@@ -72,7 +72,7 @@ shortcuts:
 
 proactivity:
   mode: only_when_topic_comes_up   # default — Lea can change (decision 10)
-  max_asides_per_conversation: 1
+  max_asides_per_conversation: 2   # Lea wants more initiative (2026-11-06)
 
 knowledge:
   folders: []                      # Lea chooses (decision 4); nothing indexed until she does
@@ -110,7 +110,7 @@ schedule:
   idle_minutes: 30              # …when Lea hasn't used Sylvie for this long…
   max_hours_per_night: 5        # …plugged in (never on battery), within this cap
   finetune_every_days: 10       # plan: every 1–2 weeks, promoted only if better
-  interest_research: weekly     # decision 10 — default, Lea can change (off | weekly | daily)
+  interest_research: daily      # Lea wants Sylvie to learn more on her own (2026-11-06); off | weekly | daily
 
 privacy:
   log_conversations: true

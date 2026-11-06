@@ -458,7 +458,10 @@ class Sylvie:
             with trace.stage("recall"):
                 facts = recall(self.db, self.embedder, text, k=self.cfg.get_path("memory.recall_top_k", 6))
                 aside = None
-                if not conv.get("aside_used") and self.cfg.get_path("proactivity.mode") != "off":
+                max_asides = self.cfg.get_path("proactivity.max_asides_per_conversation", 2)
+                if (conv.get("aside_used") or 0) < max_asides and self.cfg.get_path(
+                    "proactivity.mode"
+                ) != "off":
                     aside = notice(self.interests, text)
                     if aside is None:
                         q = confirm_question(self.interests)
@@ -466,7 +469,7 @@ class Sylvie:
                             self.interests.mark_asked(q[0])
                             aside = q[1]
                     if aside:
-                        self.convs.set(cid, aside_used=1)
+                        self.convs.set(cid, aside_used=(conv.get("aside_used") or 0) + 1)
                 # What was said in earlier conversations (memory/episodes.py), with dates
                 past = self.episodes.relevant(text, cid) if self.cfg.get_path("memory.episodes", True) else []
                 if past:
@@ -660,6 +663,13 @@ class Sylvie:
                                 + "\n…(trimmed: you have enough material now; answer Lea with it)"
                             )
                         yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
+                        if call.name == "play_music" and result.ok:
+                            # What she plays is her taste: it feeds the interests Sylvie picks music from.
+                            q = str(call.arguments.get("query", "")).strip()
+                            if q and not q.startswith(("spotify:", "http")):
+                                self.bg.submit(
+                                    "taste", lambda ev, q=q: self.interests.bump(f"music: {q}", 0.5)
+                                )
                         if result.pending:
                             yield {"type": "action", "status": "pending", **result.pending}
                         if result.sources:
