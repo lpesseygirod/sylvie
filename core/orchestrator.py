@@ -23,7 +23,10 @@ from core.db import Database
 from core.devices import Devices
 from core.lang import guess_language, phrase
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
+from core.quick import quick_reply
 from core.router import route
+from core.shortcuts import NOTE as SHORTCUT_NOTE
+from core.shortcuts import Shortcuts
 from core.toolcall import StreamSplitter, ToolCall
 from core.trace import Trace
 from knowledge.docs_index import DocsIndex
@@ -143,6 +146,7 @@ class Sylvie:
         self.learning = LearningStore(db)
         self.devices = Devices(db)
         self.ab = ABTests(db)
+        self.shortcuts = Shortcuts(db, embedder, cfg)
         self.teacher = Teacher(self, self.learning)
         self.bg = BackgroundWorker(idle_seconds=idle_seconds)
         self.scheduler = None  # set by the server (learning/scheduler.py)
@@ -287,6 +291,7 @@ class Sylvie:
             }
 
             notes: list[str] = []
+            base_notes = 1 if channel in ("voice", "phone") else 0  # notes beyond these mean "special turn"
             if channel in ("voice", "phone"):
                 notes.append(
                     "Lea is talking to you by voice. Answer in the SAME language as her message below "
@@ -361,6 +366,22 @@ class Sylvie:
                     )
                     yield {"type": "notice", "kind": "feedback", "message_id": last_answer["id"]}
 
+            # 1c. "Hello" / "thanks" / "bye": an instant answer, no model (core/quick.py)
+            reply = None
+            if forgotten is None and pending is None and not attachments and len(notes) == base_notes:
+                reply = quick_reply(text, self.cfg)
+            if reply:
+                trace.mark("first_token")
+                yield {"type": "status", "mode": "quick", "reason": "greeting"}
+                yield {"type": "text", "text": reply}
+                final_mid = self.convs.add_message(
+                    cid, "assistant", reply, model_content=reply, trace=trace.to_dict(), mode="quick",
+                    channel=channel,
+                )  # fmt: skip
+                yield {"type": "done", "message_id": final_mid, "conversation_id": cid,
+                       "trace": trace.to_dict(), "stopped": False}  # fmt: skip
+                return
+
             # 2. "No Sylvie, I prefer…" → saved and applied right now
             system_prompt = conv.get("system_prompt")
             with trace.stage("preference"):
@@ -422,6 +443,35 @@ class Sylvie:
             invalid_calls = 0
             announced = False
             final_mid = None
+
+            # 5b. Something Lea asks often: start its lookup now instead of after a model round
+            sc = self.shortcuts.find(text) if tools else None
+            if sc is not None:
+                call = ToolCall(sc.tool, sc.args)
+                if validate(call, tools) is None:
+                    announced = True
+                    trace.mark("first_status")
+                    yield {"type": "status", "text": phrase("checking", text)}
+                    result = self._run_tool(call, tools, tctx, trace)
+                    self.shortcuts.used(sc.id)
+                    assistant_msg = {"role": "assistant", "content": "", "tool_calls": [call.to_message()]}
+                    messages.append(assistant_msg)
+                    self.convs.add_message(
+                        cid,
+                        "assistant",
+                        "",
+                        model_content="",
+                        tool_calls=assistant_msg["tool_calls"],
+                        mode=mode,
+                    )
+                    content = SHORTCUT_NOTE.format(q=sc.question) + result.content
+                    yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok,
+                           "shortcut": True}  # fmt: skip
+                    if result.sources:
+                        yield {"type": "sources", "sources": tctx.sources}
+                    messages.append({"role": "tool", "content": content})
+                    self.convs.add_message(cid, "tool", "", model_content=content)
+
             for round_no in range(MAX_TOOL_ROUNDS + 1):
                 # Tools are dropped on the last round, or after a second malformed call (retry once).
                 use_tools = tools if round_no < MAX_TOOL_ROUNDS and invalid_calls < 2 else None
@@ -492,6 +542,9 @@ class Sylvie:
                     tool_calls=assistant_msg["tool_calls"],
                     mode=mode,
                 )
+                if round_no == 0:  # remember the lookup; asked often enough, it becomes a shortcut
+                    first = calls[0]
+                    self.bg.submit("shortcut", lambda ev, c=first: self._note_lookup(text, c))
                 for call in calls:
                     result = self._run_tool(call, tools, tctx, trace)
                     if result is None:  # invalid call
@@ -534,6 +587,11 @@ class Sylvie:
             if cid:
                 self._stops.pop(cid, None)
             self.bg.turn_finished()
+
+    def _note_lookup(self, text: str, call: ToolCall) -> None:
+        sc = self.shortcuts.record(text, call.name, call.arguments)
+        if sc is not None:
+            log.info("new shortcut #%s: %s → %s", sc.id, sc.question[:60], sc.tool)
 
     def _run_tool(self, call: ToolCall, tools, tctx, trace):
         if call.name == "__invalid__" or validate(call, tools):

@@ -56,6 +56,18 @@ persona:
   tone: warm, direct, a little playful   # default — Lea can change
   length: short_by_default         # default — Lea can change
 
+quick_replies:
+  # "Hello", "thanks", "bye", "how are you" (EN/ES/FR) are answered instantly, without the model.
+  # Change a reply by adding e.g.:  hello: {en: ["Hey {name}!"], es: ["¡Hola {name}!"]}
+  # Intents: hello, good_morning, good_afternoon, good_evening, good_night, thanks, bye, how_are_you.
+  enabled: true
+
+shortcuts:
+  # Requests Lea makes often (3+ times, e.g. "what's on my calendar today?") get their lookup started
+  # right away instead of after a model round. Only read-only lookups; answers are always fresh.
+  # See them: GET /api/shortcuts; switch one off: POST /api/shortcuts/<id> {"status": "off"}.
+  enabled: true
+
 proactivity:
   mode: only_when_topic_comes_up   # default — Lea can change (decision 10)
   max_asides_per_conversation: 1

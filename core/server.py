@@ -660,6 +660,19 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
         )
         return {"ok": True}
 
+    @app.get("/api/shortcuts")
+    def shortcuts_list():
+        """Requests Lea makes often, whose lookup starts right away (core/shortcuts.py)."""
+        return {"enabled": S().shortcuts.enabled, "shortcuts": S().shortcuts.list()}
+
+    @app.post("/api/shortcuts/{sid}")
+    def shortcut_set(sid: int, body: dict = Body(...)):
+        status = body.get("status")
+        if status not in ("on", "off"):
+            raise HTTPException(400, "status must be on or off")
+        S().shortcuts.set_status(sid, status)
+        return {"ok": True}
+
     @app.get("/api/versions")
     def versions():
         from learning.promote import load_state
