@@ -82,6 +82,7 @@ final class AppController: ObservableObject {
     private var micLevel = 0.0
     private var lastLevelSent = Date.distantPast
     private var autoHide: DispatchWorkItem?
+    private var ignoreMicUntil = Date.distantPast
 
     func start() {
         hotKey = HotKey { [weak self] in self?.hotKeyPressed() }
@@ -215,6 +216,7 @@ final class AppController: ObservableObject {
     private func beginListening(chime: Bool, greet: Bool = true) {
         guard pipeline.running else { return }
         if chime { NSSound(named: "Tink")?.play() }
+        ignoreMicUntil = Date().addingTimeInterval(pipeline.echoCancelled ? 0 : 0.35)  // not the chime
         if Date().timeIntervalSince(lastTurnAt) > conversationTimeout && !voiceModeActive { conversationId = nil }
         if !voiceModeActive { panel?.show() }
         recording = preRoll.snapshot()
@@ -234,6 +236,9 @@ final class AppController: ObservableObject {
     private func handle(_ samples: [Float]) {
         preRoll.append(samples)
         guard recordingActive else { return }
+        // Without echo cancellation the mic hears Sylvie herself (her "Hello Lea", the chime): measured
+        // 2026-11-06, her greeting ended up in Lea's question ("Sylvie. Hello Lea."). Leave those out.
+        if !pipeline.echoCancelled && (speaker.isSpeaking || Date() < ignoreMicUntil) { return }
         recording.append(contentsOf: samples)
         sendLevel(samples)
         for event in vad.process(samples) {
