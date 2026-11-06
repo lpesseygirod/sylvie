@@ -58,7 +58,10 @@ def screen_is_locked() -> bool:
         out = subprocess.run(
             # Full path: the background service (launchd) has no /usr/sbin in its PATH, so plain "ioreg"
             # failed there and the safe fallback said "locked" every time (Lea, 2026-11-06).
-            ["/usr/sbin/ioreg", "-n", "Root", "-d1", "-a"], capture_output=True, text=True, timeout=3
+            ["/usr/sbin/ioreg", "-n", "Root", "-d1", "-a"],
+            capture_output=True,
+            text=True,
+            timeout=3,
         ).stdout
     except (OSError, subprocess.SubprocessError):
         return True  # if we can't tell, be safe
