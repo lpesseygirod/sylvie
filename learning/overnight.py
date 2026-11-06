@@ -363,7 +363,7 @@ def main() -> None:
     # Checked again: tonight's verified practice may have made it due.
     finetune_due, why = due(cfg, night.store, model_id)
     print("fine-tune:", why, flush=True)
-    if finetune_due and not night.stop and end - time.time() > reserve / 2:
+    if finetune_due and not night.stop and end - time.time() >= reserve * 0.9:
         res = run_now(cfg, night.store, sylvie.ab, model_id)
         print("cycle:", json.dumps(res["comparison"]), flush=True)
 

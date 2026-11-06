@@ -43,6 +43,15 @@ def in_window(now: datetime, start: str, end: str) -> bool:
     return s <= t < e if s < e else (t >= s or t < e)  # windows may cross midnight
 
 
+def minutes_until(now: datetime, end: str) -> int:
+    """Whole minutes from `now` until the next `end` (HH:MM) time."""
+    h, m = (int(x) for x in end.split(":"))
+    target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    return int((target - now).total_seconds() // 60)
+
+
 @dataclass
 class Job:
     name: str
@@ -95,7 +104,11 @@ class Scheduler:
 
     def next_job(self) -> Job | None:
         """Overnight loop first; the fine-tune/eval cycle is started by the loop when it's due."""
-        py = [sys.executable, "-m", "learning.overnight", "--max-minutes", str(int(self.max_hours * 60))]
+        # Never past the window's end or tonight's cap: a job started at 06:55 gets 5 minutes, not 5 hours.
+        left = min(self.max_hours * 60 - self.used_tonight / 60, minutes_until(self.clock(), self.window[1]))
+        if left < 5:
+            return None
+        py = [sys.executable, "-m", "learning.overnight", "--max-minutes", str(int(left))]
         return Job("overnight", py)
 
     # ---------- running ----------
@@ -104,6 +117,8 @@ class Scheduler:
             if self.proc is not None:
                 if self.proc.poll() is not None:
                     self._finished()
+                elif not in_window(self.clock(), *self.window):
+                    self._stop("the night window is over")  # safety net; jobs also get a time limit
                 return
             ok, why = self.can_run()
             self.last_reason = why
@@ -133,15 +148,18 @@ class Scheduler:
         with self._lock:
             if self.proc is None or self.proc.poll() is not None:
                 return False
-            log.info("Lea is here: stopping %s", self.current.name if self.current else "job")
-            self.proc.send_signal(signal.SIGTERM)
-            try:
-                self.proc.wait(timeout=20)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
-                self.proc.wait()
-            self._finished()
+            self._stop("Lea is here")
             return True
+
+    def _stop(self, why: str) -> None:
+        log.info("%s: stopping %s", why, self.current.name if self.current else "job")
+        self.proc.send_signal(signal.SIGTERM)
+        try:
+            self.proc.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            self.proc.wait()
+        self._finished()
 
     def status(self) -> dict:
         return {

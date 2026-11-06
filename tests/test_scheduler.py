@@ -43,3 +43,32 @@ def test_job_runs_and_lea_preempts_it(tmp_path):
     assert any(e["type"] == "status" and "waking" in e.get("text", "") for e in ev)
     assert ev[-1]["type"] == "done"
     assert sc.status()["running"] is None
+
+
+def test_job_time_limit_never_runs_past_the_window(tmp_path):
+    from learning.scheduler import minutes_until
+
+    assert minutes_until(datetime(2026, 11, 6, 6, 55), "07:00") == 5
+    assert minutes_until(datetime(2026, 11, 6, 23, 0), "07:00") == 480
+    sc, _ = sched(tmp_path, hour=2)
+    assert sc.next_job().args[-1] == "300"  # 02:00: the 5-hour cap
+    sc.clock = lambda: datetime(2026, 11, 6, 6, 30)
+    assert sc.next_job().args[-1] == "30"  # 06:30: only until 07:00
+    sc.clock = lambda: datetime(2026, 11, 6, 6, 57)
+    assert sc.next_job() is None  # not worth starting
+
+
+def test_running_job_is_stopped_when_the_window_closes(tmp_path):
+    import sys
+
+    from learning.scheduler import Job
+
+    sc, s = sched(tmp_path, hour=6)
+    s.warm = lambda: None
+    (s.cfg.data_dir / "logs").mkdir(exist_ok=True)
+    sc.next_job = lambda: Job("sleeper", [sys.executable, "-c", "import time; time.sleep(30)"])
+    sc.tick()
+    assert sc.status()["running"] == "sleeper"
+    sc.clock = lambda: datetime(2026, 11, 6, 7, 1)
+    sc.tick()
+    assert sc.status()["running"] is None
