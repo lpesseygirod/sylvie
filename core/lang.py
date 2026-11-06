@@ -33,7 +33,9 @@ def guess_language(text: str, default: str = "en") -> str:
     scores = {lang: sum(w in vocab for w in words) for lang, vocab in _WORDS.items()}
     if re.search(r"[ñ¿¡]", text):
         scores["es"] += 2
-    if re.search(r"[çèêàù]|\b(qu'|j'|l'|d')", text.lower()):
+    # ô â î û ë ï œ never appear in Spanish (é does, so it doesn't count). Measured: "Un hexagone a
+    # 6 côtés." was guessed as Spanish ("un", "a" are Spanish words too).
+    if re.search(r"[çèêàùôâîûëïœ]|\b(qu'|j'|l'|d')", text.lower()):
         scores["fr"] += 2
     best = max(scores, key=scores.get)
     return best if scores[best] > 0 else default

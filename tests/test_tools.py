@@ -80,6 +80,8 @@ def test_router():
 def test_language_guess():
     assert guess_language("¿Qué tiempo hace hoy en Madrid?") == "es"
     assert guess_language("Qu'est-ce que tu penses de ça ?") == "fr"
+    assert guess_language("Un hexagone a 6 côtés.") == "fr"
+    assert guess_language("Un hexagone a **6 côtés**.") == "fr"
     assert guess_language("What's the weather like today?") == "en"
 
 
