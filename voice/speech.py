@@ -100,11 +100,15 @@ def split_sentences(text: str, final: bool) -> tuple[list[str], str]:
 class SentenceStreamer:
     """feed(chunk) → list of complete sentences ready to speak; flush() at the end."""
 
-    def __init__(self, max_sentences: int = MAX_SPOKEN_SENTENCES):
+    def __init__(self, max_sentences: int = MAX_SPOKEN_SENTENCES, full: bool = False):
         self.buf = ""
         self.spoken = 0
         self.max = max_sentences
         self.done = False
+        # full: speak the whole answer (Lea's rule, 2026-11-06: "don't cut yourself off unless I say
+        # stop"). Code blocks and tables are still skipped: they can't be read aloud sensibly.
+        self.full = full
+        self.in_code = False
 
     def _take(self, sentences: list[str]) -> list[str]:
         room = self.max - self.spoken
@@ -114,10 +118,33 @@ class SentenceStreamer:
             self.done = True
         return sentences
 
+    def _speakable(self, paragraph: str) -> bool:
+        fences = paragraph.count("```")
+        was_code = self.in_code
+        if fences % 2:
+            self.in_code = not self.in_code
+        return not (was_code or fences or paragraph.lstrip().startswith("|"))
+
+    def _feed_full(self, final: bool = False) -> list[str]:
+        out = []
+        while "\n\n" in self.buf:
+            head, _, self.buf = self.buf.partition("\n\n")
+            if self._speakable(head):
+                out += split_sentences(head, final=True)[0]
+        pending = self.buf.lstrip()
+        if self.in_code or pending.startswith(("```", "|")):
+            if final:
+                self.buf = ""
+            return out
+        sentences, self.buf = split_sentences(self.buf, final=final)
+        return out + sentences
+
     def feed(self, chunk: str) -> list[str]:
         if self.done:
             return []
         self.buf += chunk
+        if self.full:
+            return self._feed_full()
         if "\n\n" in self.buf:
             head, _, rest = self.buf.partition("\n\n")
             sentences, _ = split_sentences(head, final=True)
@@ -137,6 +164,9 @@ class SentenceStreamer:
     def flush(self) -> list[str]:
         if self.done:
             return []
+        if self.full:
+            self.done = True
+            return self._feed_full(final=True)
         sentences, self.buf = split_sentences(self.buf, final=True)
         self.done = True
         return self._take(sentences)

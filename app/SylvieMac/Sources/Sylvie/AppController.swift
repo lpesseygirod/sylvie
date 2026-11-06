@@ -96,6 +96,9 @@ final class AppController: ObservableObject {
 
     private func checkListening() {
         guard serverWasReady, state != .muted, state != .starting else { return }
+        if !wake.isEnabled {
+            wakeLog.notice("check: not listening (speech auth \(SFSpeechRecognizer.authorizationStatus().rawValue, privacy: .public), available \(self.wake.isAvailable, privacy: .public), state \(String(describing: self.state), privacy: .public))")
+        }
         if !pipeline.running {
             Task { await startAudio() }
             return
@@ -170,6 +173,7 @@ final class AppController: ObservableObject {
             detail = "Couldn't start the microphone: \(error.localizedDescription)"
             return
         }
+        wakeLog.notice("audio started: mic \(micOK, privacy: .public), speech \(speechOK, privacy: .public), on-device \(self.wake.isAvailable, privacy: .public), echo cancellation \(self.pipeline.echoCancelled, privacy: .public)")
         if speechOK && wake.isAvailable {
             wake.start()
             detail = ""
@@ -283,10 +287,13 @@ final class AppController: ObservableObject {
         case "speak":
             guard let text = event["text"] as? String else { return }
             state = .speaking
+            wake.deaf = !pipeline.echoCancelled
             speaker.onFinished = { [weak self] in
                 guard let self, self.state == .speaking else { return }
                 self.state = .idle
                 self.wake.listensForStop = false
+                self.wake.deaf = false
+                self.wake.restart()  // fresh transcript: what she said herself doesn't count
             }
             speaker.say(text, language: event["language"] as? String ?? lastLanguage)
         case "done":
@@ -306,6 +313,7 @@ final class AppController: ObservableObject {
         if let cid = conversationId { api?.stop(conversationId: cid) }
         recordingActive = false
         wake.listensForStop = false
+        wake.deaf = false
         state = pipeline.running ? .idle : .muted
     }
 

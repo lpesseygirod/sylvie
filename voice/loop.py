@@ -84,7 +84,8 @@ def voice_turn(
 
 
 def _answer(sylvie, text: str, lang: str, conversation_id: str | None, channel: str) -> Iterator[dict]:
-    speaker = SentenceStreamer()
+    full = bool(sylvie.cfg.get_path("voice.speak_full_answer", True))
+    speaker = SentenceStreamer(full=full)
     docs = DocFilter()  # documents Sylvie writes go to the screen, not the speaker
     for ev in sylvie.turn(text, conversation_id=conversation_id, channel=channel):
         if ev["type"] == "status" and ev.get("text"):
@@ -102,4 +103,6 @@ def _answer(sylvie, text: str, lang: str, conversation_id: str | None, channel: 
             for sentence in speaker.feed(docs.feed(ev["text"])):
                 yield {"type": "speak", "text": sentence, "language": guess_language(sentence, default=lang)}
         elif ev["type"] == "tool":
-            speaker = SentenceStreamer()  # text before a tool call was a filler; speak the real answer fresh
+            speaker = SentenceStreamer(
+                full=full
+            )  # text before a tool call was a filler; speak the real answer fresh

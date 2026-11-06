@@ -80,6 +80,7 @@ voice:
   stt_model: mlx-community/whisper-large-v3-turbo
   # Speech output: "kokoro" (Kokoro-82M on this Mac, decision T27) or "system" (macOS/iOS voices, T11).
   # The Mac app falls back to the system voice if Kokoro isn't available. The iPhone Shortcut uses Siri's voice.
+  speak_full_answer: true   # Lea's rule (2026-11-06): read the whole answer aloud; she says "stop" to interrupt
   tts: kokoro
   tts_model: mlx-community/Kokoro-82M-bf16
   kokoro_voices: {en: af_heart, es: ef_dora, fr: ff_siwis}   # default — Lea can change (decision 9)

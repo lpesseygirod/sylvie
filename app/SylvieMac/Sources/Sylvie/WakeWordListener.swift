@@ -1,6 +1,10 @@
 import AVFoundation
+import os
 import Speech
 import SylvieCore
+
+/// Diagnostics only (Console.app, subsystem app.sylvie.mac): states and error codes, never what Lea says.
+let wakeLog = Logger(subsystem: "app.sylvie.mac", category: "wake")
 
 /// Listens for "Sylvie" using Apple's on-device speech recognizer (nothing leaves the Mac).
 ///
@@ -11,6 +15,8 @@ final class WakeWordListener {
     var onStopCommand: (() -> Void)?
     /// Only while Sylvie is speaking or thinking: "stop" / "para" / "arrête" interrupts her.
     var listensForStop = false
+    /// True while Sylvie speaks without echo cancellation: she'd hear her own voice (and her name).
+    var deaf = false
 
     private let recognizer: SFSpeechRecognizer?
     private let matcher = WakeMatcher()
@@ -36,6 +42,7 @@ final class WakeWordListener {
     }
 
     func start() {
+        wakeLog.notice("wake listener started (on-device available: \(self.isAvailable, privacy: .public))")
         lock.lock()
         enabled = true
         lock.unlock()
@@ -74,6 +81,7 @@ final class WakeWordListener {
 
     private func beginTask() {
         guard let recognizer, recognizer.isAvailable else {
+            wakeLog.notice("recognizer not available yet; retrying in 2 s")
             // Not ready yet (e.g. right after login): try again shortly instead of going deaf for good.
             DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [weak self] in self?.restart() }
             return
@@ -94,7 +102,9 @@ final class WakeWordListener {
                 let text = result.bestTranscription.formattedString
                 self.check(text)
                 if result.isFinal { self.restart() }
-            } else if error != nil {
+            } else if let error {
+                let ns = error as NSError
+                wakeLog.notice("recognition task ended: \(ns.domain, privacy: .public) \(ns.code, privacy: .public)")
                 DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.restart() }
             }
         }
@@ -104,6 +114,7 @@ final class WakeWordListener {
     }
 
     private func check(_ text: String) {
+        if deaf { return }
         let count = matcher.wakeCount(in: text)
         lock.lock()
         let isNewWake = count > seenWakes
@@ -116,6 +127,7 @@ final class WakeWordListener {
             return
         }
         if isNewWake {
+            wakeLog.notice("wake word heard")
             DispatchQueue.main.async { self.onWake?() }
             restart()  // fresh transcript, so the next "Sylvie" counts again
         }

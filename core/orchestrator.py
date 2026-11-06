@@ -316,12 +316,20 @@ class Sylvie:
             notes: list[str] = []
             base_notes = 1 if channel in ("voice", "phone") else 0  # notes beyond these mean "special turn"
             if channel in ("voice", "phone"):
-                notes.append(
-                    "Lea is talking to you by voice. Answer in the SAME language as her message below "
-                    f"(it sounds like {LANG_NAMES.get(guess_language(text), 'English')}). Start with a short "
-                    "spoken answer: 1-3 plain sentences, no markdown, no lists. If details help, add them "
-                    "after a blank line: they are shown on screen, not read aloud."
-                )
+                lang_name = LANG_NAMES.get(guess_language(text), "English")
+                if self.cfg.get_path("voice.speak_full_answer", True):
+                    notes.append(
+                        "Lea is talking to you by voice. Answer in the SAME language as her message below "
+                        f"(it sounds like {lang_name}). Your whole answer is read aloud, so write it to be "
+                        "spoken: plain sentences, no markdown, no lists or tables unless she asks for them."
+                    )
+                else:
+                    notes.append(
+                        "Lea is talking to you by voice. Answer in the SAME language as her message below "
+                        f"(it sounds like {lang_name}). Start with a short spoken answer: 1-3 plain sentences, "
+                        "no markdown, no lists. If details help, add them after a blank line: they are shown "
+                        "on screen, not read aloud."
+                    )
             # 1. "Sylvie, forget that"
             with trace.stage("forget"):
                 forgotten = forget(self.memory, text, [f"{cid}#{i}" for i in prev_user_ids])

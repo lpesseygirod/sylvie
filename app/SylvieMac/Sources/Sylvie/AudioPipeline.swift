@@ -19,17 +19,39 @@ final class AudioPipeline {
     private var outputConverters: [String: AVAudioConverter] = [:]
     private(set) var running = false
 
+    /// False when macOS refused echo cancellation and the mic runs without it (see start()).
+    private(set) var echoCancelled = true
+
+    /// Measured 2026-11-06 on Lea's MacBook: the voice-processing unit failed to initialise
+    /// ("client-side input and output formats do not match", -10875), so the app never listened.
+    /// Then it starts without echo cancellation instead of giving up.
     func start() throws {
         guard !running else { return }
+        do {
+            try configure(voiceProcessing: true)
+            echoCancelled = true
+        } catch {
+            wakeLog.notice("echo cancellation unavailable (\(error.localizedDescription, privacy: .public)); mic without it")
+            teardown()
+            try configure(voiceProcessing: false)
+            echoCancelled = false
+        }
+        running = true
+    }
+
+    private func configure(voiceProcessing: Bool) throws {
         let input = engine.inputNode
-        try input.setVoiceProcessingEnabled(true)
+        if input.isVoiceProcessingEnabled != voiceProcessing {
+            try input.setVoiceProcessingEnabled(voiceProcessing)
+        }
         let inFormat = input.outputFormat(forBus: 0)
         inputConverter = AVAudioConverter(from: inFormat, to: speechFormat)
         inputConverter?.downmix = true
 
-        engine.attach(player)
+        if player.engine == nil { engine.attach(player) }
         engine.connect(player, to: engine.mainMixerNode, format: playerFormat)
 
+        input.removeTap(onBus: 0)  // a failed earlier start may have left one (installing twice crashes)
         input.installTap(onBus: 0, bufferSize: 1024, format: inFormat) { [weak self] buffer, _ in
             guard let self else { return }
             self.onBuffer?(buffer)
@@ -39,7 +61,13 @@ final class AudioPipeline {
         }
         engine.prepare()
         try engine.start()
-        running = true
+    }
+
+    private func teardown() {
+        engine.inputNode.removeTap(onBus: 0)
+        player.stop()
+        engine.stop()
+        engine.reset()
     }
 
     func stop() {

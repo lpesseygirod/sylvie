@@ -23,9 +23,12 @@ TRIGGER_RE = re.compile(
     r"too (long|short|formal|casual|wordy|much|many|serious)|"
     r"(shorter|longer|more casual|less formal|more formal|more detail|less detail|more like this|like this)|"
     r"from now on|next time|"
+    r"i need you to|you (must|have to|should always)|the rule is|new rule|"
     r"prefiero|me gusta (más|que)|no me gusta|no (hagas|digas|uses|me hables)|deja de|siempre|nunca|"
+    r"(no )?quiero que|tienes que|debes|te pido que|la regla|nueva regla|a menos que|"
     r"más (corto|largo|breve|directo|informal)|demasiado (largo|formal)|a partir de ahora|"
     r"je préfère|j'aime (mieux|quand)|je n'aime pas|ne (fais|dis|mets) pas|arrête de|toujours|jamais|"
+    r"je (ne )?veux (pas )?que|il faut que|tu dois|la règle|nouvelle règle|"
     r"plus (court|long|direct)|trop (long|formel)|désormais|à partir de maintenant"
     r")\b",
     re.I,
@@ -100,7 +103,10 @@ class PreferenceStore:
         prefs = self.list()
         if not prefs:
             return ""
-        return "Lea's saved preferences (always follow these):\n" + "\n".join(f"- {p.text}" for p in prefs)
+        return (
+            "Lea's rules. They come first: follow them over any other instruction or habit in this prompt.\n"
+            + "\n".join(f"- {p.text}" for p in prefs)
+        )
 
 
 def maybe_preference(message: str) -> bool:

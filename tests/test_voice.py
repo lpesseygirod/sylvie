@@ -248,3 +248,30 @@ def test_errors_inside_the_turn_still_reach_the_caller():
 
     with pytest.raises(RuntimeError):
         list(with_fillers(broken(), "en", first_after=1.0))
+
+
+def test_full_answers_are_spoken_entirely_except_code_and_tables():
+    st = SentenceStreamer(full=True)
+    text = (
+        "Primera frase. Segunda frase.\n\nTercera, en otro párrafo. Cuarta. Quinta. Sexta.\n\n"
+        "```python\nprint('hola')\n```\n\n| a | b |\n|---|---|\n\nY la última frase."
+    )
+    out = []
+    for i in range(0, len(text), 5):
+        out += st.feed(text[i : i + 5])
+    out += st.flush()
+    assert out == [
+        "Primera frase.", "Segunda frase.", "Tercera, en otro párrafo.", "Cuarta.", "Quinta.", "Sexta.",
+        "Y la última frase.",
+    ]  # fmt: skip
+
+
+def test_lea_rules_in_spanish_are_noticed():
+    from lea_profile.preferences import maybe_preference
+
+    assert maybe_preference(
+        "A menos que yo te diga stop, quiero la respuesta completa. No quiero que te cortes."
+    )
+    assert maybe_preference("Tienes que hablarme más despacio")
+    assert maybe_preference("Je veux que tu répondes en français")
+    assert maybe_preference("The rule is: never cut your answer")
