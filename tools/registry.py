@@ -68,7 +68,15 @@ def _settings_tools() -> list[dict]:
         ["name", "value"],
     )
     show = _fn("show_settings", "List Sylvie's current settings, when Lea asks what they are.", {}, [])
-    return [change, show]
+    past = _fn(
+        "search_past_conversations",
+        "Search everything Lea and Sylvie said in earlier conversations (any date), by topic or words. Use it "
+        "when Lea refers to something she told you before ('remember when…', 'what did I say about…', "
+        "'te lo dije hace dos meses'). Returns exchanges with their dates.",
+        {"query": {"type": "string", "description": "what to look for, in a few words"}},
+        ["query"],
+    )
+    return [change, show, past]
 
 
 OPEN_URL = _fn(
@@ -195,6 +203,16 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
             for s in reversed(sources):
                 text = text.replace(f"[{s['n']}] ", f"[{s['n'] + offset}] ", 1)
         return ToolResult(text, numbered)
+    if call.name == "search_past_conversations":
+        if ctx.settings is None:
+            return ToolResult("Past conversations can't be searched here.", ok=False)
+        found = ctx.settings.episodes.search(
+            str(args["query"]), k=6, exclude_conversation=ctx.conversation_id
+        )
+        if not found:
+            return ToolResult(f"Nothing about '{args['query']}' in earlier conversations.")
+        return ToolResult("Earlier conversations (oldest dates first):\n" + "\n\n".join(
+            e.line() for e in sorted(found, key=lambda e: e.created_at)))  # fmt: skip
     if call.name in ("change_setting", "show_settings"):
         from core.settings import BadValue, change, describe
 

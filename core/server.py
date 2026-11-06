@@ -80,6 +80,9 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
 
                     state["sylvie"].claude_history = ClaudeHistory(state["sylvie"])
                     state["sylvie"].claude_history.start()
+                    # Index conversations from before episodic memory existed (when Lea is away).
+                    s = state["sylvie"]
+                    s.bg.submit("episodes-backfill", lambda ev: s.episodes.backfill(stop=ev), backlog=True)
                 state["ready"] = True
                 log.info("Sylvie ready")
             except Exception as e:

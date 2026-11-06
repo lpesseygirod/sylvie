@@ -41,6 +41,7 @@ from lea_profile.summary import profile_text
 from learning.ab import ABTests
 from learning.store import LearningStore
 from learning.teacher import Teacher, is_criticism, is_wrong_feedback
+from memory.episodes import Episodes
 from memory.extract import REMEMBER_RE, run_extraction
 from memory.forget import forget
 from memory.recall import recall
@@ -170,6 +171,7 @@ class Sylvie:
         self.devices = Devices(db)
         self.ab = ABTests(db)
         self.shortcuts = Shortcuts(db, embedder, cfg)
+        self.episodes = Episodes(db, embedder)
         self.teacher = Teacher(self, self.learning)
         backlog_idle = cfg.get_path("learning.backlog_idle_minutes", 10) * 60 if idle_seconds > 0 else 0
         self.bg = BackgroundWorker(idle_seconds=idle_seconds, backlog_idle_seconds=backlog_idle)
@@ -465,6 +467,13 @@ class Sylvie:
                             aside = q[1]
                     if aside:
                         self.convs.set(cid, aside_used=1)
+                # What was said in earlier conversations (memory/episodes.py), with dates
+                past = self.episodes.relevant(text, cid) if self.cfg.get_path("memory.episodes", True) else []
+                if past:
+                    notes.append(
+                        "From earlier conversations with Lea (use only if it helps; say when it was if you refer "
+                        "to it):\n" + "\n".join(e.line() for e in past)
+                    )
             context = build_turn_context(self.cfg, memories=[f.text for f in facts] + notes, aside=aside)
 
             # 4. Attachments (dropped files) are untrusted data
@@ -673,6 +682,7 @@ class Sylvie:
             # 7. Learn in the background
             answer = "\n\n".join(display_parts)
             source = f"{cid}#{user_mid}"
+            self.bg.submit("episode", lambda ev: self.episodes.add(cid, user_mid, text, answer))
             self.bg.submit("learn", lambda ev: self._learn(text, answer, source, ev))
             max_ctx = self.cfg.get_path("llm.summarize_after_tokens", 11000)
             self.bg.submit("summarize", lambda ev: maybe_summarize(self.llm, self.convs, cid, max_ctx))
