@@ -267,3 +267,14 @@ def test_what_she_plays_becomes_lea_taste(tmp_path):
     run(s, "Ponme algo de Rosalía")
     s.bg.drain()
     assert s.interests.find("music: Rosalía") is not None
+
+
+def test_unknown_shortcut_is_reported_not_confirmed(tmp_path):
+    import subprocess
+
+    s = make(tmp_path, [])
+    s.actions.run_cmd = lambda args: subprocess.CompletedProcess(args, 0, "Spotify\nWeather\nGmail\n", "")
+    out = s.actions.call("run_shortcut", {"name": "make spotify"}, None)
+    assert not out.ok and "no Shortcut called 'make spotify'" in out.content and "Spotify" in out.content
+    ok = s.actions.call("run_shortcut", {"name": "spotify"}, None)
+    assert ok.pending_id and "Spotify" in s.actions.log.get(ok.pending_id).summary  # real one, exact name

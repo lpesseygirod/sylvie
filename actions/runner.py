@@ -9,6 +9,7 @@ Three kinds:
 
 from __future__ import annotations
 
+import difflib
 import logging
 import re
 import subprocess
@@ -209,6 +210,16 @@ class ActionRunner:
         self.is_locked = is_locked
         self.timers: dict[int, threading.Timer] = {}
 
+    def shortcut_names(self) -> list[str] | None:
+        """Lea's Shortcuts (None if they can't be listed: then the name isn't checked)."""
+        try:
+            p = self.run_cmd(["shortcuts", "list"])
+        except Exception:
+            return None
+        if getattr(p, "returncode", 1) != 0:
+            return None
+        return [line.strip() for line in (p.stdout or "").splitlines() if line.strip()]
+
     def _saved_playlist(self, query: str) -> str | None:
         saved = self.cfg.get_path("music.playlists") or {}
         key = _playlist_key(query)
@@ -292,6 +303,16 @@ class ActionRunner:
     def _check(self, name: str, a: dict) -> str | None:
         if name in ("send_email", "draft_email") and not EMAIL_RE.match(str(a.get("to", "")).strip()):
             return "'to' must be one valid email address."
+        if name == "run_shortcut":
+            names = self.shortcut_names()
+            if names is not None:
+                wanted = str(a.get("name", "")).strip()
+                exact = next((n for n in names if n.lower() == wanted.lower()), None)
+                if exact is None:
+                    close = difflib.get_close_matches(wanted, names, n=3, cutoff=0.4)
+                    hint = f" Closest: {', '.join(close)}." if close else ""
+                    return f"Lea has no Shortcut called '{wanted}'.{hint} Don't ask her to confirm; tell her."
+                a["name"] = exact
         if name == "save_playlist" and not spotify_uri(str(a.get("link", ""))):
             return "link must be a Spotify share link (open.spotify.com/...) or a spotify: URI."
         if name == "create_event" and not ISO_RE.match(str(a.get("start", ""))):
@@ -368,8 +389,9 @@ class ActionRunner:
                 if setup_missing:
                     return ActionOutcome(
                         f"Opened Spotify's search for '{q}', but couldn't start it: to play songs by name Sylvie "
-                        "needs a free Spotify developer key, which Lea sets up once with `make spotify` (5 min). "
-                        "Say this in one sentence; don't ask her to click anything."
+                        "needs a free Spotify developer key. Lea adds it once herself by typing the command "
+                        "'make spotify' in the Terminal app, in the Sylvie folder (about 5 minutes; it is NOT a "
+                        "Shortcut and you can't run it for her). Say this in one sentence; don't ask her to click."
                     )
                 return ActionOutcome(
                     f"Nothing on Spotify matched '{q}'. Opened the search; suggest another name."
