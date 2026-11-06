@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct MenuIcon: View {
     @ObservedObject var controller: AppController
     var body: some View {
-        Image(systemName: controller.state.symbol)
+        Image(nsImage: controller.menuIcon)
             .accessibilityLabel("Sylvie: \(controller.state.label)")
     }
 }
@@ -39,14 +39,17 @@ struct MenuContent: View {
             Text(controller.detail)
         }
         Divider()
+        Button("Open chat") { controller.openChat() }
         Button("Ask Sylvie…") { controller.showPanel() }
             .keyboardShortcut(" ", modifiers: .option)
-        Button("Open chat") { controller.openChat() }
+        Button("Voice mode") { controller.openVoiceMode() }
         if controller.state == .speaking || controller.state == .thinking {
             Button("Stop") { controller.interrupt() }
         }
         Divider()
-        Button(controller.state == .muted ? "Unmute microphone" : "Mute microphone") { controller.toggleMute() }
+        Button(controller.state == .muted ? "Unmute mic" : "Mute mic") { controller.toggleMute() }
+        Button(controller.learningPaused ? "Resume learning" : "Pause learning") { controller.toggleLearningPause() }
+        Button("Dashboard") { controller.openDashboard() }
         Toggle("Launch at login", isOn: Binding(
             get: { controller.launchAtLogin },
             set: { controller.setLaunchAtLogin($0) }

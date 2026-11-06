@@ -74,6 +74,24 @@ final class APIClient {
         return data
     }
 
+    /// Model version, web search switch and learning pause (GET /api/info).
+    func info() async -> [String: Any]? {
+        guard let (data, resp) = try? await session.data(for: request("/api/info")),
+              (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    /// "Pause learning" in the menu: no night jobs until resumed. Returns the new state.
+    func pauseLearning(_ paused: Bool) async -> Bool? {
+        var req = request("/api/schedule/pause", method: "POST")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["paused": paused])
+        guard let (data, resp) = try? await session.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return obj["paused"] as? Bool
+    }
+
     func stop(conversationId: String) {
         let req = request("/api/chat/\(conversationId)/stop", method: "POST")
         session.dataTask(with: req).resume()

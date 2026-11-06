@@ -1,0 +1,48 @@
+/* Sylvie's orb (design/DESIGN.md §3): glow, ring, three blurred colour blobs, breathing core.
+   One component, any size: set --orb-size on .orb. States: idle | listening | thinking | speaking | muted.
+   --level (0..1) lets audio drive the core while listening/speaking. */
+.orb { --orb-size: 300px; --level: 0; position: relative; width: var(--orb-size); height: var(--orb-size); flex: none; isolation: isolate; }
+.orb > * { position: absolute; border-radius: 50%; transition: opacity .3s ease, filter .3s ease, transform .3s ease; }
+.orb .glow { inset: -23%; background: radial-gradient(circle, rgba(142,168,255,.28) 0%, rgba(197,155,255,.10) 40%, rgba(8,9,12,0) 70%); animation: orb-pulse 4s ease-in-out infinite; }
+.orb .ring { inset: -2%; border: 1px solid rgba(142,168,255,.22); }
+.orb .blob { inset: 0; mix-blend-mode: screen; filter: blur(calc(var(--orb-size) * .053)); animation: orb-spin 12s linear infinite; }
+.orb .b1 { background: radial-gradient(circle at 32% 30%, var(--orb-lilac, #C59BFF) 0%, rgba(197,155,255,0) 62%); }
+.orb .b2 { background: radial-gradient(circle at 72% 42%, var(--orb-blue, #5B7CFF) 0%, rgba(91,124,255,0) 60%); animation-duration: 16s; animation-direction: reverse; }
+.orb .b3 { background: radial-gradient(circle at 48% 76%, var(--orb-cyan, #6FE0FF) 0%, rgba(111,224,255,0) 56%); animation-duration: 20s; }
+.orb .core { inset: 22%; background: radial-gradient(circle at 42% 38%, #FFFFFF 0%, #E6DEFF 22%, rgba(169,139,255,.55) 55%, rgba(91,124,255,0) 75%); filter: blur(calc(var(--orb-size) * .013)); animation: orb-breathe 4s ease-in-out infinite; }
+.orb .core-level { inset: 22%; transform: scale(calc(1 + var(--level) * .22)); transition: transform .08s linear; }
+.orb .core-level > .core { position: absolute; inset: 0; border-radius: 50%; }
+
+/* Small sizes: fewer, sharper layers (wake panel 44 px, sidebar logo 26 px) */
+.orb.mini .glow, .orb.mini .ring, .orb.mini .b3 { display: none; }
+.orb.mini .blob { filter: blur(calc(var(--orb-size) * .11)); animation-duration: 6s; }
+.orb.mini .b2 { animation-duration: 8s; }
+.orb.mini .core { filter: blur(calc(var(--orb-size) * .035)); }
+.orb.mini .core-level { inset: 24%; }
+
+/* States */
+.orb.idle .glow { opacity: .75; }
+.orb.listening .core, .orb.listening .glow { animation-duration: 2.2s; }
+.orb.thinking .blob { animation-duration: 2.6s; }
+.orb.thinking .core { opacity: .75; animation-duration: 1.4s; }
+.orb.speaking .core { animation: orb-talk .42s ease-in-out infinite alternate; }
+.orb.speaking .glow { animation-duration: .9s; }
+.orb.muted > *, .orb.muted .core-level > .core { animation: none; filter: grayscale(1) blur(calc(var(--orb-size) * .03)); opacity: .45; }
+.orb.muted .glow { opacity: .15; }
+
+@keyframes orb-spin { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(1.07); } 100% { transform: rotate(360deg) scale(1); } }
+@keyframes orb-breathe { 0%, 100% { transform: scale(.96); } 50% { transform: scale(1.06); } }
+@keyframes orb-pulse { 0%, 100% { opacity: .7; transform: scale(.97); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes orb-talk { from { transform: scale(.92); } to { transform: scale(1.12); } }
+
+/* Sound-wave bars under the orb while speaking */
+.wave { display: flex; align-items: center; gap: 4px; height: 32px; }
+.wave span { width: 4px; border-radius: 4px; background: var(--accent); animation: wave-bar .9s ease-in-out infinite alternate; }
+@keyframes wave-bar { from { height: 6px; opacity: .5; } to { height: 30px; opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .orb > *, .orb .core-level > .core, .wave span { animation: none !important; }
+  .orb.listening .core, .orb.speaking .core { opacity: .95; }
+  .orb.thinking .core { opacity: .7; }
+  .wave span { height: 14px; }
+}

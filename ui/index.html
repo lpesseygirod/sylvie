@@ -4,62 +4,113 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sylvie</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/orb.css">
   <link rel="stylesheet" href="/static/app.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%237c5cff'/><text x='16' y='22' font-size='17' text-anchor='middle' fill='white' font-family='Georgia'>S</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><radialGradient id='g' cx='.38' cy='.36' r='.7'><stop offset='0' stop-color='%23FFFFFF'/><stop offset='.3' stop-color='%23C59BFF'/><stop offset='.7' stop-color='%235B7CFF'/><stop offset='1' stop-color='%2322305E'/></radialGradient></defs><circle cx='16' cy='16' r='14' fill='url(%23g)'/></svg>">
 </head>
 <body>
   <div id="app">
-    <aside id="sidebar">
-      <div class="side-top">
-        <button id="new-chat" class="btn-primary" title="New chat (⌘K)">＋ New chat</button>
-        <input id="search" type="search" placeholder="Search chats" autocomplete="off">
+    <nav id="sidebar" aria-label="Conversations">
+      <div class="brand">
+        <div data-orb="26" data-orb-mini id="brand-orb"></div>
+        <span>Sylvie</span>
+        <button id="close-sidebar" class="icon-btn narrow-only" aria-label="Close sidebar"></button>
       </div>
-      <nav id="conv-list" aria-label="Conversations"></nav>
+      <button id="new-chat" class="btn new-chat" title="New chat (⌘K)"></button>
+      <label class="search">
+        <span class="sr-only">Search conversations</span>
+        <input id="search" type="search" placeholder="Search" autocomplete="off">
+      </label>
+      <div id="conv-list"></div>
       <div class="side-bottom">
-        <button id="open-memory" class="btn-ghost">🧠 What Sylvie knows</button>
-        <a id="open-dashboard" class="btn-ghost" href="/dashboard" title="Dashboard">⚙︎</a>
-        <button id="theme-toggle" class="btn-ghost" title="Light / dark">◐</button>
+        <button id="open-memory" class="side-link"></button>
+        <a id="open-dashboard" class="side-link" href="/dashboard"></a>
+        <div id="status-line" class="status-line"><span class="status-dot" aria-hidden="true"></span><span class="txt">Starting…</span></div>
       </div>
-    </aside>
+    </nav>
 
-    <main id="main">
-      <header id="topbar">
-        <button id="toggle-sidebar" class="btn-icon" title="Toggle sidebar">☰</button>
-        <h1 id="conv-title">Sylvie</h1>
-        <span id="status-dot" class="dot" title="Starting…"></span>
-      </header>
+    <div id="work">
+      <main id="main">
+        <header id="topbar">
+          <button id="toggle-sidebar" class="icon-btn narrow-only" aria-label="Show conversations"></button>
+          <h1 id="conv-title">New chat</h1>
+          <span id="version-chip" class="pill" hidden></span>
+          <a id="voice-btn" class="voice-btn" href="/voice"><span class="mini-orb" aria-hidden="true"></span>Voice mode</a>
+        </header>
 
-      <section id="messages" aria-live="polite">
-        <div id="empty" class="empty">
-          <div class="logo">S</div>
-          <h2>Hello Lea</h2>
-          <p>Ask me anything — in English, español or français.</p>
+        <section id="messages" aria-live="polite">
+          <div id="empty" class="empty">
+            <div data-orb="120" data-state="idle"></div>
+            <h2>Hello Lea</h2>
+            <p>Ask me anything, in English, español or français.</p>
+          </div>
+        </section>
+
+        <footer id="composer-wrap">
+          <div id="drop-hint">Drop files to add them</div>
+          <div id="attachments"></div>
+          <form id="composer">
+            <label for="input" class="sr-only">Message Sylvie</label>
+            <textarea id="input" rows="2" placeholder="Message Sylvie, or just say “Sylvie”…" autofocus></textarea>
+            <div class="composer-row">
+              <button type="button" id="attach" class="icon-btn" aria-label="Attach a file"></button>
+              <input type="file" id="file-input" multiple hidden>
+              <button type="button" id="search-toggle" class="chip-btn" aria-pressed="true">Web search on</button>
+              <label class="chip-btn mode-chip" title="Answer mode">
+                <span class="sr-only">Answer mode</span>
+                <select id="mode">
+                  <option value="auto">Auto</option>
+                  <option value="fast">Fast</option>
+                  <option value="think">Think</option>
+                </select>
+              </label>
+              <span class="spacer"></span>
+              <a id="mic-btn" class="round-btn" href="/voice" aria-label="Talk to Sylvie"></a>
+              <button type="submit" id="send" class="round-btn send" aria-label="Send"></button>
+            </div>
+          </form>
+        </footer>
+      </main>
+
+      <aside id="work-panel" aria-label="Work panel" hidden>
+        <div class="wp-head">
+          <span id="wp-title" class="wp-title"></span>
+          <div class="wp-tabs" role="tablist" aria-label="Panel view">
+            <button type="button" role="tab" id="wp-tab-preview" aria-selected="true">Preview</button>
+            <button type="button" role="tab" id="wp-tab-edit" aria-selected="false">Edit</button>
+          </div>
+          <button type="button" id="wp-close" class="icon-btn" aria-label="Close panel"></button>
         </div>
-      </section>
-
-      <footer id="composer-wrap">
-        <div id="drop-hint">Drop files to add them</div>
-        <div id="attachments"></div>
-        <form id="composer">
-          <button type="button" id="attach" class="btn-icon" title="Add a file">📎</button>
-          <input type="file" id="file-input" multiple hidden>
-          <textarea id="input" rows="1" placeholder="Message Sylvie…" autofocus></textarea>
-          <select id="mode" title="Answer mode">
-            <option value="auto">Auto</option>
-            <option value="fast">Fast</option>
-            <option value="think">Think</option>
-          </select>
-          <button type="submit" id="send" class="btn-send" title="Send (Enter)">↑</button>
-        </form>
-        <p class="fine">Sylvie runs on your Mac. Nothing leaves it except web searches.</p>
-      </footer>
-    </main>
+        <article id="wp-preview" class="wp-body bubble"></article>
+        <textarea id="wp-edit" class="wp-body wp-edit" hidden aria-label="Edit document"></textarea>
+        <div class="wp-foot">
+          <button type="button" id="wp-copy" class="btn">Copy</button>
+          <button type="button" id="wp-pdf" class="btn">Export PDF</button>
+          <span id="wp-note" class="wp-note"></span>
+          <button type="button" id="wp-save" class="btn btn-primary">Save to notes</button>
+        </div>
+      </aside>
+    </div>
   </div>
+
+  <!-- Wake panel (Mac app, ?embed=panel): the Spotlight-like popup when Lea says "Sylvie" -->
+  <section id="wake" aria-label="Sylvie">
+    <div class="wake-row">
+      <div data-orb="44" data-orb-mini id="wake-orb"></div>
+      <textarea id="wake-q" rows="1" placeholder="Ask Sylvie…" aria-label="Ask Sylvie"></textarea>
+    </div>
+    <div id="wake-body" class="wake-body"></div>
+    <div class="wake-foot">
+      <span id="wake-hint" class="hint">Say “Sylvie” to talk · Esc to close</span>
+      <button type="button" id="wake-open">Open chat</button>
+    </div>
+  </section>
 
   <dialog id="memory-dialog">
     <form method="dialog" class="dialog-head">
-      <h2>What Sylvie knows about you</h2>
-      <button class="btn-icon" value="close">✕</button>
+      <h2>About Lea</h2>
+      <button class="icon-btn" value="close" aria-label="Close"></button>
     </form>
     <div class="tabs">
       <button data-tab="corrections">Corrections <span id="corr-badge" class="count" hidden></span></button>
@@ -71,6 +122,8 @@
     <div id="memory-body"></div>
   </dialog>
 
+  <script src="/static/icons.js"></script>
+  <script src="/static/orb.js"></script>
   <script src="/static/markdown.js"></script>
   <script src="/static/app.js"></script>
 </body>

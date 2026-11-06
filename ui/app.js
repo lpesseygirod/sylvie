@@ -3,10 +3,27 @@
   "use strict";
   const $ = (s, el = document) => el.querySelector(s);
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
-  const esc = window.escapeHtml, md = window.renderMarkdown;
+  const esc = window.escapeHtml, md = window.renderMarkdown, icon = window.icon;
   const params = new URLSearchParams(location.search);
+  const PANEL = params.get("embed") === "panel";
 
-  const S = { cid: null, streaming: false, controller: null, attachments: [], convs: [] };
+  const S = { cid: null, streaming: false, controller: null, attachments: [], convs: [], doc: null, info: null };
+
+  // ---------- static icons ----------
+  const setIcon = (sel, name, label, cls) => { const b = $(sel); if (b) b.innerHTML = icon(name, cls) + (label ? " " + label : ""); };
+  setIcon("#new-chat", "plus", "New chat");
+  setIcon("#open-memory", "person", "About Lea");
+  setIcon("#open-dashboard", "chart", "Learning dashboard");
+  setIcon("#attach", "clip", "", "i-18");
+  setIcon("#mic-btn", "mic", "", "i-18");
+  setIcon("#send", "send", "", "i-18");
+  setIcon("#wp-close", "close");
+  setIcon("#toggle-sidebar", "menu", "", "i-18");
+  setIcon("#close-sidebar", "close");
+  $("#memory-dialog .dialog-head button").innerHTML = icon("close");
+  $(".search").insertAdjacentHTML("afterbegin", icon("search", "i-14"));
+  $("#wake-open").insertAdjacentHTML("beforeend", icon("arrowOut", "i-14"));
+  window.SylvieOrb.mountAll();
 
   // ---------- API ----------
   async function api(path, opts = {}) {
@@ -18,36 +35,45 @@
     return r.headers.get("content-type")?.includes("json") ? r.json() : r;
   }
 
-  // ---------- theme ----------
-  function applyTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
-  try { applyTheme(localStorage.getItem("theme")); } catch (_) {}
-  $("#theme-toggle").onclick = () => {
-    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-    const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
-    const next = cur === "dark" ? "light" : "dark";
-    applyTheme(next);
-    try { localStorage.setItem("theme", next); } catch (_) {}
-  };
-
-  // ---------- health ----------
+  // ---------- status line, version chip, web search switch ----------
+  function setStatus(kind, text) {
+    $("#status-line .status-dot").className = "status-dot" + (kind ? " " + kind : "");
+    $("#status-line .txt").textContent = text;
+  }
   async function pollHealth() {
-    const dot = $("#status-dot");
     try {
       const h = await api("/api/health");
-      if (h.ready) { dot.className = "dot ready"; dot.title = "Ready"; return; }
-      if (h.error) { dot.className = "dot err"; dot.title = h.error; return; }
-      dot.title = "Loading the model…";
-    } catch (_) { dot.className = "dot err"; dot.title = "Server not reachable"; }
+      if (h.ready) { setStatus("ok", "Running on this Mac"); loadInfo(); return; }
+      if (h.error) { setStatus("err", "Couldn't start: " + h.error); return; }
+      setStatus("", "Loading the model…");
+    } catch (_) { setStatus("err", "Sylvie's server isn't running"); }
     setTimeout(pollHealth, 1500);
   }
+  async function loadInfo() {
+    try {
+      S.info = await api("/api/info");
+      const chip = $("#version-chip");
+      chip.textContent = `Sylvie ${S.info.version} · local`;
+      chip.title = S.info.model;
+      chip.hidden = false;
+      setSearchChip(S.info.web_search);
+    } catch (_) {}
+  }
+  function setSearchChip(on) {
+    const b = $("#search-toggle");
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.textContent = on ? "Web search on" : "Web search off";
+  }
+  $("#search-toggle").onclick = async () => {
+    const on = $("#search-toggle").getAttribute("aria-pressed") !== "true";
+    try { setSearchChip((await api("/api/settings/search", { method: "POST", body: { enabled: on } })).enabled); } catch (_) {}
+  };
 
   // ---------- sidebar ----------
   function group(c) {
     const d = new Date(c.updated_at), now = new Date();
-    const days = (now - d) / 86400000;
     if (d.toDateString() === now.toDateString()) return "Today";
-    if (days < 7) return "Previous 7 days";
-    if (days < 30) return "Previous 30 days";
+    if ((now - d) / 86400000 < 7) return "This week";
     return "Older";
   }
 
@@ -61,8 +87,11 @@
       const g = group(c);
       if (g !== last) { list.appendChild(el("div", "group-label", g)); last = g; }
       const row = el("div", "conv" + (c.id === S.cid ? " active" : ""));
-      row.innerHTML = `<span class="t">${esc(c.title)}</span><span class="acts"><button title="Rename">✎</button><button title="Delete">🗑</button></span>`;
+      row.tabIndex = 0;
+      if (c.id === S.cid) row.setAttribute("aria-current", "page");
+      row.innerHTML = `<span class="t">${esc(c.title)}</span><span class="acts"><button aria-label="Rename">${icon("pencil", "i-14")}</button><button aria-label="Delete">${icon("trash", "i-14")}</button></span>`;
       row.onclick = (e) => { if (!e.target.closest("button,input")) openConv(c.id); };
+      row.onkeydown = (e) => { if (e.key === "Enter" && e.target === row) openConv(c.id); };
       const [ren, del] = row.querySelectorAll("button");
       ren.onclick = () => renameConv(row, c);
       del.onclick = async () => {
@@ -95,23 +124,30 @@
 
   let searchTimer;
   $("#search").oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadConvs, 200); };
-  $("#new-chat").onclick = () => newChat();
-  $("#toggle-sidebar").onclick = () => { $("#app").classList.toggle(innerWidth < 720 ? "side-open" : "no-side"); };
+  $("#new-chat").onclick = () => { newChat(); $("#app").classList.remove("side-open"); };
+  $("#toggle-sidebar").onclick = () => $("#app").classList.add("side-open");
+  $("#close-sidebar").onclick = () => $("#app").classList.remove("side-open");
+
+  function voiceHref() { return "/voice" + (S.cid ? `?c=${encodeURIComponent(S.cid)}` : ""); }
+  function syncVoiceLinks() { $("#voice-btn").href = voiceHref(); $("#mic-btn").href = voiceHref(); }
 
   function newChat() {
     if (S.streaming) stop();
     S.cid = null;
     $("#messages").innerHTML = "";
     $("#messages").appendChild(emptyState());
-    $("#conv-title").textContent = "Sylvie";
+    $("#conv-title").textContent = "New chat";
     document.querySelectorAll(".conv.active").forEach((c) => c.classList.remove("active"));
+    closePanel();
+    syncVoiceLinks();
     $("#input").focus();
   }
 
   function emptyState() {
     const e = el("div", "empty");
     e.id = "empty";
-    e.innerHTML = `<div class="logo">S</div><h2>Hello Lea</h2><p>Ask me anything — in English, español or français.</p>`;
+    e.innerHTML = `<div data-orb="120" data-state="idle"></div><h2>Hello Lea</h2><p>Ask me anything, in English, español or français.</p>`;
+    window.SylvieOrb.mountAll(e);
     return e;
   }
 
@@ -121,19 +157,117 @@
     const msgs = await api(`/api/conversations/${cid}/messages`);
     const box = $("#messages");
     box.innerHTML = "";
-    for (const m of msgs) box.appendChild(m.role === "user" ? userMsg(m.content) : assistantMsg(m).root);
+    closePanel();
+    let tools = [];  // tool rounds are stored as separate, empty assistant rows: show them as notes on the answer
+    const withDocs = [];
+    for (const m of msgs) {
+      if (m.role === "user") { box.appendChild(userMsg(m.content)); tools = []; continue; }
+      if (m.role !== "assistant") continue;
+      const calls = (m.tool_calls || []).map((t) => t.function || t);
+      if (!m.content && calls.length) { tools.push(...calls); continue; }
+      const parts = assistantMsg({ ...m, tool_calls: [...tools, ...calls] });
+      box.appendChild(parts.root);
+      if (parts.docs.length) withDocs.push(parts);
+      tools = [];
+    }
     const c = S.convs.find((x) => x.id === cid);
     $("#conv-title").textContent = c ? c.title : "Sylvie";
-    document.querySelectorAll(".conv").forEach((r, i) => r.classList.toggle("active", false));
+    $("#app").classList.remove("side-open");
+    syncVoiceLinks();
     loadConvs();
     box.scrollTop = box.scrollHeight;
+    const n = +params.get("doc");  // ?c=…&doc=1 opens the conversation's first document in the panel
+    if (n && withDocs[n - 1] && cid === params.get("c")) showDoc(withDocs[n - 1], 0);
   }
+
+  // ---------- documents (<doc title="…">…</doc>) → card + work panel ----------
+  const DOC_RE = /<doc\b(?:\s+title\s*=\s*"([^"]*)")?[^>]*>([\s\S]*?)(<\/doc>|$)/gi;
+
+  function splitDocs(text) {
+    const parts = [];
+    let last = 0, m;
+    DOC_RE.lastIndex = 0;
+    while ((m = DOC_RE.exec(text))) {
+      if (m.index > last) parts.push({ kind: "text", text: text.slice(last, m.index) });
+      parts.push({ kind: "doc", title: (m[1] || "Document").trim(), body: m[2].replace(/^\n+|\s+$/g, ""), done: !!m[3] });
+      last = DOC_RE.lastIndex;
+      if (!m[0]) break;
+    }
+    // a "<do" at the very end may be the start of a tag that's still streaming: hide it
+    const tail = text.slice(last).replace(/<d?o?c?$/i, "");
+    if (tail) parts.push({ kind: "text", text: tail });
+    return parts;
+  }
+
+  // Renders an answer; documents become cards. p.docs keeps them (edits made in the panel stick).
+  function renderAnswer(p) {
+    const parts = splitDocs(p.text);
+    p.docs = p.docs || [];
+    let html = "", n = 0;
+    for (const part of parts) {
+      if (part.kind === "text") { html += md(part.text); continue; }
+      const d = p.docs[n] || (p.docs[n] = { title: part.title, body: part.body, edited: false });
+      d.title = part.title;
+      if (!d.edited) d.body = part.body;
+      d.done = part.done;
+      html += `<button type="button" class="doc-card" data-doc="${n}">${icon("doc")}<span class="dc-t"><span class="dc-name">${esc(d.title)}</span><span class="dc-sub">${part.done ? "Document · open in panel" : "Writing…"}</span></span></button>`;
+      n++;
+    }
+    p.bubble.innerHTML = html;
+    if (S.doc && S.doc.owner === p) showDoc(p, S.doc.index, true);
+    return n;
+  }
+
+  function showDoc(p, index, keepTab) {
+    const d = p.docs[index];
+    if (!d) return;
+    if (PANEL) { notifyNative({ type: "openChat", conversation_id: S.cid }); return; }
+    S.doc = { owner: p, index };
+    $("#work-panel").hidden = false;
+    $("#wp-title").textContent = d.title;
+    $("#wp-preview").innerHTML = md(d.body);
+    if (!keepTab || $("#wp-edit").hidden) $("#wp-edit").value = d.body;
+    if (!keepTab) setTab("preview");
+    $("#wp-note").textContent = "";
+  }
+  function closePanel() { S.doc = null; $("#work-panel").hidden = true; }
+  function setTab(t) {
+    const edit = t === "edit";
+    $("#wp-tab-preview").setAttribute("aria-selected", String(!edit));
+    $("#wp-tab-edit").setAttribute("aria-selected", String(edit));
+    $("#wp-preview").hidden = edit;
+    $("#wp-edit").hidden = !edit;
+    if (edit) $("#wp-edit").focus();
+  }
+  function currentDoc() { return S.doc ? S.doc.owner.docs[S.doc.index] : null; }
+  $("#wp-tab-preview").onclick = () => {
+    const d = currentDoc();
+    if (d) $("#wp-preview").innerHTML = md(d.body);
+    setTab("preview");
+  };
+  $("#wp-tab-edit").onclick = () => setTab("edit");
+  $("#wp-edit").oninput = () => { const d = currentDoc(); if (d) { d.body = $("#wp-edit").value; d.edited = true; } };
+  $("#wp-close").onclick = closePanel;
+  const flash = (t) => { $("#wp-note").textContent = t; setTimeout(() => ($("#wp-note").textContent = ""), 2500); };
+  $("#wp-copy").onclick = () => { const d = currentDoc(); if (d) navigator.clipboard.writeText(d.body).then(() => flash("Copied")); };
+  $("#wp-pdf").onclick = () => {
+    $("#wp-tab-preview").click();
+    if (window.webkit?.messageHandlers?.sylvie) notifyNative({ type: "print" }); else window.print();
+  };
+  $("#wp-save").onclick = async () => {
+    const d = currentDoc();
+    if (!d) return;
+    try { const r = await api("/api/notes", { method: "POST", body: { title: d.title, content: d.body } }); flash("Saved to notes"); $("#wp-save").title = r.file; }
+    catch (e) { flash("Couldn't save: " + e.message); }
+  };
 
   // ---------- messages ----------
   function userMsg(text) {
     const m = el("div", "msg user");
     const b = el("div", "bubble");
-    b.textContent = text;
+    const [main, ...att] = text.split("\n\u0001");
+    b.textContent = main;
+    if (att.length) b.insertAdjacentHTML("beforeend", `<div class="att-note">${icon("clip", "i-14")}${esc(att.join(", "))}</div>`);
     m.appendChild(b);
     return m;
   }
@@ -141,48 +275,48 @@
   function sourcesHtml(sources) {
     if (!sources || !sources.length) return "";
     return sources.map((s) => s.url
-      ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer"><b>${s.n}</b>${esc(s.title || s.url)}</a>`
-      : `<span><b>${s.n}</b>${esc(s.title || s.path || "")}</span>`).join("");
+      ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.url)}"><b>${s.n}</b>${esc(s.title || s.url)}</a>`
+      : `<span title="${esc(s.path || "")}"><b>${s.n}</b>${esc(s.title || s.path || "")}</span>`).join("");
   }
 
-  function assistantMsg(m = {}) {
-    const root = el("div", "msg assistant");
-    root.innerHTML = `<div class="who"><span class="avatar">S</span>Sylvie</div>
-      <div class="notices"></div><details class="thinking" hidden><summary>Thinking</summary><div></div></details>
-      <div class="status" hidden></div><div class="tools"></div><div class="bubble"></div>
-      <div class="sources"></div><div class="actions" hidden></div>`;
-    const parts = {
-      root, bubble: $(".bubble", root), status: $(".status", root), tools: $(".tools", root),
-      sources: $(".sources", root), actions: $(".actions", root), notices: $(".notices", root),
-      thinking: $("details.thinking", root), text: m.content || "", think: "", id: m.id || null,
+  function partsFor(root, m = {}) {
+    root.innerHTML = `<div class="notes"></div><details class="thinking" hidden><summary>Thinking</summary><div></div></details>
+      <div class="status" hidden></div><div class="bubble"></div><div class="confirm-slot"></div><div class="sources"></div><div class="actions" hidden></div>`;
+    const p = {
+      root, bubble: $(".bubble", root), status: $(".status", root), notes: $(".notes", root), confirm: $(".confirm-slot", root),
+      sources: $(".sources", root), actions: $(".actions", root), thinking: $("details.thinking", root),
+      text: m.content || "", think: "", id: m.id || null, docs: [],
     };
-    parts.bubble.innerHTML = md(parts.text);
-    if (m.sources) parts.sources.innerHTML = sourcesHtml(m.sources);
-    if (m.id) renderActions(parts, m);
-    return parts;
+    p.bubble.addEventListener("click", (e) => { const c = e.target.closest(".doc-card"); if (c) showDoc(p, +c.dataset.doc); });
+    renderAnswer(p);
+    if (m.sources) p.sources.innerHTML = sourcesHtml(m.sources);
+    if (m.tool_calls) for (const t of m.tool_calls) addToolNote(p, t.name, t.arguments || t.args);
+    if (m.id) renderActions(p, m);
+    return p;
   }
+  const assistantMsg = (m) => partsFor(el("div", "msg assistant"), m);
 
   function renderActions(p, m) {
     const a = p.actions;
     a.hidden = false;
     const fb = m.feedback || 0;
     const ms = m.trace && m.trace.marks_ms && m.trace.marks_ms.first_token;
-    a.innerHTML = `<button data-a="copy" title="Copy">⧉</button>
-      <button data-a="up" class="${fb === 1 ? "on" : ""}" title="Good answer">👍</button>
-      <button data-a="down" class="${fb === -1 ? "on" : ""}" title="Bad answer">👎</button>
-      <button data-a="edit" title="Edit to what I wanted">✎ Edit to what I wanted</button>
-      ${ms ? `<span class="timing" title="Time to first word">${(ms / 1000).toFixed(1)} s · ${m.mode || ""}</span>` : ""}`;
-    if (m.edited_content) a.insertAdjacentHTML("afterend", `<div class="edited">✓ Your edit was saved — Sylvie will learn from it.</div>`);
+    a.innerHTML = `<button data-a="up" class="${fb === 1 ? "on" : ""}" aria-label="Good answer" aria-pressed="${fb === 1}">${icon("up")}</button>
+      <button data-a="down" class="${fb === -1 ? "on" : ""}" aria-label="Bad answer" aria-pressed="${fb === -1}">${icon("down")}</button>
+      <button data-a="edit">Edit to what I wanted</button>
+      <button data-a="copy" aria-label="Copy answer">${icon("copy")}</button>
+      ${ms ? `<span class="timing" title="Time to first word">${(ms / 1000).toFixed(1)} s · ${esc(m.mode || "")}</span>` : ""}`;
+    if (m.edited_content && !$(".edited", p.root)) a.insertAdjacentHTML("afterend", `<div class="edited">Your edit was saved. Sylvie will learn from it.</div>`);
     a.onclick = async (e) => {
       const b = e.target.closest("button");
       if (!b) return;
-      if (b.dataset.a === "copy") { navigator.clipboard.writeText(p.text); b.textContent = "✓"; setTimeout(() => (b.textContent = "⧉"), 1200); }
+      if (b.dataset.a === "copy") { navigator.clipboard.writeText(p.text); b.innerHTML = icon("check"); setTimeout(() => (b.innerHTML = icon("copy")), 1200); }
       if (b.dataset.a === "up" || b.dataset.a === "down") {
         const v = b.dataset.a === "up" ? 1 : -1;
         const cur = b.classList.contains("on") ? null : v;
         await api(`/api/messages/${p.id}/feedback`, { method: "POST", body: { value: cur } });
-        a.querySelectorAll("[data-a=up],[data-a=down]").forEach((x) => x.classList.remove("on"));
-        if (cur) b.classList.add("on");
+        a.querySelectorAll("[data-a=up],[data-a=down]").forEach((x) => { x.classList.remove("on"); x.setAttribute("aria-pressed", "false"); });
+        if (cur) { b.classList.add("on"); b.setAttribute("aria-pressed", "true"); }
         if (cur === -1 && !$(".why-box", p.root)) askWhy(p);
       }
       if (b.dataset.a === "edit") editAnswer(p, m);
@@ -190,12 +324,12 @@
   }
 
   function askWhy(p) {
-    const box = el("div", "why-box", `<input placeholder="What was wrong? (optional — helps Sylvie learn)"><button class="btn-ghost">Send</button>
-      <span class="meta">Sylvie's teacher will review this; see 🧠 → Corrections.</span>`);
+    const box = el("div", "why-box", `<input placeholder="What was wrong? (optional, helps Sylvie learn)" aria-label="What was wrong"><button class="btn">Send</button>
+      <span class="meta">Sylvie's teacher will review it. See About Lea → Corrections.</span>`);
     const inp = $("input", box);
     const go = async () => {
       if (inp.value.trim()) await api(`/api/messages/${p.id}/teach`, { method: "POST", body: { comment: inp.value.trim() } });
-      box.innerHTML = `<span class="meta">✓ Thanks — the teacher will look at it.</span>`;
+      box.innerHTML = `<span class="meta">Thanks. The teacher will look at it.</span>`;
       refreshBadge();
     };
     $("button", box).onclick = go;
@@ -216,7 +350,7 @@
 
   function editAnswer(p, m) {
     const box = el("div", "edit-box");
-    box.innerHTML = `<textarea></textarea><div class="row"><button class="btn-ghost">Cancel</button><button class="btn-primary">Save</button></div>`;
+    box.innerHTML = `<textarea aria-label="What you wanted"></textarea><div class="row"><button class="btn btn-quiet">Cancel</button><button class="btn btn-primary">Save</button></div>`;
     const ta = $("textarea", box);
     ta.value = m.edited_content || p.text;
     p.bubble.replaceWith(box);
@@ -227,17 +361,17 @@
       await api(`/api/messages/${p.id}/edit`, { method: "POST", body: { text: ta.value } });
       m.edited_content = ta.value;
       box.replaceWith(p.bubble);
-      if (!$(".edited", p.root)) p.actions.insertAdjacentHTML("afterend", `<div class="edited">✓ Your edit was saved — Sylvie will learn from it.</div>`);
+      if (!$(".edited", p.root)) p.actions.insertAdjacentHTML("afterend", `<div class="edited">Your edit was saved. Sylvie will learn from it.</div>`);
     };
   }
 
   // Copy buttons in code blocks + citation clicks
-  $("#messages").addEventListener("click", (e) => {
+  document.addEventListener("click", (e) => {
     const c = e.target.closest(".copy-code");
     if (c) { navigator.clipboard.writeText($("code", c.closest(".code")).textContent); c.textContent = "Copied"; setTimeout(() => (c.textContent = "Copy"), 1200); }
     const cite = e.target.closest(".cite");
     if (cite) {
-      const link = [...cite.closest(".msg").querySelectorAll(".sources b")].find((b) => b.textContent === cite.dataset.n);
+      const link = [...(cite.closest(".msg, #wake") || document).querySelectorAll(".sources b")].find((b) => b.textContent === cite.dataset.n);
       if (link && link.parentElement.href) window.open(link.parentElement.href, "_blank", "noopener");
     }
   });
@@ -259,8 +393,8 @@
     S.streaming = on;
     const b = $("#send");
     b.classList.toggle("stop", on);
-    b.textContent = on ? "■" : "↑";
-    b.title = on ? "Stop" : "Send (Enter)";
+    b.innerHTML = icon(on ? "stop" : "send", "i-18");
+    b.setAttribute("aria-label", on ? "Stop" : "Send");
   }
 
   function stop() {
@@ -270,24 +404,31 @@
   }
 
   async function send(textOverride, channel = "chat") {
-    const text = (textOverride ?? input.value).trim();
+    const text = (textOverride ?? (PANEL ? $("#wake-q").value : input.value)).trim();
     if (!text || S.streaming) return;
     input.value = ""; autoGrow();
-    const empty = $("#empty");
-    if (empty) empty.remove();
-    const box = $("#messages");
-    box.appendChild(userMsg(text + (S.attachments.length ? `\n📎 ${S.attachments.map((a) => a.name).join(", ")}` : "")));
-    const p = assistantMsg();
+    let p;
+    if (PANEL) {
+      p = wakeTurn(text);
+    } else {
+      $("#empty")?.remove();
+      const box = $("#messages");
+      const names = S.attachments.map((a) => a.name);
+      box.appendChild(userMsg(text + (names.length ? "\n\u0001" + names.join("\n\u0001") : "")));
+      p = assistantMsg();
+      box.appendChild(p.root);
+      box.scrollTop = box.scrollHeight;
+    }
     p.bubble.classList.add("cursor");
-    box.appendChild(p.root);
-    box.scrollTop = box.scrollHeight;
 
     const mode = $("#mode").value;
     const body = { text, conversation_id: S.cid, channel, attachments: S.attachments, thinking: mode === "auto" ? null : mode === "think" };
     S.attachments = []; renderAttachments();
     setStreaming(true);
+    setOrb("thinking");
     S.controller = new AbortController();
     let meta = {}, done = null;
+    const box = PANEL ? $("#wake-body") : $("#messages");
     try {
       const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: S.controller.signal });
       if (!r.ok) throw new Error(await r.text());
@@ -306,10 +447,11 @@
           if (!line.startsWith("data: ")) continue;
           const ev = JSON.parse(line.slice(6));
           handle(ev, p);
-          if (ev.type === "meta") { meta = ev; if (!S.cid) { S.cid = ev.conversation_id; $("#conv-title").textContent = ev.title; loadConvs(); } }
+          if (ev.type === "meta") { meta = ev; if (!S.cid) { S.cid = ev.conversation_id; $("#conv-title").textContent = ev.title; syncVoiceLinks(); loadConvs(); } }
           if (ev.type === "done") done = ev;
         }
         if (scrollPinned) box.scrollTop = box.scrollHeight;
+        if (PANEL) reportPanelSize();
       }
     } catch (err) {
       if (err.name !== "AbortError") p.bubble.insertAdjacentHTML("beforeend", `<p class="error">${esc(String(err.message || err))}</p>`);
@@ -317,20 +459,39 @@
       p.bubble.classList.remove("cursor");
       p.status.hidden = true;
       setStreaming(false);
+      setOrb("idle");
       S.controller = null;
       if (done && done.message_id) { p.id = done.message_id; renderActions(p, { id: done.message_id, trace: done.trace, mode: p.mode }); }
       notifyNative({ type: "answer", text: p.text, conversation_id: meta.conversation_id });
+      if (PANEL) reportPanelSize();
     }
+  }
+
+  const TOOLS = {
+    web_search: ["globe", "Searched the web"], open_url: ["globe", "Read a web page"], calculator: ["calc", "Calculated"],
+    search_documents: ["folder", "Searched your files"], music: ["music", "Spotify"], play_music: ["music", "Played on Spotify"],
+    calendar_events: ["calendar", "Checked your calendar"], create_event: ["calendar", "Added to your calendar"],
+    create_reminder: ["bell", "Added a reminder"], set_timer: ["timer", "Set a timer"], open_app: ["app", "Opened an app"],
+    open_in_browser: ["globe", "Opened in your browser"], run_shortcut: ["bolt", "Ran a shortcut"],
+    read_emails: ["mail", "Read your emails"], draft_email: ["mail", "Drafted an email"], send_email: ["mail", "Email"],
+  };
+  function addToolNote(p, name, args) {
+    const [ic, label] = TOOLS[name] || ["sparkle", name];
+    const q = args && args.query ? `: ${args.query}` : "";
+    p.notes.appendChild(el("div", "note", icon(ic, "i-14") + esc(label + q)));
   }
 
   function handle(ev, p) {
     switch (ev.type) {
-      case "text":
+      case "text": {
         p.text += ev.text;
-        p.bubble.innerHTML = md(p.text);
+        const before = (p.docs || []).length;
+        const n = renderAnswer(p);
+        if (n > before && !PANEL) showDoc(p, n - 1);  // a new document: open it in the panel
         p.status.hidden = true;
         notifyNative({ type: "delta", text: ev.text });
         break;
+      }
       case "thinking":
         p.think += ev.text;
         p.thinking.hidden = false;
@@ -340,39 +501,27 @@
         if (ev.mode) p.mode = ev.mode;
         if (ev.text) { p.status.hidden = false; p.status.textContent = ev.text; notifyNative({ type: "status", text: ev.text }); }
         break;
-      case "tool": {
-        const label = {
-          web_search: "🔎 Searched the web", open_url: "🌐 Opened a page", calculator: "🧮 Calculated",
-          search_documents: "📄 Searched your documents", music: "🎵 Spotify", play_music: "🎵 Spotify",
-          calendar_events: "📅 Checked your calendar", create_event: "📅 Added to calendar", create_reminder: "☑️ Reminder",
-          set_timer: "⏰ Timer", open_app: "🖥 Opened app", open_in_browser: "🌐 Opened in browser",
-          run_shortcut: "⚡️ Shortcut", read_emails: "✉️ Read emails", draft_email: "✉️ Draft", send_email: "✉️ Email",
-        }[ev.name] || ev.name;
-        p.tools.appendChild(el("span", "chip", esc(label + (ev.args && ev.args.query ? `: ${ev.args.query}` : ""))));
+      case "tool":
+        addToolNote(p, ev.name, ev.args);
         if (p.text && !p.text.endsWith("\n")) p.text += "\n\n";
         break;
-      }
       case "sources":
         p.sources.innerHTML = sourcesHtml(ev.sources);
         break;
       case "notice":
-        if (ev.kind === "preference") p.notices.appendChild(el("div", "notice", "✓ Saved preference: " + esc(ev.item.preference)));
-        if (ev.kind === "forgot") p.notices.appendChild(el("div", "notice", "🗑 Forgot: " + esc(ev.items.map((f) => f.text).join("; "))));
+        if (ev.kind === "preference") p.notes.appendChild(el("div", "note", icon("star", "i-14") + "Remembered: " + esc(ev.item.preference)));
+        if (ev.kind === "forgot") p.notes.appendChild(el("div", "note", icon("trash", "i-14") + "Forgot: " + esc(ev.items.map((f) => f.text).join("; "))));
         break;
       case "action": {
         if (ev.status === "pending") {
-          const card = el("div", "confirm-card", `<div>⚠️ ${esc(ev.summary)}</div>
-            <div class="row"><button class="btn-ghost" data-v="no">No</button><button class="btn-primary" data-v="yes">Yes, do it</button></div>`);
-          card.onclick = (e) => {
-            const b = e.target.closest("button");
-            if (!b || S.streaming) return;
-            card.querySelectorAll("button").forEach((x) => (x.disabled = true));
-            send(b.dataset.v);
-          };
-          p.notices.appendChild(card);
+          p.confirm.appendChild(confirmCard(ev));
+          notifyNative({ type: "pendingConfirm", value: true });
+          if (PANEL) $("#wake-hint").textContent = "Say “yes” to send · nothing is sent without your OK";
         } else {
-          const label = { done: "✓ Done", failed: "✗ Not done", cancelled: "Cancelled", undone: "↩ Undone" }[ev.status] || ev.status;
-          p.notices.appendChild(el("div", "notice", esc(label + (ev.result ? ": " + ev.result : ""))));
+          const label = { done: "Done", failed: "Not done", cancelled: "Cancelled", undone: "Undone" }[ev.status] || ev.status;
+          const ic = { done: "check", undone: "undo" }[ev.status] || "alert";
+          p.notes.appendChild(el("div", "note" + (ev.status === "done" ? " ok" : ""), icon(ic, "i-14") + esc(label + (ev.result ? ": " + ev.result : ""))));
+          notifyNative({ type: "pendingConfirm", value: false });
         }
         break;
       }
@@ -382,12 +531,44 @@
     }
   }
 
+  // A "Send?" card (design §2.3): app + recipient, the exact content, Send / Edit / Cancel.
+  function confirmCard(ev) {
+    const a = ev.args || {};
+    const kinds = {
+      send_email: ["mail", `Mail · to ${a.to || "?"}`, "Send"],
+      run_shortcut: ["bolt", `Shortcuts · ${a.name || "?"}`, "Run"],
+    };
+    const [ic, head, yes] = kinds[ev.name] || ["alert", "Needs your OK", "Yes, do it"];
+    const body = ev.name === "send_email" && a.body
+      ? `${a.subject ? `<div class="meta">Subject: ${esc(a.subject)}</div>` : ""}${esc(a.body)}`
+      : esc(ev.summary);
+    const card = el("div", "confirm-card", `<div class="cc-head">${icon(ic, "i-14")}${esc(head)}</div>
+      <div class="cc-body">${body}</div>
+      <div class="row"><button class="btn btn-primary" data-v="yes">${yes}</button><button class="btn" data-v="edit">Edit</button><button class="btn btn-quiet" data-v="no">Cancel</button></div>`);
+    card.onclick = (e) => {
+      const b = e.target.closest("button");
+      if (!b || S.streaming) return;
+      if (b.dataset.v === "edit") {  // Lea says what to change; nothing is sent meanwhile
+        const field = PANEL ? $("#wake-q") : input;
+        if (PANEL) { field.readOnly = false; field.value = ""; }
+        field.placeholder = "Tell Sylvie what to change…";
+        field.focus();
+        return;
+      }
+      card.querySelectorAll("button").forEach((x) => (x.disabled = true));
+      notifyNative({ type: "pendingConfirm", value: false });
+      if (PANEL) $("#wake-hint").textContent = "Say “Sylvie” to talk · Esc to close";
+      send(b.dataset.v);
+    };
+    return card;
+  }
+
   // ---------- attachments ----------
   function renderAttachments() {
     const box = $("#attachments");
     box.innerHTML = "";
     S.attachments.forEach((a, i) => {
-      const chip = el("span", "att", `📄 ${esc(a.name)} <small>${Math.round(a.chars / 1000)}k chars</small><button title="Remove">✕</button>`);
+      const chip = el("span", "att", `${icon("doc", "i-14")}${esc(a.name)} <small>${Math.round(a.chars / 1000)}k chars</small><button aria-label="Remove ${esc(a.name)}">${icon("close", "i-14")}</button>`);
       $("button", chip).onclick = () => { S.attachments.splice(i, 1); renderAttachments(); };
       box.appendChild(chip);
     });
@@ -396,10 +577,8 @@
     for (const f of files) {
       const fd = new FormData();
       fd.append("file", f);
-      try {
-        const r = await api("/api/upload", { method: "POST", body: fd });
-        S.attachments.push(r);
-      } catch (e) { alert(`Couldn't add ${f.name}: ${e.message}`); }
+      try { S.attachments.push(await api("/api/upload", { method: "POST", body: fd })); }
+      catch (e) { alert(`Couldn't add ${f.name}: ${e.message}`); }
     }
     renderAttachments();
   }
@@ -411,7 +590,7 @@
   addEventListener("dragover", (e) => e.preventDefault());
   addEventListener("drop", (e) => { e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging"); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
 
-  // ---------- memory dialog ----------
+  // ---------- About Lea dialog ----------
   let memTab = "preferences";
   $("#open-memory").onclick = () => {
     if (!$("#corr-badge").hidden) memTab = "corrections";  // proposals are waiting: show them first
@@ -448,11 +627,11 @@
       if (!list.length) body.textContent = "No corrections yet. Thumbs-down an answer or say “Sylvie, that's wrong” and her teacher proposes a better one here.";
       for (const c of list) {
         const card = el("div", "corr " + c.status);
-        const status = { queued: "⏳ The teacher will review this soon", proposed: "", accepted: "✓ Accepted", rejected: "Rejected", failed: "The review failed" }[c.status];
+        const status = { queued: "The teacher will review this soon", proposed: "", accepted: "Accepted", rejected: "Rejected", failed: "The review failed" }[c.status];
         card.innerHTML = `<div class="meta">You asked: “${esc(c.question.slice(0, 200))}”</div>
-          <div class="old"><b>Before</b>${md(c.original)}</div>
-          ${c.proposal && c.status !== "accepted" ? `<div class="new"><b>Proposed</b>${md(c.proposal)}</div>` : ""}
-          ${c.final_answer && c.status === "accepted" ? `<div class="new"><b>Now</b>${md(c.final_answer)}</div>` : ""}
+          <div class="old bubble"><b>Before</b>${md(c.original)}</div>
+          ${c.proposal && c.status !== "accepted" ? `<div class="new bubble"><b>Proposed</b>${md(c.proposal)}</div>` : ""}
+          ${c.final_answer && c.status === "accepted" ? `<div class="new bubble"><b>Now</b>${md(c.final_answer)}</div>` : ""}
           ${c.diagnosis && c.diagnosis.problem ? `<div class="meta">Problem: ${esc(c.diagnosis.problem)}</div>` : ""}
           ${c.rule && c.rule.type !== "none" && c.rule.text ? `<div class="meta">Rule it will remember: ${esc(c.rule.text)}</div>` : ""}
           ${c.sources && c.sources.length ? `<div class="sources">${sourcesHtml(c.sources)}</div>` : ""}
@@ -465,7 +644,7 @@
             if (t) await api(`/api/corrections/${c.id}/accept`, { method: "POST", body: { text: t } });
           }));
           const ok = btn("Accept", () => api(`/api/corrections/${c.id}/accept`, { method: "POST", body: {} }));
-          ok.className = "btn-primary";
+          ok.className = "btn btn-primary";
           row.appendChild(ok);
           card.appendChild(row);
         }
@@ -476,7 +655,7 @@
     }
     const prof = await api("/api/profile");
     if (memTab === "preferences") {
-      const add = el("div", "add-row", `<input placeholder="Add a rule, e.g. “Don't use emojis”"><button class="btn-primary">Add</button>`);
+      const add = el("div", "add-row", `<input placeholder="Add a rule, e.g. “Don't use emojis”" aria-label="New preference"><button class="btn btn-primary">Add</button>`);
       $("button", add).onclick = async () => { const v = $("input", add).value.trim(); if (v) { await api("/api/preferences", { method: "POST", body: { text: v } }); renderMemory(); } };
       body.appendChild(add);
       if (!prof.preferences.length) body.appendChild(el("p", "meta", "Tell Sylvie things like “shorter please” or “no emojis” and they'll show up here."));
@@ -510,49 +689,109 @@
   addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); newChat(); }
     if (e.key === "Escape" && S.streaming) stop();
+    else if (e.key === "Escape" && !PANEL && S.doc && !$("#memory-dialog").open) closePanel();
   });
 
-  // ---------- native bridge (Mac app, Phase 2) ----------
+  // ---------- native bridge (Mac app) ----------
   function notifyNative(msg) {
     try { window.webkit?.messageHandlers?.sylvie?.postMessage(msg); } catch (_) {}
   }
-  // Voice turns run in the Mac app, which forwards each server event here so the panel shows
-  // the live transcript and the written answer.
-  let voiceMsg = null;
+
+  // ---------- wake panel (Mac app, ?embed=panel): one exchange at a time ----------
+  const wakeOrb = () => $("#wake-orb");
+  function setOrb(state) { if (PANEL && wakeOrb()) wakeOrb().setState(state); }
+
+  function wakeTurn(question, spoken) {
+    const q = $("#wake-q");
+    q.value = spoken ? `“${question}”` : question;
+    q.readOnly = true;
+    growWake();
+    const root = $("#wake-body");
+    return partsFor(root);
+  }
+  function growWake() { const q = $("#wake-q"); q.style.height = "auto"; q.style.height = q.scrollHeight + "px"; }
+  function reportPanelSize() {
+    requestAnimationFrame(() => notifyNative({ type: "panelSize", height: Math.ceil($("#wake").getBoundingClientRect().height) }));
+  }
+
+  // Voice turns run in the Mac app, which forwards each server event here.
+  let voiceP = null;
   function voiceEvent(ev) {
+    if (PANEL) {
+      if (ev.type === "transcript") {
+        if (!ev.text) return;
+        voiceP = wakeTurn(ev.text, true);
+        voiceP.bubble.classList.add("cursor");
+      } else if (ev.type === "meta") {
+        S.cid = ev.conversation_id;
+      } else if (voiceP && ev.type === "done") {
+        voiceP.bubble.classList.remove("cursor");
+        voiceP.status.hidden = true;
+        if (ev.message_id) { voiceP.id = ev.message_id; renderActions(voiceP, { id: ev.message_id, trace: ev.trace, mode: voiceP.mode }); }
+        voiceP = null;
+      } else if (voiceP && ev.type !== "speak") {
+        handle(ev, voiceP);
+      }
+      reportPanelSize();
+      return;
+    }
     const box = $("#messages");
-    const empty = $("#empty");
     if (ev.type === "transcript") {
       if (!ev.text) return;
-      if (empty) empty.remove();
-      box.appendChild(userMsg("🎙 " + ev.text));
-      voiceMsg = assistantMsg();
-      voiceMsg.bubble.classList.add("cursor");
-      box.appendChild(voiceMsg.root);
+      $("#empty")?.remove();
+      box.appendChild(userMsg(ev.text));
+      voiceP = assistantMsg();
+      voiceP.bubble.classList.add("cursor");
+      box.appendChild(voiceP.root);
     } else if (ev.type === "meta") {
-      if (S.cid !== ev.conversation_id) { S.cid = ev.conversation_id; $("#conv-title").textContent = ev.title; loadConvs(); }
-    } else if (voiceMsg && ev.type === "done") {
-      voiceMsg.bubble.classList.remove("cursor");
-      voiceMsg.status.hidden = true;
-      if (ev.message_id) { voiceMsg.id = ev.message_id; renderActions(voiceMsg, { id: ev.message_id, trace: ev.trace, mode: voiceMsg.mode }); }
-      voiceMsg = null;
-    } else if (voiceMsg && ev.type !== "speak") {
-      handle(ev, voiceMsg);
+      if (S.cid !== ev.conversation_id) { S.cid = ev.conversation_id; $("#conv-title").textContent = ev.title; syncVoiceLinks(); loadConvs(); }
+    } else if (voiceP && ev.type === "done") {
+      voiceP.bubble.classList.remove("cursor");
+      voiceP.status.hidden = true;
+      if (ev.message_id) { voiceP.id = ev.message_id; renderActions(voiceP, { id: ev.message_id, trace: ev.trace, mode: voiceP.mode }); }
+      voiceP = null;
+    } else if (voiceP && ev.type !== "speak") {
+      handle(ev, voiceP);
     }
     box.scrollTop = box.scrollHeight;
   }
 
-  window.sylvie = { send: (t, channel) => send(t, channel || "voice"), newChat, openConv, stop, voiceEvent };
+  // The Mac app tells the panel what the orb should show (listening, thinking, speaking, muted…)
+  function voiceState(state, detail) {
+    setOrb(state);
+    const q = $("#wake-q");
+    if (state === "listening") {
+      $("#wake-body").innerHTML = "";
+      q.value = ""; q.readOnly = true; q.placeholder = "Listening…"; growWake();
+      $("#wake-hint").textContent = "Say “Sylvie, stop” to interrupt · Esc to close";
+    } else if (state === "idle" && !S.streaming) {
+      q.readOnly = false; q.placeholder = "Ask Sylvie…";
+    }
+    if (detail) $("#wake-hint").textContent = detail;
+    reportPanelSize();
+  }
+  function voiceLevel(x) { if (wakeOrb()) wakeOrb().setLevel(x); }
+  function focusInput() {
+    if (PANEL) { const q = $("#wake-q"); q.readOnly = false; q.focus(); q.select(); } else input.focus();
+  }
+
+  window.sylvie = { send: (t, channel) => send(t, channel || "voice"), newChat, openConv, stop, voiceEvent, voiceState, voiceLevel, focusInput };
 
   // ---------- start ----------
-  if (params.get("embed") === "panel") {
+  if (PANEL) {
     document.body.classList.add("panel");
-    const bar = el("div", "panel-bar", `<button id="open-full">Open full chat ↗</button><button id="panel-new">New</button>`);
-    $("#main").prepend(bar);
-    $("#open-full").onclick = () => notifyNative({ type: "openChat", conversation_id: S.cid });
-    $("#panel-new").onclick = () => newChat();
+    const q = $("#wake-q");
+    q.addEventListener("input", growWake);
+    q.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!q.readOnly) send(); }
+      if (e.key === "Escape" && !S.streaming) notifyNative({ type: "closePanel" });
+    });
+    q.addEventListener("click", () => { if (q.readOnly && !S.streaming) { q.readOnly = false; q.select(); } });
+    $("#wake-open").onclick = () => notifyNative({ type: "openChat", conversation_id: S.cid });
     addEventListener("keydown", (e) => { if (e.key === "Escape" && !S.streaming) notifyNative({ type: "closePanel" }); });
+    new ResizeObserver(reportPanelSize).observe($("#wake"));
   }
+  syncVoiceLinks();
   pollHealth();
   refreshBadge();
   setInterval(refreshBadge, 60000);

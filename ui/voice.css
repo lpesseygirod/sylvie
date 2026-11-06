@@ -1,0 +1,36 @@
+/* Voice mode (design/DESIGN.md §2.2): full window, deep background, everything centred. */
+html, body { height: 100%; background: var(--bg-deep); }
+.voice { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg-deep); color: var(--text); }
+.v-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 22px 32px; }
+.v-name { font: 600 18px/1 var(--display); }
+.v-head .pill { border-color: var(--divider); }
+.v-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; padding: 24px 24px 12px; text-align: center; }
+.v-orb-btn { padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }
+.v-orb-btn:focus-visible { outline-offset: 24px; }
+.v-state { display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 44px; }
+.v-label { font-size: 13px; font-weight: 500; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent); }
+.v-state .wave[hidden] { display: none; }
+.v-text { display: flex; flex-direction: column; gap: 16px; max-width: 760px; }
+.v-said { margin: 0; font: 500 30px/1.3 var(--display); color: var(--text); }
+.v-said:empty:not(.live) { display: none; }
+.v-said.live::after { content: ""; display: inline-block; width: 2px; height: 1em; margin-left: 4px; vertical-align: -3px; background: var(--accent); animation: v-blink 1s steps(1) infinite; }
+.v-answer { margin: 0; font-size: 17px; line-height: 1.6; color: #A9AFBC; }
+.v-answer a { color: var(--accent); }
+@keyframes v-blink { 50% { opacity: 0; } }
+.v-foot { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 24px 34px; }
+.v-buttons { display: flex; align-items: center; gap: 18px; }
+.v-round { display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.v-round:hover { color: var(--text); background: var(--surface-2); }
+.v-round[aria-pressed="true"] { background: var(--danger-bg); color: var(--danger-fg); border-color: #4A2A2E; }
+.v-stop { display: flex; align-items: center; justify-content: center; width: 68px; height: 68px; border-radius: 50%; border: 0; background: var(--text); color: var(--bg-deep); }
+.v-stop:hover { background: #fff; }
+.v-stop:disabled { opacity: .35; cursor: default; }
+.v-hint { font-size: 12px; color: var(--muted); }
+
+@media (max-width: 600px) {
+  .v-head { padding: 16px; }
+  .v-main .orb { --orb-size: 200px !important; }
+  .v-said { font-size: 22px; }
+  .v-answer { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) { .v-said.live::after { animation: none; } }

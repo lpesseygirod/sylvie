@@ -129,7 +129,12 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
         pending = None
         if out.pending_id:
             rec = ctx.actions.log.get(out.pending_id)
-            pending = {"id": out.pending_id, "name": call.name, "summary": rec.summary if rec else ""}
+            pending = {
+                "id": out.pending_id,
+                "name": call.name,
+                "args": args,
+                "summary": rec.summary if rec else "",
+            }
         return ToolResult(out.content, ok=out.ok, pending=pending)
     if call.name == "calculator":
         return ToolResult(calculate(args["expression"]))

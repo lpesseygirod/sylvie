@@ -69,6 +69,8 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
                     from learning.scheduler import Scheduler
 
                     state["sylvie"].scheduler = Scheduler(state["sylvie"])
+                    if saved.get("learning_paused"):
+                        state["sylvie"].scheduler.enabled = False
                     state["sylvie"].scheduler.start()
                 state["ready"] = True
                 log.info("Sylvie ready")
@@ -140,6 +142,13 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
             return HTMLResponse(LOCKED_PAGE, status_code=401)
         return FileResponse(UI_DIR / "index.html")
 
+    @app.get("/voice")
+    def voice_page(request: Request):
+        """Voice mode: the orb screen (design/DESIGN.md §2.2)."""
+        if not tokens_equal(request.cookies.get(COOKIE), token):
+            return HTMLResponse(LOCKED_PAGE, status_code=401)
+        return FileResponse(UI_DIR / "voice.html")
+
     if UI_DIR.exists():
         app.mount("/static", StaticFiles(directory=UI_DIR), name="static")
 
@@ -152,6 +161,63 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
     def schedule():
         sch = S().scheduler
         return sch.status() if sch else {"running": None, "reason_if_idle": "scheduler off"}
+
+    @app.post("/api/schedule/pause")
+    def pause_learning(body: dict = Body(...)):
+        """ "Pause learning" (menu bar / dashboard): no night jobs until resumed; a running one stops."""
+        from learning.promote import load_state, save_state
+
+        paused = bool(body.get("paused"))
+        sch = S().scheduler
+        if sch:
+            sch.enabled = not paused
+            if paused:
+                sch.preempt()
+        st = load_state(cfg)
+        st.setdefault("settings", {})["learning_paused"] = paused
+        save_state(cfg, st)
+        return {"paused": paused}
+
+    @app.get("/api/info")
+    def info():
+        """What the chat header and status line show: model version, search switch, learning pause."""
+        from learning.promote import load_state
+        from learning.train import model_short
+
+        model = cfg.get_path("llm.model")
+        st = load_state(cfg)
+        active = st.get("adapters", {}).get(model_short(model), {}).get("active")
+        return {
+            "version": active or "base",
+            "model": model_short(model),
+            "web_search": bool(cfg.get_path("search.enabled", True)),
+            "learning_paused": bool(st.get("settings", {}).get("learning_paused")),
+        }
+
+    @app.post("/api/notes")
+    def save_note(body: dict = Body(...)):
+        """ "Save to notes" in the work panel: a markdown file in Sylvie's notes, searchable afterwards."""
+        import re as _re
+        from datetime import date
+
+        title = str(body.get("title") or "Note").strip()[:120] or "Note"
+        content = str(body.get("content") or "")
+        if not content.strip() or len(content) > 200_000:
+            raise HTTPException(400, "content must be 1–200000 characters")
+        slug = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60] or "note"
+        folder = cfg.data_dir / "notes" / "saved"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"{date.today().isoformat()}-{slug}.md"
+        n = 2
+        while path.exists():
+            path = folder / f"{date.today().isoformat()}-{slug}-{n}.md"
+            n += 1
+        path.write_text(f"# {title}\n\n{content.strip()}\n", encoding="utf-8")
+        try:
+            S().docs.index_file(path)
+        except Exception as e:  # saved either way; searchable after the next reindex
+            log.warning("couldn't index note %s: %s", path.name, e)
+        return {"ok": True, "file": path.name}
 
     @app.get("/api/conversations")
     def conversations(search: str | None = None):
@@ -449,7 +515,7 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
     @app.post("/phone/ask")
     def phone_ask(body: dict = Body(...)):
         """For the "Hey Siri, Sylvie" Shortcut: text in, short spoken answer + full answer out."""
-        from voice.speech import SentenceStreamer
+        from voice.speech import SentenceStreamer, strip_docs
 
         s = S()
         text = str(body.get("text", "")).strip()
@@ -465,7 +531,7 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
             elif ev["type"] == "sources":
                 sources = ev["sources"]
         speaker = SentenceStreamer()
-        spoken = speaker.feed(answer) + speaker.flush()
+        spoken = speaker.feed(strip_docs(answer)) + speaker.flush()
         return {
             "conversation_id": conv,
             "spoken": " ".join(spoken) or answer[:300],

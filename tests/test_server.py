@@ -66,3 +66,20 @@ def test_chat_streams_and_history(client):
 def test_upload_text(client):
     r = client.post("/api/upload", files={"file": ("notes.txt", b"hello notes")}, headers=AUTH)
     assert r.json() == {"name": "notes.txt", "text": "hello notes", "chars": 11}
+
+
+def test_info_notes_pause_and_voice_page(client, tmp_path):
+    info = client.get("/api/info", headers=AUTH).json()
+    assert info["version"] == "base" and "web_search" in info and info["learning_paused"] is False
+    r = client.post(
+        "/api/notes", json={"title": "TVM cheat sheet", "content": "FV = PV(1+r)^n"}, headers=AUTH
+    )
+    assert r.json()["ok"] and r.json()["file"].endswith("-tvm-cheat-sheet.md")
+    assert client.post("/api/notes", json={"title": "x", "content": " "}, headers=AUTH).status_code == 400
+    assert client.post("/api/schedule/pause", json={"paused": True}, headers=AUTH).json() == {"paused": True}
+    assert client.get("/api/info", headers=AUTH).json()["learning_paused"] is True
+    client.post("/api/schedule/pause", json={"paused": False}, headers=AUTH)
+    assert client.get("/voice").status_code == 401  # locked without the session cookie
+    client.get("/auth", params={"t": TOKEN})
+    page = client.get("/voice")
+    assert page.status_code == 200 and "v-orb" in page.text

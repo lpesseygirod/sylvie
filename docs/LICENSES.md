@@ -44,6 +44,13 @@ Not named in the plan (the plan asks for "open datasets whose license allows it"
 
 New transitive packages from mlx-audio/phonemizer (attrs, babel, cloudpickle, csvw, dlinfo, isodate, joblib, jsonschema, language-tags, miniaudio, pyparsing, python-dateutil, rdflib, referencing, rfc3986, rpds-py, segments, sounddevice, termcolor, tzdata, uritemplate): all MIT, BSD or Apache 2.0 (checked 2026-11-06).
 
+## Fonts (bundled in ui/fonts/)
+
+| Font | Use | License | Checked |
+|---|---|---|---|
+| Inter 5.3.0 (@fontsource/inter, npm) | interface text | SIL Open Font License 1.1 (`ui/fonts/Inter-OFL.txt`) | 2026-11-06 |
+| Space Grotesk 5.3.0 (@fontsource/space-grotesk, npm) | headings, voice transcript | SIL Open Font License 1.1 (`ui/fonts/SpaceGrotesk-OFL.txt`) | 2026-11-06 |
+
 ## Services (separate programs, not linked into Sylvie)
 
 | Service | Use | License | Note |

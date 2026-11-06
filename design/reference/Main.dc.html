@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sylvie — Chat workspace</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E0F13}
+a{color:#8EA8FF;text-decoration:none}a:hover{color:#B7C6FF}
+@keyframes sv-breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.08);opacity:1}}
+</style>
+</helmet>
+<div style="min-height: 900px; display: flex; flex-wrap: wrap; background: #0E0F13; color: #ECEEF3; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <nav aria-label="Conversations" style="flex: 1 1 240px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; padding: 20px 14px; background: #121318; border-right: 1px solid #23262F">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 6px">
+      <div aria-hidden="true" style="width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #DCD0FF 0%, #A98BFF 35%, #5B7CFF 70%, #22305E 100%); animation: sv-breathe 4s ease-in-out infinite"></div>
+      <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px; font-weight: 600; letter-spacing: 0.2px">Sylvie</span>
+    </div>
+
+    <a href="#" style="display: flex; align-items: center; gap: 10px; min-height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 10px; background: #1D2028; border: 1px solid #2A2E38; color: #ECEEF3; font-weight: 500">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      New chat
+    </a>
+
+    <label style="display: flex; align-items: center; gap: 8px; min-height: 40px; box-sizing: border-box; padding: 0 12px; border-radius: 10px; background: #0E0F13; border: 1px solid #23262F; color: #9AA1B0">
+      <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search conversations</span>
+      <input type="search" placeholder="Search" style="flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: #ECEEF3; font: inherit">
+    </label>
+
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <div style="padding: 0 12px 6px; font-size: 12px; font-weight: 500; color: #9AA1B0">Today</div>
+      <a href="#" aria-current="page" style="display: block; padding: 9px 12px; border-radius: 8px; background: #1D2028; color: #ECEEF3">Corporate Finance: TVM practice</a>
+      <a href="#" style="display: block; padding: 9px 12px; border-radius: 8px; color: #C9CDD6">Study playlist + tomorrow's plan</a>
+      <a href="#" style="display: block; padding: 9px 12px; border-radius: 8px; color: #C9CDD6">FitCheck pitch notes</a>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <div style="padding: 0 12px 6px; font-size: 12px; font-weight: 500; color: #9AA1B0">This week</div>
+      <a href="#" style="display: block; padding: 9px 12px; border-radius: 8px; color: #C9CDD6">Andorra ski trip packing list</a>
+      <a href="#" style="display: block; padding: 9px 12px; border-radius: 8px; color: #C9CDD6">Macro: goods market, Ch. 3</a>
+      <a href="#" style="display: block; padding: 9px 12px; border-radius: 8px; color: #C9CDD6">Email to class reps</a>
+      <a href="#" style="display: block; padding: 9px 12px; border-radius: 8px; color: #C9CDD6">C pointers, explained again</a>
+    </div>
+
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #23262F; padding-top: 14px">
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; color: #C9CDD6">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>
+        About Lea
+      </a>
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; color: #C9CDD6">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path></svg>
+        Learning dashboard
+      </a>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; font-size: 12px; color: #9AA1B0">
+        <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #5FD39A"></span>
+        Running on this Mac
+      </div>
+    </div>
+  </nav>
+
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-wrap: wrap">
+
+    <main style="flex: 999 1 460px; min-width: 0; display: flex; flex-direction: column; min-height: 900px">
+      <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid #1D2028">
+        <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 17px; font-weight: 600">Corporate Finance: TVM practice</h1>
+        <span style="font-size: 12px; color: #9AA1B0; padding: 3px 10px; border: 1px solid #2A2E38; border-radius: 999px">Sylvie v003 · local</span>
+        <a href="Voice.dc.html" style="margin-left: auto; display: flex; align-items: center; gap: 8px; min-height: 40px; box-sizing: border-box; padding: 0 14px; border-radius: 999px; background: #1D2028; border: 1px solid #2A2E38; color: #ECEEF3; font-weight: 500">
+          <span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #DCD0FF 0%, #A98BFF 40%, #5B7CFF 80%)"></span>
+          Voice mode
+        </a>
+      </header>
+
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 26px; padding: 28px; max-width: 760px; width: 100%; box-sizing: border-box; margin: 0 auto">
+
+        <div style="align-self: flex-end; max-width: 80%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: #1F2330; color: #ECEEF3">
+          Can you make me a quick cheat sheet for time value of money? Formulas first, like last time.
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9AA1B0">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"></path></svg>
+            Remembered: you like formulas before explanations
+          </div>
+          <p style="margin: 0; color: #DADDE4">Sure. I put it in the panel on the right so you can edit it and keep it for the exam. It covers present and future value, annuities and perpetuities, each with the formula first and one worked example.</p>
+          <a href="#" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #16181E; border: 1px solid #8EA8FF; color: #ECEEF3; max-width: 360px">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8EA8FF" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg>
+            <span style="display: flex; flex-direction: column">
+              <span style="font-weight: 500">TVM cheat sheet</span>
+              <span style="font-size: 12px; color: #9AA1B0">Document · open in panel</span>
+            </span>
+          </a>
+          <div style="display: flex; gap: 4px; color: #9AA1B0">
+            <button type="button" aria-label="Good answer" style="width: 36px; height: 36px; border-radius: 8px; border: 0; background: transparent; color: inherit; cursor: pointer">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v9H4v-9zM7 11l4-8c1.5 0 2.5 1 2.5 2.5V9H19a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7"></path></svg>
+            </button>
+            <button type="button" aria-label="Bad answer" style="width: 36px; height: 36px; border-radius: 8px; border: 0; background: transparent; color: inherit; cursor: pointer">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 13V4h3v9zM17 13l-4 8c-1.5 0-2.5-1-2.5-2.5V15H5a2 2 0 0 1-2-2.3l1.2-7A2 2 0 0 1 6.2 4H17"></path></svg>
+            </button>
+            <button type="button" style="min-height: 36px; padding: 0 10px; border-radius: 8px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer">Edit to what I wanted</button>
+          </div>
+        </div>
+
+        <div style="align-self: flex-end; max-width: 80%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: #1F2330; color: #ECEEF3">
+          Perfect. Also, is the exam date still the one in the syllabus?
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9AA1B0">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"></path></svg>
+            Searched your course files and the web
+          </div>
+          <p style="margin: 0; color: #DADDE4">Your syllabus PDF lists the final in the exam period, and I didn't find any change announced. I'd still check the campus portal, since dates there are the official ones.</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <a href="#" style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #16181E; border: 1px solid #2A2E38; color: #C9CDD6">CF_Syllabus.pdf</a>
+            <a href="#" style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #16181E; border: 1px solid #2A2E38; color: #C9CDD6">IE exam calendar</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 0 28px 24px">
+        <div style="max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 10px 16px; border-radius: 18px; background: #16181E; border: 1px solid #2A2E38">
+          <label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)" for="msg">Message Sylvie</label>
+          <textarea id="msg" rows="2" placeholder="Message Sylvie, or just say “Sylvie”…" style="resize: none; background: transparent; border: 0; outline: 0; color: #ECEEF3; font: inherit; font-size: 15px"></textarea>
+          <div style="display: flex; align-items: center; gap: 6px">
+            <button type="button" aria-label="Attach a file" style="width: 40px; height: 40px; border-radius: 10px; border: 0; background: transparent; color: #9AA1B0; cursor: pointer">
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3L15 7.5"></path></svg>
+            </button>
+            <button type="button" style="min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #2A2E38; background: transparent; color: #C9CDD6; font: inherit; font-size: 13px; cursor: pointer">Web search on</button>
+            <span style="flex: 1"></span>
+            <a href="Voice.dc.html" aria-label="Talk to Sylvie" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: #1D2028; color: #ECEEF3">
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+            </a>
+            <button type="button" aria-label="Send" style="width: 44px; height: 44px; border-radius: 50%; border: 0; background: #8EA8FF; color: #0E0F13; cursor: pointer">
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside aria-label="Work panel" style="flex: 1 1 400px; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; background: #131419; border-left: 1px solid #23262F">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #23262F">
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 600; font-size: 15px">TVM cheat sheet</span>
+        <div role="tablist" aria-label="Panel view" style="display: flex; gap: 2px; margin-left: 8px; padding: 3px; border-radius: 9px; background: #0E0F13">
+          <button type="button" role="tab" aria-selected="true" style="min-height: 30px; padding: 0 12px; border-radius: 7px; border: 0; background: #1F2330; color: #ECEEF3; font: inherit; font-size: 12px; cursor: pointer">Preview</button>
+          <button type="button" role="tab" aria-selected="false" style="min-height: 30px; padding: 0 12px; border-radius: 7px; border: 0; background: transparent; color: #9AA1B0; font: inherit; font-size: 12px; cursor: pointer">Edit</button>
+        </div>
+        <button type="button" aria-label="Close panel" style="margin-left: auto; width: 36px; height: 36px; border-radius: 8px; border: 0; background: transparent; color: #9AA1B0; cursor: pointer">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+
+      <article style="flex: 1; padding: 24px 26px; display: flex; flex-direction: column; gap: 18px; color: #DADDE4">
+        <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; font-weight: 600; color: #ECEEF3">Time value of money</h2>
+        <section style="display: flex; flex-direction: column; gap: 8px">
+          <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #9AA1B0">Future value</h3>
+          <code style="display: block; padding: 12px 14px; border-radius: 10px; background: #0E0F13; border: 1px solid #23262F; font-family: ui-monospace, Menlo, monospace; font-size: 14px; color: #ECEEF3">FV = PV × (1 + r)^n</code>
+        </section>
+        <section style="display: flex; flex-direction: column; gap: 8px">
+          <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #9AA1B0">Present value</h3>
+          <code style="display: block; padding: 12px 14px; border-radius: 10px; background: #0E0F13; border: 1px solid #23262F; font-family: ui-monospace, Menlo, monospace; font-size: 14px; color: #ECEEF3">PV = FV / (1 + r)^n</code>
+        </section>
+        <section style="display: flex; flex-direction: column; gap: 8px">
+          <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #9AA1B0">Annuity (PV)</h3>
+          <code style="display: block; padding: 12px 14px; border-radius: 10px; background: #0E0F13; border: 1px solid #23262F; font-family: ui-monospace, Menlo, monospace; font-size: 14px; color: #ECEEF3">PV = C × [1 − (1 + r)^−n] / r</code>
+        </section>
+        <section style="display: flex; flex-direction: column; gap: 8px">
+          <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #9AA1B0">Perpetuity</h3>
+          <code style="display: block; padding: 12px 14px; border-radius: 10px; background: #0E0F13; border: 1px solid #23262F; font-family: ui-monospace, Menlo, monospace; font-size: 14px; color: #ECEEF3">PV = C / r</code>
+        </section>
+        <p style="margin: 0; font-size: 13px; color: #9AA1B0">Tip: match r and n to the same period (monthly rate with months).</p>
+      </article>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px; border-top: 1px solid #23262F">
+        <button type="button" style="min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #2A2E38; background: #1D2028; color: #ECEEF3; font: inherit; font-size: 13px; cursor: pointer">Copy</button>
+        <button type="button" style="min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #2A2E38; background: #1D2028; color: #ECEEF3; font: inherit; font-size: 13px; cursor: pointer">Export PDF</button>
+        <button type="button" style="margin-left: auto; min-height: 40px; padding: 0 14px; border-radius: 10px; border: 0; background: #8EA8FF; color: #0E0F13; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Save to notes</button>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

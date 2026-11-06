@@ -148,3 +148,41 @@ def test_speak_endpoint(tmp_path):
         assert c.post("/api/voice/speak", json={"text": ""}, headers=AUTH).status_code == 400
         s.cfg["voice"]["tts"] = "system"  # Lea switched back: the app uses its own voice
         assert c.post("/api/voice/speak", json={"text": "Hi"}, headers=AUTH).status_code == 404
+
+
+# ---------- documents are shown, not spoken (<doc> blocks, design §2.1 work panel) ----------
+def test_doc_blocks_are_not_spoken():
+    from voice.speech import DocFilter, strip_docs
+
+    text = 'Here it is.\n<doc title="TVM cheat sheet">\n## FV\n`FV = PV(1+r)^n`\n</doc>\nWant examples?'
+    assert (
+        "FV" not in strip_docs(text)
+        and "Here it is." in strip_docs(text)
+        and "Want examples?" in strip_docs(text)
+    )
+    assert strip_docs("Sure. <doc title='x'>never closed") == "Sure.  "
+    f = DocFilter()
+    out = (
+        "".join(f.feed(text[i : i + 3]) for i in range(0, len(text), 3)) + f.flush()
+    )  # tags split across chunks
+    assert out.replace("\n", " ").split() == "Here it is. Want examples?".split()
+    f = DocFilter()
+    assert f.feed("I like <b>bold</b> and a < b") + f.flush() == "I like <b>bold</b> and a < b"
+
+
+def test_voice_turn_skips_documents(tmp_path):
+    from tests.test_orchestrator import extraction, make
+    from voice.loop import voice_turn
+
+    s = make(tmp_path, ['Done.\n<doc title="Plan">\nStep one. Step two.\n</doc>', extraction()])
+    s.speech_to_text = lambda: type(
+        "STT",
+        (),
+        {
+            "transcribe": lambda self, wav: type(
+                "T", (), {"text": "make me a plan", "language": "en", "ms": 1.0}
+            )()
+        },
+    )()
+    spoken = [e["text"] for e in voice_turn(s, b"RIFF") if e["type"] == "speak"]
+    assert spoken == ["Done."]

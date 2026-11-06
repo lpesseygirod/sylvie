@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from core.lang import guess_language
-from voice.speech import SentenceStreamer
+from voice.speech import DocFilter, SentenceStreamer
 
 
 def voice_turn(
@@ -24,6 +24,7 @@ def voice_turn(
         return
     lang = tr.language
     speaker = SentenceStreamer()
+    docs = DocFilter()  # documents Sylvie writes go to the screen, not the speaker
     for ev in sylvie.turn(tr.text, conversation_id=conversation_id, channel=channel):
         if ev["type"] == "status" and ev.get("text"):
             yield ev
@@ -31,13 +32,13 @@ def voice_turn(
             continue
         if ev["type"] == "done":
             # The last sentence goes out before "done", so clients know all speech has arrived.
-            for sentence in speaker.flush():
+            for sentence in speaker.feed(docs.flush()) + speaker.flush():
                 yield {"type": "speak", "text": sentence, "language": guess_language(sentence, default=lang)}
             yield ev
             continue
         yield ev
         if ev["type"] == "text":
-            for sentence in speaker.feed(ev["text"]):
+            for sentence in speaker.feed(docs.feed(ev["text"])):
                 yield {"type": "speak", "text": sentence, "language": guess_language(sentence, default=lang)}
         elif ev["type"] == "tool":
             speaker = SentenceStreamer()  # text before a tool call was a filler; speak the real answer fresh

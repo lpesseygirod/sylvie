@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sylvie — Voice mode</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#08090C}
+a{color:#8EA8FF;text-decoration:none}a:hover{color:#B7C6FF}
+.sv-orb{position:relative;width:300px;height:300px}
+.sv-glow{position:absolute;inset:-70px;border-radius:50%;background:radial-gradient(circle,rgba(142,168,255,.28) 0%,rgba(197,155,255,.10) 40%,rgba(8,9,12,0) 70%);animation:sv-pulse 4s ease-in-out infinite}
+.sv-blob{position:absolute;inset:0;border-radius:50%;mix-blend-mode:screen;filter:blur(16px);animation:sv-spin 12s linear infinite}
+.sv-b1{background:radial-gradient(circle at 32% 30%,#C59BFF 0%,rgba(197,155,255,0) 62%)}
+.sv-b2{background:radial-gradient(circle at 72% 42%,#5B7CFF 0%,rgba(91,124,255,0) 60%);animation-duration:16s;animation-direction:reverse}
+.sv-b3{background:radial-gradient(circle at 48% 76%,#6FE0FF 0%,rgba(111,224,255,0) 56%);animation-duration:20s}
+.sv-core{position:absolute;inset:22%;border-radius:50%;background:radial-gradient(circle at 42% 38%,#FFFFFF 0%,#E6DEFF 22%,rgba(169,139,255,.55) 55%,rgba(91,124,255,0) 75%);filter:blur(4px);animation:sv-breathe 4s ease-in-out infinite}
+.sv-ring{position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(142,168,255,.22)}
+.listening .sv-core,.listening .sv-glow{animation-duration:2.2s}
+.thinking .sv-blob{animation-duration:2.6s}
+.thinking .sv-core{opacity:.75;animation-duration:1.4s}
+.speaking .sv-core{animation:sv-talk .42s ease-in-out infinite alternate}
+.speaking .sv-glow{animation-duration:.9s}
+.sv-bar{width:4px;border-radius:4px;background:#8EA8FF;animation:sv-bar .9s ease-in-out infinite alternate}
+.sv-caret{display:inline-block;width:2px;height:1em;margin-left:4px;vertical-align:-3px;background:#8EA8FF;animation:sv-blink 1s steps(1) infinite}
+@keyframes sv-spin{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(1.07)}100%{transform:rotate(360deg) scale(1)}}
+@keyframes sv-breathe{0%,100%{transform:scale(.96)}50%{transform:scale(1.06)}}
+@keyframes sv-pulse{0%,100%{opacity:.7;transform:scale(.97)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes sv-talk{from{transform:scale(.92)}to{transform:scale(1.12)}}
+@keyframes sv-bar{from{height:6px;opacity:.5}to{height:30px;opacity:1}}
+@keyframes sv-blink{50%{opacity:0}}
+@media (prefers-reduced-motion: reduce){.sv-glow,.sv-blob,.sv-core,.sv-bar,.sv-caret{animation:none}}
+</style>
+</helmet>
+<div style="min-height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: #08090C; color: #ECEEF3; font-family: Inter, system-ui, sans-serif; font-size: 14px">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 22px 32px">
+    <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px; font-weight: 600">Sylvie</span>
+    <span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9AA1B0; padding: 4px 10px; border: 1px solid #23262F; border-radius: 999px">
+      <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #5FD39A"></span>
+      On your Mac · private
+    </span>
+    <div role="group" aria-label="Preview state" style="margin-left: auto; display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: #121318; border: 1px solid #23262F">
+      <sc-for list="{{modes}}" as="m" hint-placeholder-count="3">
+        <button type="button" onClick="{{m.pick}}" aria-pressed="{{m.pressed}}" style="{{m.style}}">{{m.label}}</button>
+      </sc-for>
+    </div>
+  </header>
+
+  <main style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; padding: 24px 24px 12px; text-align: center">
+    <div class="sv-orb {{mode}}" role="img" aria-label="Sylvie orb, {{stateLabel}}">
+      <div class="sv-glow"></div>
+      <div class="sv-ring"></div>
+      <div class="sv-blob sv-b1"></div>
+      <div class="sv-blob sv-b2"></div>
+      <div class="sv-blob sv-b3"></div>
+      <div class="sv-core"></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 44px">
+      <span style="font-size: 13px; font-weight: 500; letter-spacing: 1.6px; text-transform: uppercase; color: #8EA8FF">{{stateLabel}}</span>
+      <sc-if value="{{isSpeaking}}" hint-placeholder-val="{{false}}">
+        <div aria-hidden="true" style="display: flex; align-items: center; gap: 4px; height: 32px">
+          <sc-for list="{{bars}}" as="bar" hint-placeholder-count="24">
+            <span class="sv-bar" style="{{bar.style}}"></span>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 760px">
+      <p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 30px; font-weight: 500; line-height: 1.3; color: #ECEEF3">“Sylvie, what do I have tomorrow? And put on my study playlist.”<sc-if value="{{isListening}}" hint-placeholder-val="{{true}}"><span class="sv-caret" aria-hidden="true"></span></sc-if></p>
+      <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #A9AFBC">{{answer}}</p>
+    </div>
+  </main>
+
+  <footer style="display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 24px 34px">
+    <div style="display: flex; align-items: center; gap: 18px">
+      <button type="button" onClick="{{toggleMute}}" aria-pressed="{{muted}}" aria-label="Mute microphone" style="{{muteStyle}}">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+      </button>
+      <button type="button" aria-label="Stop" style="width: 68px; height: 68px; border-radius: 50%; border: 0; background: #ECEEF3; color: #08090C; cursor: pointer; display: flex; align-items: center; justify-content: center">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"></rect></svg>
+      </button>
+      <a href="Main.dc.html" aria-label="Open chat" style="width: 56px; height: 56px; border-radius: 50%; background: #16181E; border: 1px solid #2A2E38; color: #ECEEF3; display: flex; align-items: center; justify-content: center; box-sizing: border-box">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>
+      </a>
+    </div>
+    <span style="font-size: 12px; color: #9AA1B0">Say “Sylvie, stop” to interrupt · ⌥ Space to open</span>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["listening","thinking","speaking"],"default":"listening"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const mode = this.state.mode ?? this.props.mode ?? 'listening';
+const muted = !!this.state.muted;
+const labels = { listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' };
+const answers = {
+listening: 'Go ahead, I’m listening.',
+thinking: 'Checking your calendar and Spotify…',
+speaking: 'Tomorrow you have two classes: Corporate Finance in the morning and Macro after lunch. Your study playlist is playing on Spotify now.'
+};
+const base = 'min-height: 34px; padding: 0 14px; border-radius: 8px; border: 0; font: inherit; font-size: 13px; cursor: pointer;';
+const modes = ['listening', 'thinking', 'speaking'].map((id) => ({
+id,
+label: labels[id],
+pressed: id === mode ? 'true' : 'false',
+style: base + (id === mode ? ' background: #1F2330; color: #ECEEF3;' : ' background: transparent; color: #9AA1B0;'),
+pick: () => this.setState({ mode: id })
+}));
+const bars = Array.from({ length: 24 }, (_, i) => ({
+style: 'animation-delay: ' + ((i * 0.13) % 0.9).toFixed(2) + 's; animation-duration: ' + (0.6 + (i % 5) * 0.12).toFixed(2) + 's'
+}));
+return {
+mode,
+modes,
+bars,
+stateLabel: labels[mode],
+answer: answers[mode],
+isSpeaking: mode === 'speaking',
+isListening: mode === 'listening',
+muted: muted ? 'true' : 'false',
+muteStyle: 'width: 56px; height: 56px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border: 1px solid #2A2E38; ' + (muted ? 'background: #3A2226; color: #FFB4B4;' : 'background: #16181E; color: #ECEEF3;'),
+toggleMute: () => this.setState({ muted: !muted })
+};
+}
+}
+</script>
+</body>
+</html>

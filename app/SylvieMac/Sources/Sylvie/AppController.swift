@@ -30,14 +30,31 @@ enum VoiceState: String {
         case .offline: "Sylvie's server isn't running"
         }
     }
+
+    /// The orb's look for this state (menu bar glyph, panel, voice mode).
+    var orb: OrbState {
+        switch self {
+        case .starting, .idle: .idle
+        case .listening: .listening
+        case .thinking: .thinking
+        case .speaking: .speaking
+        case .muted, .offline: .muted
+        }
+    }
 }
 
 /// Wake word → listen → send audio → speak the answer, with the floating panel showing it all.
 @MainActor
 final class AppController: ObservableObject {
-    @Published var state: VoiceState = .starting
-    @Published var detail = ""
+    @Published var state: VoiceState = .starting {
+        didSet { if state != oldValue { stateChanged(from: oldValue) } }
+    }
+    @Published var detail = "" {
+        didSet { if detail != oldValue { forwardState() } }
+    }
     @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @Published var learningPaused = false
+    @Published private(set) var menuIcon = AppController.glyph(.idle, time: 0)
 
     private let port = 8765
     private var api: APIClient?
@@ -59,6 +76,12 @@ final class AppController: ObservableObject {
     private var lastLanguage = "en"
     private let conversationTimeout: TimeInterval = 5 * 60  // after 5 min of quiet, a new conversation
     private var serverWasReady = false
+    private var voiceModeActive = false  // the chat window is showing voice mode (/voice)
+    private var glyphTimer: Timer?
+    private let glyphStart = Date()
+    private var micLevel = 0.0
+    private var lastLevelSent = Date.distantPast
+    private var autoHide: DispatchWorkItem?
 
     func start() {
         hotKey = HotKey { [weak self] in self?.hotKeyPressed() }
@@ -88,8 +111,11 @@ final class AppController: ObservableObject {
             let panel = PanelController(base: api.base)
             panel.onOpenChat = { [weak self] cid in self?.openChat(cid) }
             self.panel = panel
-            chat = ChatWindowController(base: api.base)
+            let chat = ChatWindowController(base: api.base)
+            chat.onMessage = { [weak self] msg in self?.chatMessage(msg) }
+            self.chat = chat
         }
+        if let info = await api.info() { learningPaused = info["learning_paused"] as? Bool ?? false }
         panel?.load()
         serverWasReady = true
         await startAudio()
@@ -150,6 +176,10 @@ final class AppController: ObservableObject {
     }
 
     private func hotKeyPressed() {
+        if voiceModeActive, chat?.isVisible == true {
+            orbPressed()
+            return
+        }
         guard let panel else { return }
         if panel.isVisible && state == .idle {
             panel.hide()
@@ -160,11 +190,11 @@ final class AppController: ObservableObject {
         if state == .idle { beginListening(chime: true) }
     }
 
-    private func beginListening(chime: Bool) {
+    private func beginListening(chime: Bool, greet: Bool = true) {
         guard pipeline.running else { return }
         if chime { NSSound(named: "Tink")?.play() }
-        if Date().timeIntervalSince(lastTurnAt) > conversationTimeout { conversationId = nil }
-        panel?.show()
+        if Date().timeIntervalSince(lastTurnAt) > conversationTimeout && !voiceModeActive { conversationId = nil }
+        if !voiceModeActive { panel?.show() }
         recording = preRoll.snapshot()
         vad.reset()
         heardSpeech = false
@@ -173,7 +203,7 @@ final class AppController: ObservableObject {
         wake.listensForStop = false
         // Greet only if Lea paused after "Sylvie" — if she's already talking, don't interrupt her.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-            guard let self, self.recordingActive, !self.heardSpeech else { return }
+            guard greet, let self, self.recordingActive, !self.heardSpeech else { return }
             let greetings = ["en": "Hello Lea", "es": "Hola Lea", "fr": "Bonjour Lea"]
             self.speaker.say(greetings[self.lastLanguage] ?? "Hello Lea", language: self.lastLanguage)
         }
@@ -183,6 +213,7 @@ final class AppController: ObservableObject {
         preRoll.append(samples)
         guard recordingActive else { return }
         recording.append(contentsOf: samples)
+        sendLevel(samples)
         for event in vad.process(samples) {
             switch event {
             case .speechStarted:
@@ -213,7 +244,7 @@ final class AppController: ObservableObject {
             do {
                 for try await event in api.voiceTurn(wav: wav, conversationId: self.conversationId) {
                     if Task.isCancelled { break }
-                    self.panel?.send(event: event)
+                    if self.voiceModeActive { self.chat?.voiceEvent(event) } else { self.panel?.send(event: event) }
                     self.apply(event)
                 }
             } catch {
@@ -277,6 +308,127 @@ final class AppController: ObservableObject {
 
     func openChat(_ cid: String? = nil) {
         chat?.open(conversationId: cid ?? conversationId)
+    }
+
+    func openVoiceMode() {
+        var path = "/voice"
+        if let cid = conversationId, Date().timeIntervalSince(lastTurnAt) < conversationTimeout { path += "?c=\(cid)" }
+        panel?.hide()
+        chat?.open(path: path)
+    }
+
+    func openDashboard() {
+        chat?.open(path: "/dashboard")
+    }
+
+    func toggleLearningPause() {
+        guard let api else { return }
+        let want = !learningPaused
+        Task {
+            if let paused = await api.pauseLearning(want) { learningPaused = paused }
+        }
+    }
+
+    // MARK: Voice mode (the chat window's /voice page)
+
+    private func chatMessage(_ msg: [String: Any]) {
+        switch msg["type"] as? String {
+        case "voiceMode":
+            let active = msg["active"] as? Bool ?? false
+            guard active != voiceModeActive || active else { return }
+            voiceModeActive = active
+            guard active else { return }
+            if let cid = msg["conversation_id"] as? String {
+                conversationId = cid
+                lastTurnAt = Date()
+            }
+            panel?.hide()
+            forwardState()
+            if state == .idle { beginListening(chime: true, greet: false) }  // opening voice mode = "I want to talk"
+        case "voiceListen":
+            orbPressed()
+        case "voiceStop":
+            interrupt()
+        case "voiceMute":
+            toggleMute()
+        default:
+            break
+        }
+    }
+
+    /// A tap on the orb (or ⌥Space in voice mode): talk, finish talking, or interrupt Sylvie.
+    private func orbPressed() {
+        switch state {
+        case .idle:
+            beginListening(chime: true, greet: false)
+        case .listening:
+            if heardSpeech { finishRecording() } else { recordingActive = false; state = .idle }
+        case .thinking, .speaking:
+            interrupt()
+            beginListening(chime: true, greet: false)
+        default:
+            break
+        }
+    }
+
+    // MARK: Orb everywhere: menu bar glyph, panel, voice mode
+
+    private func stateChanged(from old: VoiceState) {
+        forwardState()
+        updateGlyphTimer()
+        menuIcon = Self.glyph(state.orb, time: Date().timeIntervalSince(glyphStart))
+        // Close the panel a few seconds after the answer, unless Lea is typing there or a "Send?" card waits.
+        autoHide?.cancel()
+        if state == .idle, old == .speaking || old == .thinking, let panel, panel.isVisible {
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, self.state == .idle, let panel = self.panel,
+                      !panel.isKey, !panel.hasPendingConfirmation else { return }
+                panel.hide()
+            }
+            autoHide = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: work)
+        }
+    }
+
+    private func forwardState() {
+        let web = state == .offline ? "offline" : state.orb.rawValue
+        let note = state == .offline || state == .muted ? detail : ""
+        panel?.voiceState(web, detail: note)
+        if voiceModeActive { chat?.voiceState(web, detail: note) }
+    }
+
+    private func sendLevel(_ samples: [Float]) {
+        var sum: Float = 0
+        for x in samples { sum += x * x }
+        micLevel = Double(min(1, sqrt(sum / Float(max(samples.count, 1))) * 12))
+        guard Date().timeIntervalSince(lastLevelSent) > 0.05 else { return }
+        lastLevelSent = Date()
+        if voiceModeActive { chat?.voiceLevel(micLevel) } else { panel?.voiceLevel(micLevel) }
+    }
+
+    private func updateGlyphTimer() {
+        if state.orb.animates {
+            guard glyphTimer == nil else { return }
+            let timer = Timer(timeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    let level = self.state == .listening ? self.micLevel : 0
+                    self.menuIcon = Self.glyph(self.state.orb, time: Date().timeIntervalSince(self.glyphStart), level: level)
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)  // keeps animating while the menu is open
+            glyphTimer = timer
+        } else {
+            glyphTimer?.invalidate()
+            glyphTimer = nil
+        }
+    }
+
+    static func glyph(_ state: OrbState, time: Double, level: Double = 0) -> NSImage {
+        guard let cg = OrbGlyph.render(state: state, time: time, pixels: 36, level: level) else {
+            return NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Sylvie") ?? NSImage()
+        }
+        return NSImage(cgImage: cg, size: NSSize(width: 18, height: 18))
     }
 
     func showPanel() {

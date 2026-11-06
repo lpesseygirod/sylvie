@@ -14,6 +14,55 @@ _SENTENCE_END = re.compile(r"[.!?…]+(?=\s|$)")
 _ABBREV = re.compile(r"\b(e\.g|i\.e|etc|vs|dr|mr|mrs|ms|sr|sra|mme|p\.ej|approx|aprox|nº)\.$", re.I)
 
 
+_DOC_BLOCK = re.compile(r"<doc\b[^>]*>.*?(?:</doc>|$)", re.S | re.I)
+_DOC_OPEN = re.compile(r"<doc[\s>]", re.I)
+
+
+def strip_docs(text: str) -> str:
+    """Removes <doc …>…</doc> blocks: things Sylvie made to read and edit on screen, not to say."""
+    return _DOC_BLOCK.sub(" ", text)
+
+
+class DocFilter:
+    """Streaming version of strip_docs: feed(chunk) returns only the text outside doc blocks,
+    holding back a tag that may be split across chunks."""
+
+    def __init__(self):
+        self.buf = ""
+        self.inside = False
+
+    def feed(self, chunk: str) -> str:
+        self.buf += chunk
+        out = ""
+        while True:
+            if self.inside:
+                i = self.buf.lower().find("</doc>")
+                if i < 0:
+                    self.buf = self.buf[-5:]  # might be the start of "</doc>"
+                    return out
+                self.buf, self.inside = self.buf[i + 6 :], False
+                continue
+            m = _DOC_OPEN.search(self.buf)
+            if m:
+                end = self.buf.find(">", m.start())
+                if end < 0:
+                    out, self.buf = out + self.buf[: m.start()], self.buf[m.start() :]
+                    return out
+                out, self.buf, self.inside = out + self.buf[: m.start()], self.buf[end + 1 :], True
+                continue
+            j = self.buf.rfind("<")
+            if j >= 0 and len(self.buf) - j <= 4 and "<doc".startswith(self.buf[j:].lower()):
+                out, self.buf = out + self.buf[:j], self.buf[j:]
+                return out
+            out, self.buf = out + self.buf, ""
+            return out
+
+    def flush(self) -> str:
+        out = "" if self.inside else self.buf
+        self.buf, self.inside = "", False
+        return out
+
+
 def clean_for_speech(text: str) -> str:
     t = re.sub(r"```.*?(```|$)", " ", text, flags=re.S)  # code isn't spoken
     t = re.sub(r"`([^`]*)`", r"\1", t)

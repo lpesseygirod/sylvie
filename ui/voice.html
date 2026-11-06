@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sylvie · Voice</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/orb.css">
+  <link rel="stylesheet" href="/static/voice.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><radialGradient id='g' cx='.38' cy='.36' r='.7'><stop offset='0' stop-color='%23FFFFFF'/><stop offset='.3' stop-color='%23C59BFF'/><stop offset='.7' stop-color='%235B7CFF'/><stop offset='1' stop-color='%2322305E'/></radialGradient></defs><circle cx='16' cy='16' r='14' fill='url(%23g)'/></svg>">
+</head>
+<body>
+  <div class="voice">
+    <header class="v-head">
+      <span class="v-name">Sylvie</span>
+      <span class="pill"><span id="v-dot" class="status-dot ok" aria-hidden="true"></span><span id="v-where">On your Mac · private</span></span>
+    </header>
+
+    <main class="v-main">
+      <button type="button" id="v-orb-btn" class="v-orb-btn" aria-label="Talk to Sylvie">
+        <div data-orb="300" id="v-orb"></div>
+      </button>
+      <div class="v-state">
+        <span id="v-label" class="v-label" aria-live="polite">Starting</span>
+        <div id="v-wave" class="wave" aria-hidden="true" hidden></div>
+      </div>
+      <div class="v-text">
+        <p id="v-said" class="v-said"></p>
+        <p id="v-answer" class="v-answer" aria-live="polite"></p>
+      </div>
+    </main>
+
+    <footer class="v-foot">
+      <div class="v-buttons">
+        <button type="button" id="v-mute" class="v-round" aria-pressed="false" aria-label="Mute microphone"></button>
+        <button type="button" id="v-stop" class="v-stop" aria-label="Stop"></button>
+        <a id="v-chat" class="v-round" href="/" aria-label="Open chat"></a>
+      </div>
+      <span id="v-hint" class="v-hint">Say “Sylvie, stop” to interrupt · ⌥ Space to open</span>
+    </footer>
+  </div>
+
+  <script src="/static/icons.js"></script>
+  <script src="/static/orb.js"></script>
+  <script src="/static/voice.js"></script>
+</body>
+</html>

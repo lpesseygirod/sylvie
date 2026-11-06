@@ -48,6 +48,29 @@ So the NPV is about **69.96 €** — positive, so it's worth it [1].
 > Tip: a higher discount rate lowers the NPV."""
 
 
+DOC = """Here it is. I put it in the panel so you can edit it and keep it.
+
+<doc title="TVM cheat sheet">
+## Time value of money
+
+#### Future value
+`FV = PV × (1 + r)^n`
+
+#### Present value
+`PV = FV / (1 + r)^n`
+
+#### Annuity (PV)
+`PV = C × [1 − (1 + r)^−n] / r`
+
+#### Perpetuity
+`PV = C / r`
+
+Tip: match r and n to the same period (monthly rate with months).
+</doc>
+
+Formulas first, one example each if you want them."""
+
+
 class SlowFake(FakeLLM):
     def stream(
         self, messages, tools=None, thinking=False, effort="low", max_tokens=None, stop=None, use_cache=True
@@ -65,6 +88,8 @@ class SlowFake(FakeLLM):
                 "<parameter=subject>\nMeeting\n</parameter>\n<parameter=body>\nCan we meet Monday at 10?\n</parameter>\n"
                 "</function>\n</tool_call>"
             )
+        elif "cheat sheet" in last.lower():
+            text = DOC
         elif "search" in last.lower():
             text = "Let me look.\n<tool_call>\n<function=web_search>\n<parameter=query>\nNPV formula\n</parameter>\n</function>\n</tool_call>"
         else:
@@ -84,6 +109,7 @@ def main():
     cfg = Config(dict(load_config()))
     cfg["server"] = {**cfg["server"], "port": PORT, "allowed_origins": [f"http://127.0.0.1:{PORT}"]}
     tmp = Path(tempfile.mkdtemp(prefix="sylvie-ui-dev-"))
+    cfg["paths"] = {**cfg["paths"], "data_dir": str(tmp / "data")}  # notes etc. never land in Lea's data
     db = Database(tmp / "dev.db", dim=256)
     # Fake AppleScript and commands: the dev server can never control Lea's real apps.
     runner = ActionRunner(

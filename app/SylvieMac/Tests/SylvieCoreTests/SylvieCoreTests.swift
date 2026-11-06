@@ -1,3 +1,4 @@
+import ImageIO
 import XCTest
 @testable import SylvieCore
 
@@ -64,5 +65,42 @@ final class SylvieCoreTests: XCTestCase {
         XCTAssertEqual(r.snapshot(), [1, 2])
         r.append([3, 4, 5])
         XCTAssertEqual(r.snapshot(), [3, 4, 5])
+    }
+
+    func testOrbGlyphStates() throws {
+        for state in OrbState.allCases {
+            let img = try XCTUnwrap(OrbGlyph.render(state: state, time: 0.3, pixels: 36))
+            XCTAssertEqual(img.width, 36)
+            let (r, g, b, a) = try pixel(img, x: 18, y: 18)
+            XCTAssertGreaterThan(a, 100, "\(state) should be visible in the middle")
+            if state == .muted {
+                XCTAssertLessThan(abs(Int(r) - Int(b)), 40, "muted is grey")
+            } else {
+                XCTAssertGreaterThan(Int(b) + Int(g) + Int(r), 400, "\(state) has a bright core")
+            }
+        }
+        // Moving states change over time; idle barely does.
+        XCTAssertTrue(OrbState.thinking.animates && !OrbState.idle.animates && !OrbState.muted.animates)
+        let a = try XCTUnwrap(OrbGlyph.render(state: .thinking, time: 0, pixels: 36))
+        let b = try XCTUnwrap(OrbGlyph.render(state: .thinking, time: 0.7, pixels: 36))
+        XCTAssertNotEqual(a.dataProvider?.data as Data?, b.dataProvider?.data as Data?)
+        if let dir = ProcessInfo.processInfo.environment["SYLVIE_GLYPH_DIR"] {  // for design screenshots
+            for state in OrbState.allCases {
+                try writePNG(XCTUnwrap(OrbGlyph.render(state: state, time: 0.3, pixels: 144)),
+                             to: URL(fileURLWithPath: dir).appendingPathComponent("glyph-\(state.rawValue).png"))
+            }
+        }
+    }
+
+    private func pixel(_ img: CGImage, x: Int, y: Int) throws -> (UInt8, UInt8, UInt8, UInt8) {
+        let data = try XCTUnwrap(img.dataProvider?.data as Data?)
+        let i = y * img.bytesPerRow + x * 4
+        return (data[i], data[i + 1], data[i + 2], data[i + 3])
+    }
+
+    private func writePNG(_ img: CGImage, to url: URL) throws {
+        let dest = try XCTUnwrap(CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil))
+        CGImageDestinationAddImage(dest, img, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(dest))
     }
 }
