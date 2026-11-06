@@ -45,9 +45,9 @@ log = logging.getLogger("sylvie")
 
 MAX_TOOL_ROUNDS = 4
 CLAUDE_NOTE = (
-    "This message was written to Claude Code, a coding assistant on Lea's Mac, not to Sylvie, and there "
-    "is no reply. Instructions about the coding task itself (what to build, run, fix or commit) are not "
-    "facts about Lea and not style."
+    "This message was written to Claude, another AI assistant (often for coding), not to Sylvie, and "
+    "there is no reply. Instructions about the task itself (what to build, run, fix, write or commit) "
+    "are not facts about Lea and not style."
 )
 LANG_NAMES = {"en": "English", "es": "Spanish", "fr": "French"}
 MAX_ATTACHMENT_CHARS = 20000
@@ -543,7 +543,7 @@ class Sylvie:
 
     # ---------- background learning ----------
     def learn_from_claude(self, message: str, source: str, stop: threading.Event) -> None:
-        """One of Lea's own messages to Claude Code (memory/claude_history.py). Facts and interests
+        """One of Lea's own messages to Claude (memory/claude_history.py). Facts and interests
         are learned as usual; a rule about answers is saved switched off, for Lea to approve."""
         detect_preference(_Stoppable(self.llm, stop), self.prefs, message, source="claude")
         if not stop.is_set():

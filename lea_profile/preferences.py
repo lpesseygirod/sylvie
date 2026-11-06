@@ -108,7 +108,7 @@ def maybe_preference(message: str) -> bool:
 
 
 CLAUDE_NOTE = (
-    "Note: this message was written to Claude Code, a coding assistant, not to Sylvie. Only count a \
+    "Note: this message was written to Claude, another AI assistant (often for coding), not to Sylvie. Only count a \
 preference about how answers should be written that would suit any assistant (length, tone, language, \
 format, how much to explain). Instructions about the coding work, permissions, or when to ask or stop \
 are NOT preferences for Sylvie.\n\n"

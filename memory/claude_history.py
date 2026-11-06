@@ -1,10 +1,13 @@
 """Learn from Lea's own messages to Claude Code, so Sylvie knows what Lea is working on and how she
 likes answers, even when she talked to Claude instead of Sylvie.
 
-Claude Code keeps every session as a JSON-lines file under ~/.claude/projects/<project>/. Every few
-minutes this reads what was appended since last time and keeps only the messages Lea typed
-(origin "human"): never Claude's answers, tool output, pasted text, task notifications or briefs
-written by other Claude sessions. Each message then goes through Sylvie's normal background
+Two sources, both checked every few minutes:
+- Claude Code keeps every session as a JSON-lines file under ~/.claude/projects/<project>/. New lines
+  are read from where we stopped, keeping only the messages Lea typed (origin "human"): never
+  Claude's answers, tool output, pasted text, task notifications or briefs from other Claude sessions.
+- Chats on claude.ai (web, phone, the Claude app) live on Anthropic's servers. Lea downloads them
+  (Settings → Privacy → Export data) and drops the zip in the exports folder; only her own turns
+  ("sender": "human") are read, never Claude's replies or attached files' contents. Each message then goes through Sylvie's normal background
 learning. Nothing is copied into conversations or training data, and nothing leaves the Mac.
 """
 
@@ -14,12 +17,16 @@ import json
 import logging
 import re
 import threading
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
 log = logging.getLogger("sylvie.claude_history")
 
 OFFSETS_KEY = "claude_history.offsets"
+EXPORT_SEEN_KEY = "claude_history.export_seen"
+EXPORT_FILES_KEY = "claude_history.export_files"
+MAX_EXPORT_BYTES = 1_000_000_000
 # Text Lea didn't write herself: system notes, pasted text, IDE selections, command output.
 TAGGED_BLOCK_RE = re.compile(r"<([a-z_-]+)(?:\s[^>]*)?>.*?</\1>", re.S)
 MIN_CHARS = 12
@@ -105,6 +112,50 @@ def read_new(folder: Path, offsets: dict[str, int], exclude: set[str]) -> list[C
     return out
 
 
+def _export_conversations(path: Path) -> list:
+    """conversations.json from a claude.ai export (the zip as downloaded, or the file itself).
+    Read in memory: nothing is unpacked to disk."""
+    if path.suffix == ".zip":
+        with zipfile.ZipFile(path) as z:
+            names = [n for n in z.namelist() if n.rsplit("/", 1)[-1] == "conversations.json"]
+            if not names or z.getinfo(names[0]).file_size > MAX_EXPORT_BYTES:
+                return []
+            data = json.loads(z.read(names[0]))
+    else:
+        if path.stat().st_size > MAX_EXPORT_BYTES:
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+    return data if isinstance(data, list) else []
+
+
+def read_export(path: Path) -> list[ClaudeMessage]:
+    """Lea's own messages from a claude.ai export. Other formats (e.g. other chat apps) give []."""
+    out: list[ClaudeMessage] = []
+    for conv in _export_conversations(path):
+        if not isinstance(conv, dict) or not isinstance(conv.get("chat_messages"), list):
+            continue
+        for m in conv["chat_messages"]:
+            if not isinstance(m, dict) or m.get("sender") != "human":
+                continue
+            text = m.get("text")
+            if not text and isinstance(m.get("content"), list):
+                text = "\n".join(
+                    b.get("text", "") for b in m["content"] if isinstance(b, dict) and b.get("type") == "text"
+                )
+            text = TAGGED_BLOCK_RE.sub("", str(text or "")).strip()
+            if len(text) >= MIN_CHARS:
+                out.append(
+                    ClaudeMessage(
+                        str(m.get("uuid") or ""),
+                        str(conv.get("uuid") or ""),
+                        "claude.ai",
+                        str(m.get("created_at") or ""),
+                        text,
+                    )
+                )
+    return out
+
+
 class ClaudeHistory:
     """Checks for new messages every few minutes and queues them for background learning."""
 
@@ -117,40 +168,71 @@ class ClaudeHistory:
             str(cfg.get_path("memory.claude_history.folder", "~/.claude/projects"))
         ).expanduser()
         self.exclude = set(cfg.get_path("memory.claude_history.exclude_projects", []) or [])
+        self.exports = Path(
+            str(cfg.get_path("memory.claude_history.exports_folder", "~/Documents/Sylvie/Claude exports"))
+        ).expanduser()
         self._stop = threading.Event()
 
-    def _offsets(self) -> dict[str, int]:
-        rows = self.s.db.query("SELECT value FROM meta WHERE key = ?", (OFFSETS_KEY,))
+    def _get(self, key: str, default):
+        rows = self.s.db.query("SELECT value FROM meta WHERE key = ?", (key,))
         try:
-            return json.loads(rows[0]["value"]) if rows else {}
+            return json.loads(rows[0]["value"]) if rows else default
         except ValueError:
-            return {}
+            return default
 
-    def _save_offsets(self, offsets: dict[str, int]) -> None:
+    def _set(self, key: str, value) -> None:
         self.s.db.execute(
             "INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (OFFSETS_KEY, json.dumps(offsets)),
+            (key, json.dumps(value)),
         )
+
+    def _new_from_exports(self) -> list[ClaudeMessage]:
+        """Messages from exports Lea dropped in the folder. Each export holds her whole history, so
+        messages already learned from an earlier export are skipped by id."""
+        if not self.exports.is_dir():
+            return []
+        files = self._get(EXPORT_FILES_KEY, {})
+        seen = set(self._get(EXPORT_SEEN_KEY, []))
+        out: list[ClaudeMessage] = []
+        for path in sorted([*self.exports.glob("*.zip"), *self.exports.glob("*.json")]):
+            st = path.stat()
+            sig = f"{st.st_size}:{int(st.st_mtime)}"
+            if files.get(path.name) == sig:
+                continue
+            try:
+                msgs = read_export(path)
+            except (OSError, ValueError, zipfile.BadZipFile) as e:
+                log.warning("couldn't read Claude export %s: %s", path.name, e)
+                continue
+            files[path.name] = sig
+            for m in msgs:
+                if m.uuid not in seen:
+                    seen.add(m.uuid)
+                    out.append(m)
+        self._set(EXPORT_FILES_KEY, files)
+        self._set(EXPORT_SEEN_KEY, sorted(seen))
+        return out
 
     def scan(self) -> int:
         """Queue every new message of Lea's. Returns how many were queued."""
         if not self.enabled:
             return 0
-        offsets = self._offsets()
-        msgs = read_new(self.folder, offsets, self.exclude)
+        offsets = self._get(OFFSETS_KEY, {})
+        msgs = read_new(self.folder, offsets, self.exclude) + self._new_from_exports()
         for m in msgs:
             source = f"claude:{m.session}#{m.uuid}"
             self.s.bg.submit(
                 "learn-claude", lambda ev, m=m, source=source: self.s.learn_from_claude(m.text, source, ev)
             )
-        self._save_offsets(offsets)
+        self._set(OFFSETS_KEY, offsets)
         if msgs:
-            log.info("queued %d of Lea's Claude Code messages for learning", len(msgs))
+            log.info("queued %d of Lea's Claude messages for learning", len(msgs))
         return len(msgs)
 
     def start(self) -> None:
         if not self.enabled:
             return
+        self.exports.mkdir(parents=True, exist_ok=True)
 
         def loop():
             while not self._stop.is_set():

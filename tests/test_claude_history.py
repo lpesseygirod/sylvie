@@ -1,6 +1,7 @@
 import json
+import zipfile
 
-from memory.claude_history import ClaudeHistory, lea_text, read_new
+from memory.claude_history import ClaudeHistory, lea_text, read_export, read_new
 from tests.test_orchestrator import extraction, make
 
 
@@ -82,7 +83,7 @@ def test_scan_learns_facts_and_suggests_rules_switched_off(tmp_path):
     assert "Keep answers short." not in s.current_system_prompt()  # not used until Lea turns it on
     facts = s.memory.list()
     assert facts[0].text.startswith("Lea is building") and facts[0].source.startswith("claude:s1#")
-    assert "Claude Code" in s.llm.calls[1]["messages"][0]["content"]  # extraction knows the context
+    assert "written to Claude" in s.llm.calls[1]["messages"][0]["content"]  # extraction knows the context
     assert h.scan() == 0  # nothing new
     assert s.convs.list() == []  # nothing copied into Sylvie's conversations
 
@@ -97,3 +98,55 @@ def test_background_learning_waits_while_a_night_job_runs(tmp_path):
     assert s.bg.hold()
     s.scheduler.proc = None
     assert not s.bg.hold()
+
+
+def claude_ai_export(path, messages):
+    conv = {"uuid": "c1", "name": "Trip", "chat_messages": messages}
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("conversations.json", json.dumps([conv]))
+        z.writestr("users.json", "[]")
+
+
+def test_claude_ai_export_keeps_only_leas_turns(tmp_path):
+    msgs = [
+        {
+            "uuid": "m1",
+            "sender": "human",
+            "text": "I'm moving to Barcelona in January",
+            "attachments": [{"extracted_content": "lease"}],
+        },
+        {"uuid": "m2", "sender": "assistant", "text": "Congratulations! Here is a checklist."},
+        {
+            "uuid": "m3",
+            "sender": "human",
+            "text": "",
+            "content": [{"type": "text", "text": "Explain it simply, no jargon"}],
+        },
+    ]
+    claude_ai_export(tmp_path / "data-2026.zip", msgs)
+    assert [m.text for m in read_export(tmp_path / "data-2026.zip")] == [
+        "I'm moving to Barcelona in January",
+        "Explain it simply, no jargon",
+    ]
+    other = tmp_path / "chatgpt.json"
+    other.write_text(json.dumps([{"title": "x", "mapping": {}}]))  # another app's format
+    assert read_export(other) == []
+
+
+def test_export_folder_is_read_once_and_re_exports_skip_old_messages(tmp_path):
+    s = make(tmp_path, [extraction()] * 4)
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    s.cfg["memory"] = {
+        **s.cfg["memory"],
+        "claude_history": {"enabled": True, "folder": str(tmp_path / "none"), "exports_folder": str(exports)},
+    }
+    h = ClaudeHistory(s)
+    first = [{"uuid": "m1", "sender": "human", "text": "I'm learning to play the cello"}]
+    claude_ai_export(exports / "data-1.zip", first)
+    assert h.scan() == 1
+    assert h.scan() == 0
+    second = first + [{"uuid": "m9", "sender": "human", "text": "My cello teacher is called Marta"}]
+    claude_ai_export(exports / "data-2.zip", second)  # a newer export holds the whole history again
+    assert h.scan() == 1
+    s.bg.drain()
