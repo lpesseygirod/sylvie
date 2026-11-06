@@ -21,6 +21,7 @@ from core.context import history_messages, maybe_summarize, system_with_summary
 from core.conversations import Conversations
 from core.db import Database
 from core.devices import Devices
+from core.intent import ACTION_NOTE, CLAIM_NUDGE, claims_done, looks_like_action
 from core.lang import guess_language, phrase
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
 from core.quick import quick_reply
@@ -415,6 +416,10 @@ class Sylvie:
             # 1d. "speak faster", "use the Bella voice": make sure the change really happens (core/settings.py)
             if looks_like_setting_request(text):
                 notes.append(SETTING_NOTE)
+            # 1e. "play my playlist", "add it to my calendar": the action must really happen (core/intent.py)
+            action_request = looks_like_action(text)
+            if action_request:
+                notes.append(ACTION_NOTE)
 
             # 1c. "Hello" / "thanks" / "bye": an instant answer, no model (core/quick.py)
             reply = None
@@ -527,6 +532,8 @@ class Sylvie:
                     self.convs.add_message(cid, "tool", "", model_content=content)
                     tool_chars += len(content)
 
+            called_tools = False
+            nudged = False
             for round_no in range(MAX_TOOL_ROUNDS + 1):
                 # Tools are dropped on the last round, or after a second malformed call (retry once).
                 use_tools = (
@@ -571,6 +578,22 @@ class Sylvie:
                     log.warning("Unusable tool call, retrying without tools: %r", sp.raw[:300])
                     invalid_calls = 2
                     continue
+                if (
+                    not calls
+                    and action_request
+                    and use_tools
+                    and not called_tools
+                    and not nudged
+                    and not stop.is_set()
+                    and claims_done(visible)
+                ):
+                    # She said it's done without calling a tool: send her back to really do it.
+                    log.warning("claimed an action without a tool call: %r", visible[:120])
+                    nudged = True
+                    display_parts.append(visible)
+                    messages.append({"role": "assistant", "content": visible})
+                    messages.append({"role": "user", "content": CLAIM_NUDGE})
+                    continue
                 if not calls:
                     if not visible and not stop.is_set():
                         # Never leave Lea with silence: say plainly that this one didn't work out.
@@ -589,6 +612,7 @@ class Sylvie:
                     )
                     break
                 # Tool round
+                called_tools = True
                 if visible:
                     display_parts.append(visible)
                 assistant_msg = {

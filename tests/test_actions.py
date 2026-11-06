@@ -3,7 +3,7 @@ import pytest
 from actions.confirm import is_clear_yes, is_undo
 from actions.osa import FakeOSA
 from actions.scripts import CALENDAR_CREATE, CALENDAR_DELETE, MAIL_COMPOSE
-from tests.test_orchestrator import extraction, make
+from tests.test_orchestrator import extraction, make, run
 
 
 def call(name, **params):
@@ -158,3 +158,36 @@ def test_saved_playlist_plays_by_name(tmp_path):
     assert any("spotify:playlist:ABC123" in args for _, args in osa.calls)
     bad = s.actions.call("save_playlist", {"name": "x", "link": "not a link"}, None)
     assert not bad.ok
+
+
+def test_claiming_an_action_without_doing_it_is_sent_back(tmp_path):
+    play = (
+        "<tool_call>\n<function=play_music>\n<parameter=query>\nERA\n</parameter>\n</function>\n</tool_call>"
+    )
+    osa = FakeOSA({"play track": "Song — Artist"})
+    s = make(
+        tmp_path, ["I'm putting your ERA playlist on for you now.", play, "Ahí la tienes.", "{}"], osa=osa
+    )
+    ev = run(s, "Sylvie, can you put my playlist ERA?")
+    assert any(e["type"] == "tool" and e["name"] == "play_music" for e in ev)  # she really did it
+    sent = [m["content"] for m in s.llm.calls[1]["messages"] if m["role"] == "user"]
+    assert any("you didn't call any tool" in c for c in sent)
+
+
+def test_no_spotify_means_an_honest_failure(tmp_path):
+    s = make(tmp_path, [])
+    s.actions.has_spotify = lambda: False
+    out = s.actions.call("play_music", {"query": "ERA"}, None)
+    assert not out.ok and "isn't installed" in out.content
+
+
+def test_action_requests_and_claims_are_recognised():
+    from core.intent import claims_done, looks_like_action
+
+    assert looks_like_action("Sylvie, can you put my playlist ERA?")
+    assert looks_like_action("Ponme música para estudiar")
+    assert looks_like_action("recuérdame llamar a mi madre")
+    assert not looks_like_action("What's the capital of Australia?")
+    assert claims_done("I'm putting your ERA playlist on for you now.")
+    assert claims_done("¡Listo! He añadido la cita.")
+    assert not claims_done("I couldn't find that playlist.")

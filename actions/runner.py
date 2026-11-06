@@ -155,6 +155,14 @@ def spotify_uri(text: str) -> str | None:
     return f"spotify:{m.group(1)}:{m.group(2)}" if m else None
 
 
+def spotify_installed() -> bool:
+    from pathlib import Path
+
+    return any(
+        p.exists() for p in (Path("/Applications/Spotify.app"), Path.home() / "Applications/Spotify.app")
+    )
+
+
 def _playlist_key(name: str) -> str:
     n = unicodedata.normalize("NFKD", name.lower())
     n = "".join(c for c in n if not unicodedata.combining(c))
@@ -164,8 +172,15 @@ def _playlist_key(name: str) -> str:
 
 class ActionRunner:
     def __init__(
-        self, cfg, log: ActionLog, osa=None, run_cmd: Callable | None = None, is_locked=screen_is_locked
+        self,
+        cfg,
+        log: ActionLog,
+        osa=None,
+        run_cmd: Callable | None = None,
+        is_locked=screen_is_locked,
+        has_spotify: Callable[[], bool] | None = None,
     ):
+        self.has_spotify = has_spotify or spotify_installed
         self.cfg = cfg
         self.log = log
         self.osa = osa or OSARunner()
@@ -301,6 +316,12 @@ class ActionRunner:
                 key = _playlist_key(str(a["name"]))
                 save_override(self.cfg, f"music.playlists.{key}", uri)
                 return ActionOutcome(f"Saved '{key}' → {uri}. Say 'play my {key} playlist' to start it.")
+            if name in ("music", "play_music") and not self.has_spotify():
+                return ActionOutcome(
+                    "Spotify isn't installed on this Mac, so nothing can play. Tell Lea: install the Spotify "
+                    "desktop app (spotify.com/download) and log in once; then this works.",
+                    ok=False,
+                )
             if name == "play_music":
                 q = str(a["query"]).strip()
                 q = spotify_uri(q) or self._saved_playlist(q) or q

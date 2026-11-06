@@ -32,7 +32,12 @@ def make(tmp_path, replies, osa=None, locked=False):
     }
     db = Database(tmp_path / "s.db", dim=256)
     runner = ActionRunner(
-        cfg, ActionLog(db), osa=osa or FakeOSA(), run_cmd=lambda a: FakeProc(), is_locked=lambda: locked
+        cfg,
+        ActionLog(db),
+        osa=osa or FakeOSA(),
+        run_cmd=lambda a: FakeProc(),
+        is_locked=lambda: locked,
+        has_spotify=lambda: True,
     )
     return Sylvie(cfg, FakeLLM(replies), HashEmbedder(256), db, idle_seconds=0, actions=runner)
 
