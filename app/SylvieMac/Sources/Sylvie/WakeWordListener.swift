@@ -15,7 +15,8 @@ final class WakeWordListener {
     var onStopCommand: (() -> Void)?
     /// Only while Sylvie is speaking or thinking: "stop" / "para" / "arrête" interrupts her.
     var listensForStop = false
-    /// True while Sylvie speaks without echo cancellation: she'd hear her own voice (and her name).
+    /// True while Sylvie speaks without echo cancellation: she'd hear her own voice (and her name),
+    /// so only a strong "stop" counts.
     var deaf = false
 
     private let recognizer: SFSpeechRecognizer?
@@ -129,7 +130,15 @@ final class WakeWordListener {
     }
 
     private func check(_ text: String) {
-        if deaf { return }
+        if deaf {
+            // She's speaking and the mic hears her too: ignore her name, but Lea's "stop" still works.
+            if matcher.isStrongStop(text) {
+                wakeLog.notice("stop heard while speaking")
+                DispatchQueue.main.async { self.onStopCommand?() }
+                restart()
+            }
+            return
+        }
         let count = matcher.wakeCount(in: text)
         lock.lock()
         let isNewWake = count > seenWakes

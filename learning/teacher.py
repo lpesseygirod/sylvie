@@ -93,6 +93,21 @@ def is_wrong_feedback(text: str) -> bool:
     return bool(WRONG_RE.search(text)) and len(text) < 200
 
 
+# Lea criticizing how Sylvie answered or behaved (2026-11-06: "it needs to be open to all my critics").
+CRITIC_RE = re.compile(
+    r"\b(i (don'?t|do not) like (that|this|it|how|when|the way)|that'?s (bad|terrible|awful|annoying|not good|not helpful|too (long|short|much))|"
+    r"you('re| are) (not listening|wrong|repeating|too)|you (didn'?t|did not|never|always) |why did you|stop doing|i told you|"
+    r"no me (ha )?gusta(do)?|lo has hecho mal|eso no (me sirve|es lo que)|no me (escuchas|has escuchado)|te (he|lo he) dicho|"
+    r"otra vez lo mismo|siempre (haces|dices)|no hagas eso|por qu[eé] (has|me)|demasiado (largo|lento|corto)|"
+    r"je n'aime pas|c'est nul|tu (ne m'écoutes|m'écoutes) pas|je t'ai dit|pourquoi tu as|arrête de)",
+    re.I,
+)
+
+
+def is_criticism(text: str) -> bool:
+    return bool(CRITIC_RE.search(text)) and len(text) < 400
+
+
 class Teacher:
     def __init__(self, sylvie, store: LearningStore):
         self.s = sylvie

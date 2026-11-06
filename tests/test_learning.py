@@ -143,3 +143,29 @@ def test_remember_im_into_confirms_interest(tmp_path):
     list(s.turn("Remember I'm into climbing"))
     s.bg.drain()
     assert s.interests.find("climbing").status == "confirmed"
+
+
+def test_criticism_is_noticed_in_three_languages():
+    from learning.teacher import is_criticism
+
+    assert is_criticism("No me ha gustado nada cómo me has contestado")
+    assert is_criticism("I told you to keep it short")
+    assert is_criticism("I don't like how you answer, it's too formal")
+    assert is_criticism("Je n'aime pas quand tu fais ça")
+    assert not is_criticism("¿Qué tiempo hace hoy en Madrid?")
+    assert not is_criticism("I like this song")
+
+
+def test_criticism_gets_an_open_answer_and_feedback(tmp_path):
+    from tests.test_orchestrator import extraction, make, run
+
+    s = make(
+        tmp_path, ["Here are 15 options…", extraction(), "Entendido: más corto a partir de ahora.", "{}"]
+    )
+    cid = run(s, "ideas for a gift?")[0]["conversation_id"]
+    s.bg.drain()
+    run(s, "No me ha gustado, siempre haces listas enormes", cid=cid)
+    prompt = s.llm.calls[-1]["messages"][-1]["content"]
+    assert "Lea is criticizing you" in prompt and "don't defend" in prompt
+    first_answer = next(m for m in s.convs.messages(cid) if m["role"] == "assistant")
+    assert first_answer["feedback"] == -1

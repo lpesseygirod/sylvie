@@ -37,7 +37,7 @@ from lea_profile.style import StyleStore
 from lea_profile.summary import profile_text
 from learning.ab import ABTests
 from learning.store import LearningStore
-from learning.teacher import Teacher, is_wrong_feedback
+from learning.teacher import Teacher, is_criticism, is_wrong_feedback
 from memory.extract import REMEMBER_RE, run_extraction
 from memory.forget import forget
 from memory.recall import recall
@@ -383,18 +383,26 @@ class Sylvie:
                     )
                     yield {"type": "action", "status": "undone" if out.ok else "failed", "id": last.id}
 
-            # 1c. "Sylvie, that's wrong" → thumbs down on the last answer + the teacher reviews it
-            if forgotten is None and is_wrong_feedback(text):
+            # 1c. "Sylvie, that's wrong" / any criticism → thumbs down on the last answer + teacher review
+            criticism = forgotten is None and not is_wrong_feedback(text) and is_criticism(text)
+            if criticism:
+                notes.append(
+                    "Lea is criticizing you. Take it seriously and don't defend or justify yourself. Say in a few "
+                    "words that you understand, say concretely what you'll do differently, and do it from now on. "
+                    "If she is pointing at your last answer and you can fix it, fix it now."
+                )
+            if forgotten is None and (is_wrong_feedback(text) or criticism):
                 last_answer = next(
                     (m for m in reversed(self.convs.visible_messages(cid)) if m["role"] == "assistant"), None
                 )
                 if last_answer is not None:
                     self.convs.set_feedback(last_answer["id"], -1)
                     self.teacher.report(last_answer["id"], "wrong", comment=text)
-                    notes.append(
-                        "Lea says your previous answer was wrong. Say sorry in a few words; if you can see the "
-                        "mistake, correct it now, otherwise ask briefly what was wrong. A deeper review runs later."
-                    )
+                    if not criticism:
+                        notes.append(
+                            "Lea says your previous answer was wrong. Say sorry in a few words; if you can see the "
+                            "mistake, correct it now, otherwise ask briefly what was wrong. A deeper review runs later."
+                        )
                     yield {"type": "notice", "kind": "feedback", "message_id": last_answer["id"]}
 
             # 1c. "Hello" / "thanks" / "bye": an instant answer, no model (core/quick.py)

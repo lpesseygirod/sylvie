@@ -21,6 +21,17 @@ public struct WakeMatcher {
         Self.words(transcript).filter { w in Self.wakeVariants.contains(w) }.count
     }
 
+    /// Stop words Sylvie herself rarely says. Used while she speaks without echo cancellation, when
+    /// the mic also hears her: "para" (a common Spanish word) would stop her by accident.
+    public static let strongStopWords = ["stop", "stopp", "basta", "arrête", "arrete", "stoppe"]
+
+    /// True if the transcript ends with a strong stop word (see strongStopWords).
+    public func isStrongStop(_ transcript: String) -> Bool {
+        guard let last = Self.words(transcript).last else { return false }
+        let folded = Self.strongStopWords.map { $0.folding(options: [.diacriticInsensitive], locale: nil) }
+        return folded.contains(last)
+    }
+
     /// True if the transcript ends with a stop command ("stop", "Sylvie stop", "para", "arrête").
     public func isStop(_ transcript: String) -> Bool {
         let ws = Self.words(transcript)
