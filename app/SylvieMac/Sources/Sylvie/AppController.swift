@@ -86,6 +86,24 @@ final class AppController: ObservableObject {
     func start() {
         hotKey = HotKey { [weak self] in self?.hotKeyPressed() }
         Task { await connect() }
+        // Keep listening for "Sylvie" at all times: picks up permissions granted after launch and a
+        // listener that stopped. (Measured 2026-11-06: the app was opened before Lea allowed Speech
+        // Recognition, so the wake word never started until the app was restarted.)
+        Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkListening() }
+        }
+    }
+
+    private func checkListening() {
+        guard serverWasReady, state != .muted, state != .starting else { return }
+        if !pipeline.running {
+            Task { await startAudio() }
+            return
+        }
+        if !wake.isEnabled, SFSpeechRecognizer.authorizationStatus() == .authorized, wake.isAvailable {
+            wake.start()
+            detail = ""
+        }
     }
 
     // MARK: Setup

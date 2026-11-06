@@ -28,6 +28,13 @@ final class WakeWordListener {
 
     var isAvailable: Bool { recognizer?.isAvailable == true && recognizer?.supportsOnDeviceRecognition == true }
 
+    /// True while it's meant to be listening (between start() and stop()).
+    var isEnabled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return enabled
+    }
+
     func start() {
         lock.lock()
         enabled = true
@@ -66,7 +73,11 @@ final class WakeWordListener {
     }
 
     private func beginTask() {
-        guard let recognizer, recognizer.isAvailable else { return }
+        guard let recognizer, recognizer.isAvailable else {
+            // Not ready yet (e.g. right after login): try again shortly instead of going deaf for good.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [weak self] in self?.restart() }
+            return
+        }
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
         req.requiresOnDeviceRecognition = true  // private: never sent to Apple's servers
