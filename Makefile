@@ -62,6 +62,9 @@ pair:
 phone:
 	$(UV) python scripts/setup_phone.py $(NAME)
 
+spotify:   # once: lets Sylvie start songs/playlists by name (free Spotify developer key)
+	$(UV) python scripts/setup_spotify.py
+
 eval:
 	$(UV) python evals/run.py --label base
 

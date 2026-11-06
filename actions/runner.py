@@ -9,6 +9,7 @@ Three kinds:
 
 from __future__ import annotations
 
+import logging
 import re
 import subprocess
 import threading
@@ -155,6 +156,22 @@ def spotify_uri(text: str) -> str | None:
     return f"spotify:{m.group(1)}:{m.group(2)}" if m else None
 
 
+log = logging.getLogger("sylvie.actions")
+
+
+class SpotifyNotSetUp(RuntimeError):
+    pass
+
+
+def _web_api_search(query: str) -> tuple[str, str] | None:
+    from actions import spotify_api
+
+    creds = spotify_api.credentials()
+    if creds is None:
+        raise SpotifyNotSetUp()
+    return spotify_api.search_uri(query, creds)
+
+
 def spotify_installed() -> bool:
     from pathlib import Path
 
@@ -179,8 +196,10 @@ class ActionRunner:
         run_cmd: Callable | None = None,
         is_locked=screen_is_locked,
         has_spotify: Callable[[], bool] | None = None,
+        spotify_search: Callable[[str], tuple[str, str] | None] | None = None,
     ):
         self.has_spotify = has_spotify or spotify_installed
+        self.spotify_search = spotify_search or _web_api_search
         self.cfg = cfg
         self.log = log
         self.osa = osa or OSARunner()
@@ -329,10 +348,31 @@ class ActionRunner:
                     return ActionOutcome(
                         "Playing: " + self.osa.run(scripts.SPOTIFY_PLAY_URI, q) + " (on this Mac)."
                     )
+                try:
+                    found = self.spotify_search(q)
+                except SpotifyNotSetUp:
+                    found = None
+                    setup_missing = True
+                except Exception as e:  # network, Spotify down: fall back to the search screen
+                    found, setup_missing = None, False
+                    log.warning("Spotify search failed: %s", e)
+                else:
+                    setup_missing = False
+                if found:
+                    uri, label = found
+                    playing = self.osa.run(scripts.SPOTIFY_PLAY_URI, uri)
+                    return ActionOutcome(
+                        f"Playing: {playing or label} (found '{q}' on Spotify; on this Mac)."
+                    )
                 self.osa.run(scripts.OPEN_LOCATION, "spotify:search:" + quote(q))
+                if setup_missing:
+                    return ActionOutcome(
+                        f"Opened Spotify's search for '{q}', but couldn't start it: to play songs by name Sylvie "
+                        "needs a free Spotify developer key, which Lea sets up once with `make spotify` (5 min). "
+                        "Say this in one sentence; don't ask her to click anything."
+                    )
                 return ActionOutcome(
-                    f"Opened Spotify's search for '{q}' on this Mac. Without the Spotify Web API Sylvie can't pick "
-                    "and start a result by name — Lea taps the one she wants."
+                    f"Nothing on Spotify matched '{q}'. Opened the search; suggest another name."
                 )
             if name == "calendar_events":
                 raw = self.osa.run(scripts.CALENDAR_EVENTS, str(int(a.get("day_offset", 0))), timeout=40)

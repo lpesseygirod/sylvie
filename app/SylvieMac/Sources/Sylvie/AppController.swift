@@ -83,6 +83,8 @@ final class AppController: ObservableObject {
     private var lastLevelSent = Date.distantPast
     private var autoHide: DispatchWorkItem?
     private var ignoreMicUntil = Date.distantPast
+    private var turnDone = false  // the server sent "done": once speech ends, listen for a follow-up
+    private var spokeThisTurn = false
 
     func start() {
         hotKey = HotKey { [weak self] in self?.hotKeyPressed() }
@@ -213,13 +215,23 @@ final class AppController: ObservableObject {
         if state == .idle { beginListening(chime: true) }
     }
 
-    private func beginListening(chime: Bool, greet: Bool = true) {
+    /// After an answer, listen again without the wake word (Lea, 2026-11-06: "I need to repeat her name
+    /// every sentence"). If she says nothing within the voice detector's 6 s, back to waiting for "Sylvie".
+    private func listenForFollowUp() {
+        guard !voiceModeActive, state == .idle || state == .speaking else { return }
+        wakeLog.notice("listening for a follow-up")
+        beginListening(chime: false, greet: false, usePreRoll: false)
+    }
+
+    private func beginListening(chime: Bool, greet: Bool = true, usePreRoll: Bool = true) {
         guard pipeline.running else { return }
         if chime { NSSound(named: "Tink")?.play() }
         ignoreMicUntil = Date().addingTimeInterval(pipeline.echoCancelled ? 0 : 0.35)  // not the chime
         if Date().timeIntervalSince(lastTurnAt) > conversationTimeout && !voiceModeActive { conversationId = nil }
         if !voiceModeActive { panel?.show() }
-        recording = preRoll.snapshot()
+        // The pre-roll keeps "Sylvie, …" said just before the wake word fired; after an answer it would
+        // only hold the end of her own voice.
+        recording = usePreRoll ? preRoll.snapshot() : []
         vad.reset()
         heardSpeech = false
         recordingActive = true
@@ -265,6 +277,8 @@ final class AppController: ObservableObject {
 
     private func runTurn(wav: Data) {
         guard let api else { return }
+        turnDone = false
+        spokeThisTurn = false
         turnTask?.cancel()
         turnTask = Task { [weak self] in
             guard let self else { return }
@@ -291,6 +305,7 @@ final class AppController: ObservableObject {
             if (event["text"] as? String ?? "").isEmpty { state = .idle }
         case "speak":
             guard let text = event["text"] as? String else { return }
+            spokeThisTurn = true
             if state != .speaking { wake.markStopsSeen() }  // only a "stop" said from now on counts
             state = .speaking
             wake.deaf = !pipeline.echoCancelled
@@ -300,10 +315,15 @@ final class AppController: ObservableObject {
                 self.wake.listensForStop = false
                 self.wake.deaf = false
                 self.wake.restart()  // fresh transcript: what she said herself doesn't count
+                if self.turnDone { self.listenForFollowUp() }  // not between sentences, only at the end
             }
             speaker.say(text, language: event["language"] as? String ?? lastLanguage)
         case "done":
-            if !speaker.isSpeaking && state == .thinking { state = .idle }
+            turnDone = true
+            if !speaker.isSpeaking && state == .thinking {
+                state = .idle
+                if spokeThisTurn { listenForFollowUp() }
+            }
         case "error":
             detail = event["text"] as? String ?? "Something went wrong."
         default:

@@ -33,7 +33,10 @@ ACTION_NOTE = (
     "Lea may be asking you to do something (music, calendar, reminders, a timer, opening an app). If so, "
     "do it by calling the matching tool: nothing happens unless you call it. Never say it's done or "
     "happening unless the tool call succeeded in this turn; if a tool fails, say so plainly. Never invent "
-    "results a tool didn't give you (playlists, songs, events, files)."
+    "results a tool didn't give you (playlists, songs, events, files). For music, don't ask Lea which song "
+    "or artist: pick something yourself from what you know she likes (her interests, earlier requests, "
+    "saved playlists) or the mood she describes, play it with play_music, and say in a few words what you "
+    "put on. If she corrects you, just play what she says. Never ask her to click or tap anything herself."
 )
 
 CLAIM_NUDGE = (

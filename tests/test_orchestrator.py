@@ -38,6 +38,7 @@ def make(tmp_path, replies, osa=None, locked=False):
         run_cmd=lambda a: FakeProc(),
         is_locked=lambda: locked,
         has_spotify=lambda: True,
+        spotify_search=lambda q: None,
     )
     return Sylvie(cfg, FakeLLM(replies), HashEmbedder(256), db, idle_seconds=0, actions=runner)
 

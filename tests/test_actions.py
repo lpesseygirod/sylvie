@@ -191,3 +191,69 @@ def test_action_requests_and_claims_are_recognised():
     assert claims_done("I'm putting your ERA playlist on for you now.")
     assert claims_done("¡Listo! He añadido la cita.")
     assert not claims_done("I couldn't find that playlist.")
+
+
+def test_spotify_search_picks_the_kind_and_returns_a_uri():
+    from actions import spotify_api
+
+    class R:
+        def __init__(self, data):
+            self.data = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self.data
+
+    seen = {}
+
+    def post(url, data, headers, timeout):
+        return R({"access_token": "tok", "expires_in": 3600})
+
+    def get(url, params, headers, timeout):
+        seen.update(params)
+        return R(
+            {
+                "playlists": {
+                    "items": [
+                        {
+                            "uri": "spotify:playlist:P1",
+                            "name": "Lofi Study",
+                            "owner": {"display_name": "Spotify"},
+                        }
+                    ]
+                }
+            }
+        )
+
+    spotify_api._token = None
+    found = spotify_api.search_uri("lofi study playlist", ("id", "secret"), get=get, post=post)
+    assert found == ("spotify:playlist:P1", "Lofi Study — Spotify")
+    assert seen == {"q": "lofi study", "type": "playlist", "limit": 1}
+    assert (
+        spotify_api.kind_for("canciones de Rosalía") == "artist"
+        and spotify_api.kind_for("Flowers") == "track"
+    )
+
+
+def test_play_music_starts_a_found_song_itself(tmp_path):
+    osa = FakeOSA({"play track": "Flowers — Miley Cyrus"})
+    s = make(tmp_path, [], osa=osa)
+    s.actions.spotify_search = lambda q: ("spotify:track:T1", "Flowers — Miley Cyrus")
+    out = s.actions.call("play_music", {"query": "Flowers"}, None)
+    assert out.ok and "Playing: Flowers" in out.content
+    assert any("spotify:track:T1" in args for _, args in osa.calls)
+
+
+def test_without_the_key_she_says_what_is_missing(tmp_path):
+    from actions.runner import SpotifyNotSetUp
+
+    s = make(tmp_path, [])
+
+    def missing(q):
+        raise SpotifyNotSetUp()
+
+    s.actions.spotify_search = missing
+    out = s.actions.call("play_music", {"query": "Flowers"}, None)
+    assert "make spotify" in out.content and "don't ask her to click" in out.content
