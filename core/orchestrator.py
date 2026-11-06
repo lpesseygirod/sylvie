@@ -183,6 +183,10 @@ class Sylvie:
         from knowledge.embeddings import Embedder
 
         cfg = cfg or load_config()
+        from core.settings import apply_saved
+        from learning.promote import load_state
+
+        apply_saved(cfg, load_state(cfg))  # what Lea changed by asking (core/settings.py)
         dim = cfg.get_path("embeddings.dim", 1024)
         return cls(
             cfg,
@@ -208,6 +212,7 @@ class Sylvie:
             actions=self.actions if self.cfg.get_path("actions.enabled") != [] else None,
             conversation_id=conversation_id,
             llm=self.llm if self.cfg.get_path("search.research", True) else None,
+            settings=self,
         )
 
     def speech_to_text(self):

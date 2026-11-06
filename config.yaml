@@ -85,7 +85,7 @@ voice:
   speak_full_answer: true   # Lea's rule (2026-11-06): read the whole answer aloud; she says "stop" to interrupt
   tts: kokoro
   tts_model: mlx-community/Kokoro-82M-bf16
-  kokoro_voices: {en: bf_isabella, es: ef_dora, fr: ff_siwis}   # Lea chose Isabella for English (2026-11-06)
+  kokoro_voices: {en: af_heart, es: ef_dora, fr: ff_siwis}   # Lea tried Isabella, went back to Heart (2026-11-06)
   speed: 1.0
   # How names should sound (espeak reads "Lea" as "Lee"). Default — Lea can change.
   respell: {en: {Lea: Leia}, es: {Sylvie: Silvi}, fr: {Lea: Léa}}

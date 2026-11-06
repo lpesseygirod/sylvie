@@ -52,6 +52,25 @@ RESEARCH = _fn(
     {"question": {"type": "string", "description": "the whole question to research, generic wording"}},
     ["question"],
 )
+
+
+def _settings_tools() -> list[dict]:
+    from core.settings import SETTINGS, VOICES
+
+    names = ", ".join(f"{n} ({s.help})" for n, s in SETTINGS.items())
+    voices = "; ".join(f"{lang}: {', '.join(v)}" for lang, v in VOICES.items())
+    change = _fn(
+        "change_setting",
+        "Change one of Sylvie's own settings when Lea asks (e.g. 'speak faster', 'use the Bella voice in "
+        f"English', 'turn off web search'). Settings: {names}. Voices by language: {voices}. Values: on/off, "
+        "a voice name, a speed between 0.6 and 1.6, or for model 'fast'/'smart'. Then confirm in one sentence.",
+        {"name": {"type": "string", "enum": list(SETTINGS)}, "value": {"type": "string"}},
+        ["name", "value"],
+    )
+    show = _fn("show_settings", "List Sylvie's current settings, when Lea asks what they are.", {}, [])
+    return [change, show]
+
+
 OPEN_URL = _fn(
     "open_url",
     "Open and read a web page. Only for URLs Lea gave you or URLs from this turn's search results.",
@@ -72,6 +91,7 @@ class ToolContext:
     conversation_id: str | None = None
     read_untrusted: bool = False  # set once outside content (web, files, email) entered this turn
     llm: object | None = None  # for tools that think (research); the turn's model, idle while tools run
+    settings: object | None = None  # the Sylvie whose settings Lea can change by asking (core/settings.py)
 
 
 @dataclass
@@ -92,6 +112,8 @@ def available_tools(ctx: ToolContext) -> list[dict]:
         tools.append(SEARCH_DOCS)
     if ctx.actions is not None:
         tools += ctx.actions.tool_defs()
+    if ctx.settings is not None:
+        tools += _settings_tools()
     return tools
 
 
@@ -173,6 +195,17 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
             for s in reversed(sources):
                 text = text.replace(f"[{s['n']}] ", f"[{s['n'] + offset}] ", 1)
         return ToolResult(text, numbered)
+    if call.name in ("change_setting", "show_settings"):
+        from core.settings import BadValue, change, describe
+
+        if ctx.settings is None:
+            return ToolResult("Settings can't be changed here.", ok=False)
+        if call.name == "show_settings":
+            return ToolResult(describe(ctx.cfg))
+        try:
+            return ToolResult(change(ctx.settings, args["name"], args["value"]))
+        except BadValue as e:
+            return ToolResult(f"Not changed: {e}", ok=False)
     if call.name == "research":
         if ctx.llm is None:
             return ToolResult("Research isn't available here; use web_search instead.", ok=False)
