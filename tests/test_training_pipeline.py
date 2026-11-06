@@ -246,3 +246,21 @@ def test_failed_fine_tune_does_not_delay_the_next(tmp_path):
     v.mkdir(parents=True)
     (v / "meta.json").write_text(json.dumps({"created": datetime.now().isoformat(), "ok": False}))
     assert last_adapter_time(cfg, "org/M") is None
+
+
+def test_build_drops_examples_that_dont_fit_the_training_length(tmp_path):
+    from core.db import Database
+
+    store = LearningStore(Database(tmp_path / "s.db", dim=8))
+    for q in ("short one", "long one", "empty one"):
+        store.add_example(
+            [{"role": "user", "content": q}], chosen="fine", source="lea", license="lea", tag="general"
+        )
+
+    def measure(messages, tools):  # (total tokens, prompt tokens) per example
+        q = messages[0]["content"]
+        return {"short one": (100, 90), "long one": (600, 590), "empty one": (512, 510)}[q]
+
+    rep = build(store, tmp_path / "builds", name="x", measure=measure, max_tokens=512)
+    assert rep.counts["train"] + rep.counts["valid"] == 1
+    assert rep.excluded["too_long"] == 1 and rep.excluded["nothing_to_learn"] == 1

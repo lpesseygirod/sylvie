@@ -103,6 +103,28 @@ def oasst_examples(path: Path, limit: int, seed: int = 0) -> list[Example]:
     return out
 
 
+MIN_TARGET_TOKENS = 4
+
+
+def token_measure(model_id: str):
+    """Token counts as mlx-lm's ChatDataset computes them (same tokenizer and chat template)."""
+    from huggingface_hub import snapshot_download
+    from mlx_lm.tuner.datasets import ChatDataset
+    from mlx_lm.utils import load_tokenizer
+
+    path = snapshot_download(
+        model_id, local_files_only=True, allow_patterns=["*.json", "*.jinja", "*.txt", "*.model", "*.py"]
+    )
+    tok = load_tokenizer(Path(path))
+
+    def measure(messages: list[dict], tools: list | None) -> tuple[int, int]:
+        row = {"messages": messages} | ({"tools": tools} if tools else {})
+        tokens, offset = ChatDataset([row], tok, mask_prompt=True).process(row)
+        return len(tokens), offset
+
+    return measure
+
+
 @dataclass
 class BuildReport:
     path: Path
@@ -120,10 +142,14 @@ def build(
     seed: int = 0,
     name: str | None = None,
     max_chars: int = 1600,
+    measure=None,
+    max_tokens: int = 512,
 ) -> BuildReport:
+    """`measure(messages, tools) -> (total_tokens, prompt_tokens)` (see `token_measure`) checks each
+    example against the training length exactly as mlx-lm will tokenize it."""
     guard = EvalGuard()
     examples: list[Example] = []
-    excluded = {"personal": 0, "eval_overlap": 0, "bad_source": 0, "too_long": 0}
+    excluded = {"personal": 0, "eval_overlap": 0, "bad_source": 0, "too_long": 0, "nothing_to_learn": 0}
     for row in store.examples():
         if not row["source"].startswith(ALLOWED_SOURCE_PREFIXES):
             excluded["bad_source"] += 1
@@ -155,6 +181,18 @@ def build(
         if sum(len(m["content"]) for m in ex.messages) > max_chars:
             excluded["too_long"] += 1
             continue
+        if measure is not None:
+            # mlx-lm cuts examples at max_tokens and trains only on the last message. Measured
+            # 2026-11-06: the calculator's tool description alone adds ~390 prompt tokens, so many
+            # tool examples were cut before their answer → no target tokens → loss 0/0 = NaN, and
+            # one such step turned every weight of the 27B fine-tune into NaN.
+            total, prompt = measure(ex.messages, ex.tools)
+            if total > max_tokens:
+                excluded["too_long"] += 1
+                continue
+            if total - prompt < MIN_TARGET_TOKENS:
+                excluded["nothing_to_learn"] += 1
+                continue
         # Weighting by repetition: Lea's corrections (weight 2) appear twice, etc.
         kept += [ex] * max(1, round(ex.weight))
 

@@ -56,13 +56,13 @@ def due(cfg, store, model_id: str, now: datetime | None = None) -> tuple[bool, s
     return True, "due"
 
 
-def run_cycle(cfg, store, ab, model_id: str, open_data: Path | None, train_fn, eval_fn) -> dict:
+def run_cycle(cfg, store, ab, model_id: str, open_data: Path | None, train_fn, eval_fn, measure=None) -> dict:
     """train_fn(model_id, build_dir) -> adapter dir; eval_fn(label, adapter) -> report dict."""
     from evals.run import compare
     from learning.dataset import build
     from learning.promote import active_adapter
 
-    rep = build(store, cfg.data_dir / "datasets" / "builds", open_data=open_data)
+    rep = build(store, cfg.data_dir / "datasets" / "builds", open_data=open_data, measure=measure)
     adapter_dir = train_fn(model_id, rep.path)
     current = active_adapter(cfg, model_id)
     old = eval_fn("current", current.name if current else None)
@@ -79,6 +79,7 @@ def run_cycle(cfg, store, ab, model_id: str, open_data: Path | None, train_fn, e
 def run_now(cfg, store, ab, model_id: str) -> dict:
     """The real cycle with Sylvie's settings: used by the overnight loop and `make finetune`."""
     from evals.run import run as run_eval
+    from learning.dataset import token_measure
     from learning.train import train
 
     return run_cycle(
@@ -86,6 +87,7 @@ def run_now(cfg, store, ab, model_id: str) -> dict:
         cfg.data_dir / "datasets" / "open" / "oasst2" / "2023-11-05_oasst2_ready.trees.jsonl.gz",
         train_fn=lambda m, b: train(m, b, iters=cfg.get_path("learning.iters", 300)),
         eval_fn=lambda label, adapter: run_eval(label, EVAL_SETS, adapter=adapter, model=model_id),
+        measure=token_measure(model_id),
     )  # fmt: skip
 
 
