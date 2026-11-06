@@ -11,3 +11,4 @@ app/**/DerivedData/
 xcuserdata/
 app/SylvieMac/.build/
 tests/ui-shots/
+Claude exports/

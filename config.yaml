@@ -49,7 +49,7 @@ memory:
     enabled: true
     folder: ~/.claude/projects
     exclude_projects: []           # folder names under ~/.claude/projects to skip
-    exports_folder: ~/Documents/Sylvie/Claude exports   # drop claude.ai export zips here (web/phone chats)
+    exports_folder: ~/Documents/Projects/Apps/Sylvie/Claude exports   # claude.ai export zips (web/phone chats); not in git
 
 persona:
   default_language: match_lea      # default — Lea can change (decision 2)

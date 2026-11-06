@@ -166,3 +166,43 @@ def test_unlearned_messages_survive_a_restart(tmp_path):
     assert h.scan() == 0 and h.resume() == 1
     s.bg.drain()
     assert h.resume() == 0  # learned, so no longer pending
+
+
+def test_newer_split_export_and_manifest(tmp_path):
+    # Newer exports: a manifest of links plus several zips; conversations may be one file each.
+    z = tmp_path / "conversations-000.zip"
+    with zipfile.ZipFile(z, "w") as f:
+        f.writestr(
+            "conversations/c1.json",
+            json.dumps(
+                {
+                    "uuid": "c1",
+                    "chat_messages": [
+                        {"uuid": "a", "sender": "human", "text": "I'm training for a half marathon in March"},
+                        {"uuid": "b", "sender": "assistant", "text": "Great, here's a plan"},
+                    ],
+                }
+            ),
+        )
+        f.writestr(
+            "conversations/c2.jsonl",
+            json.dumps(
+                {
+                    "uuid": "c2",
+                    "messages": [
+                        {"uuid": "c", "role": "user", "text": "Please keep explanations short and concrete"},
+                    ],
+                }
+            )
+            + "\n",
+        )
+    assert sorted(m.uuid for m in read_export(z)) == ["a", "c"]
+    manifest = tmp_path / "manifest-1.json"
+    manifest.write_text(
+        json.dumps({"data_files": [{"export_url": "https://claude.ai/x", "filename": "c.zip"}]})
+    )
+    assert read_export(manifest) == []
+    memories = tmp_path / "memories-000.zip"  # Claude-written summaries: never used
+    with zipfile.ZipFile(memories, "w") as f:
+        f.writestr("memories.json", json.dumps([{"content": "Lea likes running"}]))
+    assert read_export(memories) == []

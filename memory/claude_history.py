@@ -113,30 +113,58 @@ def read_new(folder: Path, offsets: dict[str, int], exclude: set[str]) -> list[C
     return out
 
 
-def _export_conversations(path: Path) -> list:
-    """conversations.json from a claude.ai export (the zip as downloaded, or the file itself).
-    Read in memory: nothing is unpacked to disk."""
-    if path.suffix == ".zip":
-        with zipfile.ZipFile(path) as z:
-            names = [n for n in z.namelist() if n.rsplit("/", 1)[-1] == "conversations.json"]
-            if not names or z.getinfo(names[0]).file_size > MAX_EXPORT_BYTES:
-                return []
-            data = json.loads(z.read(names[0]))
-    else:
+def _conversations_in(data) -> list[dict]:
+    """Conversations from one parsed JSON value: a list of them, one, or {"conversations": [...]}."""
+    if isinstance(data, dict) and isinstance(data.get("conversations"), list):
+        data = data["conversations"]
+    items = data if isinstance(data, list) else [data]
+    return [c for c in items if isinstance(c, dict) and isinstance(_turns(c), list)]
+
+
+def _turns(conv: dict):
+    return conv.get("chat_messages", conv.get("messages"))
+
+
+def _parse(name: str, raw: bytes) -> list[dict]:
+    if name.endswith(".jsonl"):
+        out = []
+        for line in raw.splitlines():
+            try:
+                out += _conversations_in(json.loads(line))
+            except ValueError:
+                continue
+        return out
+    try:
+        return _conversations_in(json.loads(raw))
+    except ValueError:
+        return []
+
+
+def _export_conversations(path: Path) -> list[dict]:
+    """Conversations from a claude.ai export: the zip as downloaded (older exports hold
+    conversations.json, newer ones come as several zips and only conversations-000.zip matters),
+    or a JSON file. Read in memory: nothing is unpacked to disk."""
+    if path.suffix != ".zip":
         if path.stat().st_size > MAX_EXPORT_BYTES:
             return []
-        data = json.loads(path.read_text(encoding="utf-8"))
-    return data if isinstance(data, list) else []
+        return _parse(path.name, path.read_bytes())
+    out: list[dict] = []
+    with zipfile.ZipFile(path) as z:
+        budget = MAX_EXPORT_BYTES
+        for info in z.infolist():
+            if not info.filename.endswith((".json", ".jsonl")) or info.file_size > budget:
+                continue
+            budget -= info.file_size
+            out += _parse(info.filename, z.read(info))
+    return out
 
 
 def read_export(path: Path) -> list[ClaudeMessage]:
     """Lea's own messages from a claude.ai export. Other formats (e.g. other chat apps) give []."""
     out: list[ClaudeMessage] = []
     for conv in _export_conversations(path):
-        if not isinstance(conv, dict) or not isinstance(conv.get("chat_messages"), list):
-            continue
-        for m in conv["chat_messages"]:
-            if not isinstance(m, dict) or m.get("sender") != "human":
+        for m in _turns(conv):
+            if not isinstance(m, dict) or (m.get("sender") or m.get("role")) not in ("human", "user"):
                 continue
             text = m.get("text")
             if not text and isinstance(m.get("content"), list):
@@ -170,7 +198,11 @@ class ClaudeHistory:
         ).expanduser()
         self.exclude = set(cfg.get_path("memory.claude_history.exclude_projects", []) or [])
         self.exports = Path(
-            str(cfg.get_path("memory.claude_history.exports_folder", "~/Documents/Sylvie/Claude exports"))
+            str(
+                cfg.get_path(
+                    "memory.claude_history.exports_folder", "~/Documents/Projects/Apps/Sylvie/Claude exports"
+                )
+            )
         ).expanduser()
         self._stop = threading.Event()
         self._lock = threading.Lock()
