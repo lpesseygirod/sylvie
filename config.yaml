@@ -14,7 +14,9 @@ paths:
   adapters_dir: ~/Library/Application Support/Sylvie/adapters
 
 llm:
-  model: mlx-community/Qwen3.8-27B-4bit
+  # Lea chose speed (2026-11-06): the 27B (~18 GB) made the Mac swap with her other apps (9-10 tok/s,
+  # 15-35 s answers). Back to the 27B any time: mlx-community/Qwen3.8-27B-4bit (still downloaded).
+  model: mlx-community/Qwen3.5-9B-4bit
   adapter: null              # e.g. v001 once a fine-tune is promoted
   context_length: 16384      # set explicitly; long chats get summarized
   summarize_after_tokens: 11000

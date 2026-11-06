@@ -143,3 +143,14 @@ def test_searxng_retries_once_when_every_engine_timed_out():
     calls.clear()
     replies[:] = [{"results": [], "unresponsive_engines": [["brave", "too many requests"]]}]
     assert searxng("http://x", "zzz", get=get) == [] and len(calls) == 1
+
+
+def test_searxng_autostart_only_when_installed_and_local(tmp_path):
+    from tools.search import start_searxng
+
+    cfg = Config({"paths": {"data_dir": str(tmp_path)}, "search": {"searxng_url": "http://127.0.0.1:1"}})
+    assert start_searxng(cfg) == "not installed"
+    remote = Config(
+        {"paths": {"data_dir": str(tmp_path)}, "search": {"searxng_url": "https://search.example"}}
+    )
+    assert start_searxng(remote) == "not local"

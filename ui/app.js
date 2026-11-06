@@ -203,7 +203,11 @@
     DOC_RE.lastIndex = 0;
     while ((m = DOC_RE.exec(text))) {
       if (m.index > last) parts.push({ kind: "text", text: text.slice(last, m.index) });
-      parts.push({ kind: "doc", title: (m[1] || "Document").trim(), body: m[2].replace(/^\n+|\s+$/g, ""), done: !!m[3] });
+      const body = m[2].replace(/^\n+|\s+$/g, "");
+      // A finished "document" of a line or two is just part of the answer (the 9B model wraps
+      // single results in <doc>): show it inline instead of opening the work panel.
+      if (m[3] && body.length <= 200 && body.split("\n").length <= 3) parts.push({ kind: "text", text: body });
+      else parts.push({ kind: "doc", title: (m[1] || "Document").trim(), body, done: !!m[3] });
       last = DOC_RE.lastIndex;
       if (!m[0]) break;
     }
@@ -499,9 +503,14 @@
     switch (ev.type) {
       case "text": {
         p.text += ev.text;
-        const before = (p.docs || []).length;
         const n = renderAnswer(p);
-        if (n > before && !PANEL) showDoc(p, n - 1);  // a new document: open it in the panel
+        // A document opens in the panel once it's clearly a real one (more than a line or two);
+        // a tiny one ends up inline when it finishes (see splitDocs).
+        const d = n ? p.docs[n - 1] : null;
+        if (d && !PANEL && p.autoOpened !== n - 1 && (d.body.length > 200 || d.body.split("\n").length > 3)) {
+          p.autoOpened = n - 1;
+          showDoc(p, n - 1);
+        }
         p.status.hidden = true;
         notifyNative({ type: "delta", text: ev.text });
         break;

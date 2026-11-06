@@ -90,6 +90,9 @@ class SlowFake(FakeLLM):
             )
         elif "cheat sheet" in last.lower():
             text = DOC
+        elif "percent" in last.lower():  # the 9B wraps one-line results in <doc>: must stay inline
+            text = '17% of 2,340 euros is **397.80 euros**.\n\n<doc title="Calculation">\n**17% of 2,340 = 397.80 €**\n</doc>'
+
         elif "search" in last.lower():
             text = "Let me look.\n<tool_call>\n<function=web_search>\n<parameter=query>\nNPV formula\n</parameter>\n</function>\n</tool_call>"
         else:

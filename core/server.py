@@ -65,6 +65,10 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
                 if "search_enabled" in saved:
                     cfg.setdefault("search", {})["enabled"] = saved["search_enabled"]
                 if warm:
+                    if cfg.get_path("search.enabled", True):
+                        from tools.search import start_searxng
+
+                        log.info("web search (SearXNG): %s", start_searxng(cfg))
                     state["sylvie"].warm()
                     from learning.scheduler import Scheduler
 
