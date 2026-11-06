@@ -68,15 +68,23 @@ class _Job:
     fn: callable
     stop: threading.Event = field(default_factory=threading.Event)
     tries: int = 0
+    backlog_job: bool = False
 
 
 class BackgroundWorker:
     """Runs learning jobs when Lea isn't mid-conversation. A new turn interrupts the current
-    job (it's re-queued), so background work never slows Sylvie's answers down for long."""
+    job (it's re-queued), so background work never slows Sylvie's answers down for long.
 
-    def __init__(self, idle_seconds: float = 8.0):
+    Two kinds of jobs: learning from the conversation that just happened (short; after
+    `idle_seconds` of quiet) and *backlog* work like reading Lea's Claude history (hundreds of
+    jobs; only after `backlog_idle_seconds`). Measured 2026-11-06: with the backlog running after
+    every 8-second pause, a question took 135 s (memory lookup 25 s, prefill 61 s, 11 tok/s)."""
+
+    def __init__(self, idle_seconds: float = 8.0, backlog_idle_seconds: float = 600.0):
         self.q: queue.Queue[_Job] = queue.Queue()
+        self.backlog: queue.Queue[_Job] = queue.Queue()
         self.idle_seconds = idle_seconds
+        self.backlog_idle_seconds = backlog_idle_seconds
         self.last_activity = 0.0
         self.busy = threading.Event()
         self.current: _Job | None = None
@@ -84,8 +92,8 @@ class BackgroundWorker:
         self._thread = threading.Thread(target=self._run, daemon=True, name="sylvie-bg")
         self._thread.start()
 
-    def submit(self, name: str, fn) -> None:
-        self.q.put(_Job(name, fn))
+    def submit(self, name: str, fn, backlog: bool = False) -> None:
+        (self.backlog if backlog else self.q).put(_Job(name, fn, backlog_job=backlog))
 
     def turn_started(self) -> None:
         self.busy.set()
@@ -109,19 +117,31 @@ class BackgroundWorker:
     def drain(self, timeout: float = 120) -> None:
         """Tests/CLI: wait until the queue is empty."""
         end = time.time() + timeout
-        while (not self.q.empty() or self.current is not None) and time.time() < end:
+        while (
+            not self.q.empty() or not self.backlog.empty() or self.current is not None
+        ) and time.time() < end:
             time.sleep(0.05)
+
+    def _next(self) -> _Job:
+        while True:
+            idle = time.time() - self.last_activity
+            if not self.busy.is_set() and not self.hold():
+                if idle >= self.idle_seconds and not self.q.empty():
+                    return self.q.get()
+                if idle >= self.backlog_idle_seconds and self.q.empty() and not self.backlog.empty():
+                    return self.backlog.get()
+            time.sleep(0.2)
 
     def _run(self) -> None:
         while True:
-            job = self.q.get()
-            while self.busy.is_set() or time.time() - self.last_activity < self.idle_seconds or self.hold():
-                time.sleep(0.2)
+            job = self._next()
             job.stop.clear()
             self.current = job
             try:
                 job.fn(job.stop)
-                if job.stop.is_set() and job.tries < 2:
+                if job.stop.is_set() and job.backlog_job:
+                    self.backlog.put(job)  # backlog work is never dropped, just postponed
+                elif job.stop.is_set() and job.tries < 2:
                     job.tries += 1
                     self.q.put(job)
             except Exception:
@@ -148,7 +168,8 @@ class Sylvie:
         self.ab = ABTests(db)
         self.shortcuts = Shortcuts(db, embedder, cfg)
         self.teacher = Teacher(self, self.learning)
-        self.bg = BackgroundWorker(idle_seconds=idle_seconds)
+        backlog_idle = cfg.get_path("learning.backlog_idle_minutes", 10) * 60 if idle_seconds > 0 else 0
+        self.bg = BackgroundWorker(idle_seconds=idle_seconds, backlog_idle_seconds=backlog_idle)
         self.scheduler = None  # set by the server (learning/scheduler.py)
         self.bg.hold = lambda: self.scheduler is not None and self.scheduler.proc is not None
         self.claude_history = None  # set by the server (memory/claude_history.py)
@@ -271,6 +292,7 @@ class Sylvie:
     ) -> Iterator[dict]:
         trace = Trace()
         self.bg.turn_started()
+        self.bg.interrupt(timeout=5)  # let a background job release the model before we use it
         if self.scheduler is not None and self.scheduler.preempt():
             yield {"type": "status", "text": "One moment, waking up…"}
         stop = threading.Event()

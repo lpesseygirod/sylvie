@@ -20,6 +20,7 @@ def voice_turn(
     # job and the transcript took 55 s (measured 2026-11-06, while Sylvie was learning from Lea's
     # Claude history). sylvie.turn() below keeps it paused until the answer is done.
     sylvie.bg.turn_started()
+    sylvie.bg.interrupt(timeout=5)  # Whisper gets the GPU to itself
     with_stt = sylvie.speech_to_text()
     try:
         tr = with_stt.transcribe(wav)

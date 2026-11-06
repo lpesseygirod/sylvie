@@ -271,7 +271,7 @@ class ClaudeHistory:
                 with self._lock:
                     self._set(PENDING_KEY, [p for p in self._get(PENDING_KEY, []) if p[0] != source])
 
-        self.s.bg.submit("learn-claude", job)
+        self.s.bg.submit("learn-claude", job, backlog=True)  # hundreds of jobs: only when Lea is away
 
     def resume(self) -> int:
         """After a restart: queue what was read but not learned from yet."""

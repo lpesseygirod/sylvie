@@ -172,3 +172,46 @@ def test_attachments_are_marked_untrusted(tmp_path, attack):
     run(s, "summarize this file", attachments=[Attachment("mail.txt", attack)])
     user = s.llm.calls[0]["messages"][-1]["content"]
     assert '<untrusted source="file mail.txt">' in user and attack in user
+
+
+def test_backlog_waits_for_a_longer_quiet_spell():
+    """Reading Lea's Claude history must not run in the short pauses of a conversation."""
+    import time
+
+    from core.orchestrator import BackgroundWorker
+
+    bg = BackgroundWorker(idle_seconds=0, backlog_idle_seconds=0.6)
+    ran = []
+    bg.last_activity = time.time()
+    bg.submit("history", lambda ev: ran.append("history"), backlog=True)
+    bg.submit("learn", lambda ev: ran.append("learn"))
+    time.sleep(0.4)
+    assert ran == ["learn"]  # the conversation's own learning first; the backlog waits
+    time.sleep(0.6)
+    assert ran == ["learn", "history"]
+
+
+def test_interrupted_backlog_job_is_postponed_not_dropped():
+    import threading
+
+    from core.orchestrator import BackgroundWorker
+
+    bg = BackgroundWorker(idle_seconds=0, backlog_idle_seconds=0)
+    started, runs = threading.Event(), []
+
+    def job(ev):
+        runs.append(1)
+        started.set()
+        ev.wait(2)
+
+    bg.submit("history", job, backlog=True)
+    started.wait(2)
+    for _ in range(3):  # Lea talks three times while it runs
+        bg.turn_started()
+        bg.interrupt(timeout=2)
+        bg.turn_finished()
+        started.clear()
+        started.wait(2)
+    assert len(runs) == 4 and bg.current is not None  # still being retried, never dropped
+    bg.turn_started()
+    bg.interrupt(timeout=2)
