@@ -57,6 +57,8 @@ def estimate_tokens(llm, messages: list[dict]) -> int:
 def maybe_summarize(llm, convs, cid: str, max_tokens: int) -> bool:
     """If the conversation is too long, summarize its older half. Returns True if it did."""
     conv = convs.get(cid)
+    if conv is None:  # deleted meanwhile
+        return False
     rows = convs.messages(cid, after_id=conv["summarized_upto"] or 0)
     msgs = history_messages(rows)
     if estimate_tokens(llm, msgs) <= max_tokens or len(rows) < 6:

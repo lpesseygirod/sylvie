@@ -24,6 +24,11 @@ PHRASES = {
     "checking": {"en": "Let me check…", "es": "Déjame mirar…", "fr": "Je regarde…"},
     "thinking": {"en": "Let me think…", "es": "Déjame pensar…", "fr": "Je réfléchis…"},
     "moment": {"en": "One moment…", "es": "Un momento…", "fr": "Un instant…"},
+    "lost": {
+        "en": "Sorry, I got lost in what I found and don't have a good answer. Could you ask me again, a bit more specifically?",
+        "es": "Perdona, me he perdido entre lo que encontré y no tengo una buena respuesta. ¿Me lo preguntas otra vez, un poco más concreto?",
+        "fr": "Désolée, je me suis perdue dans ce que j'ai trouvé et je n'ai pas de bonne réponse. Tu peux me reposer la question, un peu plus précisément ?",
+    },
     "research": {
         "en": "I'm splitting this into parts and looking them up at the same time. It takes a little while.",
         "es": "Lo divido en partes y las busco a la vez. Tardo un poquito.",

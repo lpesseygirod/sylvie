@@ -466,6 +466,10 @@ class Sylvie:
             invalid_calls = 0
             announced = False
             final_mid = None
+            # Search material per question is capped. Measured 2026-11-06: seven web searches added
+            # ~44k characters, the last round needed 17,282 tokens (over the 16,384 context) and the
+            # answer came out empty after 7 minutes.
+            tool_chars, tool_budget = 0, self.cfg.get_path("llm.tool_budget_chars", 20000)
 
             # 5b. Something Lea asks often: start its lookup now instead of after a model round
             sc = self.shortcuts.find(text) if tools else None
@@ -494,10 +498,15 @@ class Sylvie:
                         yield {"type": "sources", "sources": tctx.sources}
                     messages.append({"role": "tool", "content": content})
                     self.convs.add_message(cid, "tool", "", model_content=content)
+                    tool_chars += len(content)
 
             for round_no in range(MAX_TOOL_ROUNDS + 1):
                 # Tools are dropped on the last round, or after a second malformed call (retry once).
-                use_tools = tools if round_no < MAX_TOOL_ROUNDS and invalid_calls < 2 else None
+                use_tools = (
+                    tools
+                    if round_no < MAX_TOOL_ROUNDS and invalid_calls < 2 and tool_chars < tool_budget
+                    else None
+                )
                 sp = StreamSplitter(thinking=r.thinking)
                 with trace.stage("llm"):
                     for chunk in self.llm.stream(
@@ -536,6 +545,10 @@ class Sylvie:
                     invalid_calls = 2
                     continue
                 if not calls:
+                    if not visible and not stop.is_set():
+                        # Never leave Lea with silence: say plainly that this one didn't work out.
+                        visible = phrase("lost", text)
+                        yield {"type": "text", "text": visible}
                     display_parts.append(visible)
                     final_mid = self.convs.add_message(
                         cid,
@@ -580,6 +593,12 @@ class Sylvie:
                             content = f"Error: {err} Answer without tools now."
                     else:
                         content = result.content
+                        room = max(tool_budget - tool_chars, 1500)
+                        if len(content) > room:
+                            content = (
+                                content[:room]
+                                + "\n…(trimmed: you have enough material now; answer Lea with it)"
+                            )
                         yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
                         if result.pending:
                             yield {"type": "action", "status": "pending", **result.pending}
@@ -587,6 +606,7 @@ class Sylvie:
                             yield {"type": "sources", "sources": tctx.sources}
                     messages.append({"role": "tool", "content": content})
                     self.convs.add_message(cid, "tool", "", model_content=content)
+                    tool_chars += len(content)
 
             trace_d = trace.to_dict()
             if final_mid:

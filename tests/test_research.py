@@ -68,3 +68,33 @@ def test_research_tool_in_a_turn(tmp_path):
     assert tool["name"] == "research" and tool["ok"]
     assert next(e for e in ev if e["type"] == "sources")["sources"][0]["url"].startswith("https://")
     assert "A is cheaper" in "".join(e["text"] for e in ev if e["type"] == "text")
+
+
+def test_search_material_is_capped_and_tools_switch_off(tmp_path):
+    import tools.registry as reg
+    from tests.test_orchestrator import make, run
+
+    call = "<tool_call>\n<function=web_search>\n<parameter=query>\nlaptops\n</parameter>\n</function>\n</tool_call>"
+    s = make(tmp_path, [call, call, "Here's what I found.", "{}"])
+    s.cfg["search"] = {**s.cfg["search"], "enabled": True}
+    s.cfg["llm"] = {**s.cfg["llm"], "tool_budget_chars": 6000}
+    original = reg.web_search
+    reg.web_search = lambda q, **kw: ("x" * 5000, [{"n": 1, "title": "t", "url": "https://a.example/"}])
+    try:
+        ev = run(s, "Which laptop?")
+    finally:
+        reg.web_search = original
+    third = s.llm.calls[2]
+    assert third["tools"] is None  # budget used up: the last round must answer
+    tool_msgs = [m["content"] for m in third["messages"] if m["role"] == "tool"]
+    assert "trimmed" in tool_msgs[1] and sum(len(t) for t in tool_msgs) < 7000
+    assert "Here's what I found." in "".join(e["text"] for e in ev if e["type"] == "text")
+
+
+def test_an_empty_answer_becomes_an_honest_sentence(tmp_path):
+    from tests.test_orchestrator import make, run
+
+    s = make(tmp_path, ["", "{}"])
+    ev = run(s, "¿Qué opinas de esto?")
+    text = "".join(e["text"] for e in ev if e["type"] == "text")
+    assert text.startswith("Perdona") and ev[-1]["type"] == "done"
