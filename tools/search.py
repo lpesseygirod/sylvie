@@ -25,19 +25,28 @@ def sanitize_query(query: str, private_terms: list[str]) -> str:
     return re.sub(r"\s+", " ", q).strip()
 
 
-def searxng(base_url: str, query: str, max_results: int = 5, language: str | None = None) -> list[dict]:
+def searxng(
+    base_url: str, query: str, max_results: int = 5, language: str | None = None, get=httpx.get
+) -> list[dict]:
     params = {"q": query, "format": "json", "safesearch": 0}
     if language:
         params["language"] = language
-    try:
-        r = httpx.get(
-            f"{base_url.rstrip('/')}/search", params=params, timeout=10.0
-        )  # SearXNG allows its engines 7 s
-        r.raise_for_status()
-    except httpx.HTTPError as e:
-        raise SearchUnavailable(f"SearXNG not reachable at {base_url}: {e}") from e
+    for attempt in range(2):
+        try:
+            # SearXNG allows each engine 7 s; this waits a little longer for its answer.
+            r = get(f"{base_url.rstrip('/')}/search", params=params, timeout=10.0)
+            r.raise_for_status()
+        except httpx.HTTPError as e:
+            raise SearchUnavailable(f"SearXNG not reachable at {base_url}: {e}") from e
+        data = r.json()
+        # Measured on Lea's network: after a quiet spell, the first connection to each engine is so
+        # slow that all of them time out; asking again right away works (the connections are open).
+        unresponsive = data.get("unresponsive_engines") or []
+        cold = not data.get("results") and unresponsive and all("timeout" in str(u) for u in unresponsive)
+        if not cold or attempt:
+            break
     out = []
-    for item in r.json().get("results", []):
+    for item in data.get("results", []):
         if item.get("url", "").startswith(("http://", "https://")):
             out.append(
                 {"title": item.get("title", ""), "url": item["url"], "snippet": item.get("content", "")}

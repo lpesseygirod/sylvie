@@ -114,3 +114,32 @@ def test_docs_index_and_search_documents_tool(tmp_path):
     idx.index_folders([str(folder)])
     assert idx.stats() == {"documents": 1, "chunks": 1}
     assert (folder / "finance.md").exists()  # the index never touches Lea's files
+
+
+def test_searxng_retries_once_when_every_engine_timed_out():
+    from tools.search import searxng
+
+    class R:
+        def __init__(self, data):
+            self.data = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self.data
+
+    cold = {"results": [], "unresponsive_engines": [["duckduckgo", "timeout"], ["wikipedia", "timeout"]]}
+    warm = {"results": [{"title": "uv", "url": "https://docs.astral.sh/uv/", "content": "fast"}]}
+    replies, calls = [cold, warm], []
+
+    def get(url, params, timeout):
+        calls.append(params["q"])
+        return R(replies.pop(0))
+
+    assert searxng("http://x", "uv", get=get)[0]["url"] == "https://docs.astral.sh/uv/"
+    assert len(calls) == 2
+    # no results for another reason (e.g. nothing found): no retry
+    calls.clear()
+    replies[:] = [{"results": [], "unresponsive_engines": [["brave", "too many requests"]]}]
+    assert searxng("http://x", "zzz", get=get) == [] and len(calls) == 1
