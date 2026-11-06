@@ -192,6 +192,25 @@ class Sylvie:
             )
         return self._tts
 
+    def unload_models(self) -> None:
+        """Frees every model's memory for a heavy night job (training the 27B needs ~35 GB of 36).
+        Anything Lea asks afterwards reloads what it needs."""
+        import gc
+
+        self.llm.unload()
+        if self._stt is not None:
+            self._stt.unload()
+        self._tts = None
+        if hasattr(self.embedder, "unload"):
+            self.embedder.unload()
+        gc.collect()
+        try:
+            import mlx.core as mx
+
+            mx.clear_cache()
+        except Exception:
+            pass
+
     def warm(self) -> None:
         """Load models and pre-read the system prompt so the first answer is fast.
         Whisper warms up first: measured, warming it after the LLM made the first question ~1.3 s slower."""

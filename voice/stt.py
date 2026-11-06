@@ -71,6 +71,13 @@ class SpeechToText:
         with self._lock:
             self._ensure()
 
+    def unload(self) -> None:
+        with self._lock:
+            from mlx_whisper.transcribe import ModelHolder
+
+            self._model = None
+            ModelHolder.model, ModelHolder.model_path = None, None
+
     def detect_language(self, audio: np.ndarray) -> str:
         """Whisper's language detection, restricted to Lea's languages."""
         import mlx.core as mx

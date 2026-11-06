@@ -27,6 +27,7 @@ SETS_DIR = Path(__file__).parent / "sets"
 BANNED = re.compile(
     r"as an ai (language )?model|como (una )?ia|en tant qu'ia|as a large language model", re.I
 )
+EMOJI = re.compile("[\U0001f300-\U0001faff\u2600-\u27bf]")
 
 
 # ---------- scoring ----------
@@ -74,7 +75,8 @@ def score(item: dict, answer: str, tools: list[str]) -> bool | None:
     if kind == "style":
         words = len(re.findall(r"\w+", answer))
         same_lang = guess_language(answer) == guess_language(item["prompt"])
-        return words <= c.get("max_words", 120) and not BANNED.search(answer) and same_lang
+        emoji = bool(EMOJI.search(answer)) and not EMOJI.search(item["prompt"])
+        return words <= c.get("max_words", 120) and not BANNED.search(answer) and same_lang and not emoji
     return None  # "judge" items are rated by Lea in the blind A/B
 
 
@@ -106,6 +108,7 @@ def build_sylvie(adapter: str | None, model: str | None):
     if model:
         cfg["llm"]["model"] = model
     cfg["llm"]["adapter"] = adapter
+    cfg["voice"]["enabled"] = False  # text-only evals: don't load Whisper/Kokoro next to the model
     tmp = Path(tempfile.mkdtemp(prefix="sylvie-eval-"))
     dim = cfg.get_path("embeddings.dim", 1024)
     db = Database(tmp / "eval.db", dim=dim)

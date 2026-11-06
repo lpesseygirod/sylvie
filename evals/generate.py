@@ -143,11 +143,19 @@ STYLE = [
     "c'est quoi un ETF, en deux mots ?",
     "is it worth learning Rust this year?",
     "tell me something interesting about octopuses",
+    # Added 2026-11-06 after reviewing the baseline answers: open-ended "many options" questions
+    # (she answered with 15-item catalogs) and plain facts (she added emojis and closing offers).
+    "any ideas for a birthday present for my sister? she likes hiking",
+    "¿qué serie me recomiendas para esta noche?",
+    "donne-moi une idée de dîner rapide",
+    "what should I name my new plant?",
+    "who painted the Mona Lisa?",
+    "¿cuántos días tiene un año bisiesto?",
 ]
 
 
 def style_items() -> list[dict]:
-    # Checks Sylvie's defaults: short, no "As an AI language model", same language.
+    # Checks Sylvie's defaults: short, no "As an AI language model", same language, no emojis.
     return [
         {"id": f"style-{i}", "prompt": q, "check": {"type": "style", "max_words": 90}}
         for i, q in enumerate(STYLE)

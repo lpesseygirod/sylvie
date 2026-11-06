@@ -113,7 +113,7 @@ class Scheduler:
             if job is None:
                 return
             log.info("starting heavy job %s", job.name)
-            self.s.llm.unload()  # frees ~18 GB for the job
+            self.s.unload_models()  # frees ~21 GB (LLM, Whisper, Kokoro, embeddings) for the job
             env = {**os.environ, "HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1"}
             logf = open(self.s.cfg.data_dir / "logs" / f"{job.name}.log", "a")  # noqa: SIM115
             self.proc = subprocess.Popen(job.args, cwd=ROOT, env=env, stdout=logf, stderr=subprocess.STDOUT)

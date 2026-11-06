@@ -91,6 +91,9 @@ def practice_skills(
 ) -> dict:
     rng = random.Random(seed)
     kept = {"tools": 0, "reasoning": 0, "tried": 0}
+    # Answers checked by code against GSM8K's known answer don't need Lea's spot-check (T28);
+    # the judged overnight pairs still do.
+    status = "ready" if cfg.get_path("learning.auto_approve_verified", True) else "staged"
     for i, item in enumerate(gsm8k(data_path, rng, n)):
         if stop():
             break
@@ -101,7 +104,7 @@ def practice_skills(
         store.add_example(
             ex["messages"], chosen=ex["chosen"], source=f"sylvie-local:{model_name}",
             license="MIT (question: GSM8K) + apache-2.0 (local model answer, verified by code)",
-            tag="general", status="staged", batch=batch, tools=ex.get("tools"), reasoning=ex.get("reasoning"),
+            tag="general", status=status, batch=batch, tools=ex.get("tools"), reasoning=ex.get("reasoning"),
         )  # fmt: skip
         kept["tools" if "tools" in ex else "reasoning"] += 1
     return kept

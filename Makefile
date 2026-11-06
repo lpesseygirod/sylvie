@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval
+.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval finetune
 
 setup:
 	uv sync
@@ -61,3 +61,6 @@ phone:
 
 eval:
 	$(UV) python evals/run.py --label base
+
+finetune:   # stop Sylvie first; ~2 h: build, train, evaluate, prepare the blind A/B
+	$(UV) python -m learning.cycle --force

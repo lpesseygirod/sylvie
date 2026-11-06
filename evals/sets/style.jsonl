@@ -4,3 +4,9 @@
 {"set": "style", "id": "style-3", "prompt": "c'est quoi un ETF, en deux mots ?", "check": {"type": "style", "max_words": 90}}
 {"set": "style", "id": "style-4", "prompt": "is it worth learning Rust this year?", "check": {"type": "style", "max_words": 90}}
 {"set": "style", "id": "style-5", "prompt": "tell me something interesting about octopuses", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-6", "prompt": "any ideas for a birthday present for my sister? she likes hiking", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-7", "prompt": "¿qué serie me recomiendas para esta noche?", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-8", "prompt": "donne-moi une idée de dîner rapide", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-9", "prompt": "what should I name my new plant?", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-10", "prompt": "who painted the Mona Lisa?", "check": {"type": "style", "max_words": 90}}
+{"set": "style", "id": "style-11", "prompt": "¿cuántos días tiene un año bisiesto?", "check": {"type": "style", "max_words": 90}}

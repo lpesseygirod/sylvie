@@ -38,6 +38,9 @@ class Embedder:
 
             self._model, self._tok = load(self.model_id)
 
+    def unload(self) -> None:
+        self._model, self._tok = None, None  # reloads on next use
+
     def embed(self, texts: list[str], query: bool = False, batch_size: int = 16) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dim), dtype=np.float32)

@@ -299,8 +299,9 @@ def main() -> None:
 
     from core.db import Database
     from core.orchestrator import Sylvie
+    from core.toolcall import ToolCall
     from learning.store import LearningStore
-    from tools.registry import ToolCall, execute
+    from tools.registry import execute
 
     cfg = load_config()
     sylvie = Sylvie.build(cfg)  # for prompts/stores only; its LLM stays unloaded (the pool loads models)
@@ -346,7 +347,13 @@ def main() -> None:
     except Exception as e:  # extras must never stop the main loop
         print(f"extras failed: {e}", flush=True)
 
-    while time.time() < end and not night.stop:
+    # When a fine-tune is due, stop practising early enough to leave it time (train ~1 h + two evals).
+    from learning.cycle import due, run_now
+
+    model_id = cfg.get_path("learning.finetune_model") or cfg.get_path("llm.model")
+    finetune_due, why = due(cfg, night.store, model_id)
+    reserve = cfg.get_path("learning.cycle_minutes", 150) * 60 if finetune_due else 0
+    while time.time() < end - reserve and not night.stop:
         night.run_batch(a.batch)
         print(json.dumps(night.stats), flush=True)
     if night.pool.model is not None:
@@ -354,32 +361,11 @@ def main() -> None:
     print("summary:", night.morning_summary(), flush=True)
 
     # Fine-tune when due (every ~10 days with enough approved new examples); Lea decides promotion.
-    from learning.cycle import due, run_cycle
-    from learning.train import train
-
-    model_id = cfg.get_path("learning.finetune_model") or cfg.get_path("llm.model")
-    ok, why = due(cfg, night.store, model_id)
+    # Checked again: tonight's verified practice may have made it due.
+    finetune_due, why = due(cfg, night.store, model_id)
     print("fine-tune:", why, flush=True)
-    if ok and not night.stop and time.time() < end:
-        from evals.run import run as run_eval
-
-        sets = [
-            "math",
-            "finance",
-            "multilingual",
-            "tools",
-            "general",
-            "style",
-            "memory",
-            "lea_questions",
-            "conversations",
-        ]
-        res = run_cycle(
-            cfg, night.store, sylvie.ab, model_id,
-            cfg.data_dir / "datasets" / "open" / "oasst2" / "2023-11-05_oasst2_ready.trees.jsonl.gz",
-            train_fn=lambda m, b: train(m, b, iters=cfg.get_path("learning.iters", 300)),
-            eval_fn=lambda label, adapter: run_eval(label, sets, adapter=adapter, model=model_id),
-        )  # fmt: skip
+    if finetune_due and not night.stop and end - time.time() > reserve / 2:
+        res = run_now(cfg, night.store, sylvie.ab, model_id)
         print("cycle:", json.dumps(res["comparison"]), flush=True)
 
 
