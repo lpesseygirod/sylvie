@@ -29,6 +29,7 @@ final class WakeWordListener {
     /// new task, and so on every ~0.5 s, so the listener never ran long enough to hear "Sylvie".
     private var generation = 0
     private var seenWakes = 0
+    private var seenStops = 0
     private var startedAt = Date()
     private var enabled = false
     private let maxTaskSeconds: TimeInterval = 45
@@ -99,6 +100,8 @@ final class WakeWordListener {
         lock.lock()
         request = req
         seenWakes = 0
+        seenStops = 0
+        resetStopsOnNext = false  // a fresh transcript: every stop word in it is new
         startedAt = Date()
         generation += 1
         let gen = generation
@@ -123,6 +126,16 @@ final class WakeWordListener {
         lock.unlock()
     }
 
+    /// Called when Sylvie starts speaking: stop words already in the transcript (e.g. in Lea's
+    /// question) don't count, only new ones.
+    func markStopsSeen() {
+        lock.lock()
+        resetStopsOnNext = true  // the next partial result sets the baseline
+        lock.unlock()
+    }
+
+    private var resetStopsOnNext = false
+
     private func isCurrent(_ gen: Int) -> Bool {
         lock.lock()
         defer { lock.unlock() }
@@ -132,7 +145,16 @@ final class WakeWordListener {
     private func check(_ text: String) {
         if deaf {
             // She's speaking and the mic hears her too: ignore her name, but Lea's "stop" still works.
-            if matcher.isStrongStop(text) {
+            let stops = matcher.strongStopCount(in: text)
+            lock.lock()
+            if resetStopsOnNext {
+                seenStops = stops
+                resetStopsOnNext = false
+            }
+            let newStop = stops > seenStops
+            seenStops = max(seenStops, stops)
+            lock.unlock()
+            if newStop {
                 wakeLog.notice("stop heard while speaking")
                 DispatchQueue.main.async { self.onStopCommand?() }
                 restart()

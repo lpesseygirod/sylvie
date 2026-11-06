@@ -60,6 +60,8 @@ final class SylvieCoreTests: XCTestCase {
         XCTAssertTrue(m.isStrongStop("los años bisiestos tienen stop"))
         XCTAssertFalse(m.isStrongStop("esto es para"))  // "para" alone never stops her mid-sentence
         XCTAssertFalse(m.isStrongStop("the bus stop is near the station"))
+        XCTAssertEqual(m.strongStopCount(in: "los años bisiestos stop tienen un día más"), 1)  // Lea's stop mid-speech
+        XCTAssertEqual(m.strongStopCount(in: "esto es para ti"), 0)
     }
 
     func testRingBuffer() {

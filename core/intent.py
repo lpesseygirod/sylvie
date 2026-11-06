@@ -32,7 +32,8 @@ CLAIM_RE = re.compile(
 ACTION_NOTE = (
     "Lea may be asking you to do something (music, calendar, reminders, a timer, opening an app). If so, "
     "do it by calling the matching tool: nothing happens unless you call it. Never say it's done or "
-    "happening unless the tool call succeeded in this turn; if a tool fails, say so plainly."
+    "happening unless the tool call succeeded in this turn; if a tool fails, say so plainly. Never invent "
+    "results a tool didn't give you (playlists, songs, events, files)."
 )
 
 CLAIM_NUDGE = (

@@ -291,6 +291,7 @@ final class AppController: ObservableObject {
             if (event["text"] as? String ?? "").isEmpty { state = .idle }
         case "speak":
             guard let text = event["text"] as? String else { return }
+            if state != .speaking { wake.markStopsSeen() }  // only a "stop" said from now on counts
             state = .speaking
             wake.deaf = !pipeline.echoCancelled
             speaker.onFinished = { [weak self] in
