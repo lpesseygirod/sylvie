@@ -23,6 +23,10 @@ final class WakeWordListener {
     private let lock = NSLock()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
+    /// Bumped for every new recognition task. Callbacks from older (cancelled) tasks are ignored:
+    /// measured 2026-11-06, a cancelled task's error triggered another restart, which cancelled the
+    /// new task, and so on every ~0.5 s, so the listener never ran long enough to hear "Sylvie".
+    private var generation = 0
     private var seenWakes = 0
     private var startedAt = Date()
     private var enabled = false
@@ -95,9 +99,11 @@ final class WakeWordListener {
         request = req
         seenWakes = 0
         startedAt = Date()
+        generation += 1
+        let gen = generation
         lock.unlock()
         let newTask = recognizer.recognitionTask(with: req) { [weak self] result, error in
-            guard let self else { return }
+            guard let self, self.isCurrent(gen) else { return }  // an old task we already replaced
             if let result {
                 let text = result.bestTranscription.formattedString
                 self.check(text)
@@ -105,12 +111,21 @@ final class WakeWordListener {
             } else if let error {
                 let ns = error as NSError
                 wakeLog.notice("recognition task ended: \(ns.domain, privacy: .public) \(ns.code, privacy: .public)")
-                DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.restart() }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 1) { [weak self] in
+                    guard let self, self.isCurrent(gen) else { return }
+                    self.restart()
+                }
             }
         }
         lock.lock()
         task = newTask
         lock.unlock()
+    }
+
+    private func isCurrent(_ gen: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return gen == generation
     }
 
     private func check(_ text: String) {
