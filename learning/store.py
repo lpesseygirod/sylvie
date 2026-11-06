@@ -89,6 +89,9 @@ class LearningStore:
         if "tools" not in cols:
             self.db.execute("ALTER TABLE training_examples ADD COLUMN tools TEXT")  # JSON tool definitions
             self.db.execute("ALTER TABLE training_examples ADD COLUMN reasoning TEXT")  # thinking-mode trace
+        if "tool_calls" not in {r["name"] for r in self.db.query("PRAGMA table_info(training_examples)")}:
+            # JSON tool calls of the trained (last) assistant message, e.g. the decision to use the calculator
+            self.db.execute("ALTER TABLE training_examples ADD COLUMN tool_calls TEXT")
 
     # ---------- corrections ----------
     def _row(self, r) -> Correction:
@@ -149,6 +152,7 @@ class LearningStore:
         batch: str | None = None,
         tools: list | None = None,
         reasoning: str | None = None,
+        tool_calls: list | None = None,
     ) -> int:
         if not source.startswith(ALLOWED_SOURCE_PREFIXES):
             raise DisallowedSource(f"source '{source}' is not allowed in training data (plan rule 4)")
@@ -156,7 +160,7 @@ class LearningStore:
             raise ValueError("tag must be personal or general")
         return self.db.execute(
             "INSERT INTO training_examples(kind, messages, chosen, rejected, tag, source, license, weight, correction_id, "
-            "created_at, status, batch, tools, reasoning) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "created_at, status, batch, tools, reasoning, tool_calls) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 "preference" if rejected else "sft",
                 json.dumps(messages, ensure_ascii=False),
@@ -172,6 +176,7 @@ class LearningStore:
                 batch,
                 json.dumps(tools, ensure_ascii=False) if tools else None,
                 reasoning,
+                json.dumps(tool_calls, ensure_ascii=False) if tool_calls else None,
             ),
         ).lastrowid
 

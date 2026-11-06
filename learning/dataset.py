@@ -134,6 +134,8 @@ def build(
         final = {"role": "assistant", "content": row["chosen"]}
         if row.get("reasoning"):
             final["reasoning_content"] = row["reasoning"]  # the chat template renders it inside <think>
+        if row.get("tool_calls"):
+            final["tool_calls"] = json.loads(row["tool_calls"])  # trains the decision to call a tool
         tools = json.loads(row["tools"]) if row.get("tools") else None
         examples.append(
             Example(
