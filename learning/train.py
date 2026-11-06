@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -37,20 +38,33 @@ def next_version(root: Path) -> str:
 def parse_losses(log: str) -> dict:
     """Reads losses from mlx-lm's output (older "Iter N: Train loss X" lines or the newer table)."""
     log = re.sub(r"\x1b\[[0-9;]*m", "", log)
-    train = [float(x) for x in re.findall(r"Train loss ([\d.]+)", log)]
-    val = [float(x) for x in re.findall(r"Val loss ([\d.]+)", log)]
-    train += [float(m) for m in re.findall(r"^\s*\d+\s+([\d.]+)\s+[▲▼=]", log, re.M)]
-    val += [float(m) for m in re.findall(r"^\s*\d+\s+val\s+([\d.]+)", log, re.M)]
+    num = r"([\d.]+|nan)"
+    train = [float(x) for x in re.findall(rf"Train loss {num}", log)]
+    val = [float(x) for x in re.findall(rf"Val loss {num}", log)]
+    train += [float(m) for m in re.findall(rf"^\s*\d+\s+{num}\s+[▲▼=]", log, re.M)]
+    val += [float(m) for m in re.findall(rf"^\s*\d+\s+val\s+{num}", log, re.M)]
     peak = [float(x) for x in re.findall(r"Peak mem ([\d.]+) GB", log)]
-    rss = re.search(r"(\d+)\s+maximum resident set size", log)
-    if rss:
-        peak.append(int(rss.group(1)) / 1e9)  # /usr/bin/time -l reports bytes on macOS
+    # /usr/bin/time -l on macOS (bytes). "peak memory footprint" includes GPU memory and is the
+    # number that matters on 36 GB; "maximum resident set size" misses most of it (measured 12 vs 38 GB).
+    footprint = re.findall(r"(\d+)\s+peak memory footprint", log)
+    rss = re.findall(r"(\d+)\s+maximum resident set size", log)
+    peak += [int(x) / 1e9 for x in (footprint or rss)]
     return {
         "train_first": train[:1],
         "train_last": train[-1:],
         "val": val,
         "peak_mem_gb": round(max(peak), 2) if peak else None,
+        "nan": any(x != x for x in train + val),
     }
+
+
+def adapter_is_finite(path: Path) -> bool:
+    """False if any LoRA weight is NaN/inf (a diverged run: its answers would be garbage)."""
+    import mlx.core as mx
+
+    if not path.exists():
+        return False
+    return not any(bool((mx.isnan(v) | mx.isinf(v)).any().item()) for v in mx.load(str(path)).values())
 
 
 def train(
@@ -64,6 +78,7 @@ def train(
     version: str | None = None,
     segment: int = 100,
     seed: int = 0,
+    run=lambda args, env: subprocess.run(args, capture_output=True, text=True, env=env),
 ) -> Path:
     cfg = load_config()
     root = adapters_root(cfg, model_id)
@@ -77,7 +92,10 @@ def train(
     env = {**os.environ, "HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1"}
     t0 = time.time()
     logs, returncode, done = [], 0, 0
-    seg = 0
+    seg, retried, lr, stopped = 0, False, learning_rate, None
+    good = out / "segments"  # a copy of the adapter after every good segment, to roll back to
+    good.mkdir()
+    adapter = out / "adapters.safetensors"
     while done < iters:
         n = min(segment, iters - done)
         args = [
@@ -85,32 +103,49 @@ def train(
             sys.executable, "-m", "mlx_lm", "lora",
             "--model", model_id, "--train", "--data", str(build_dir), "--adapter-path", str(out),
             "--fine-tune-type", "lora", "--mask-prompt", "--num-layers", str(num_layers),
-            "--batch-size", str(batch_size), "--iters", str(n), "--learning-rate", str(learning_rate),
+            "--batch-size", str(batch_size), "--iters", str(n), "--learning-rate", str(lr),
             "--max-seq-length", str(max_seq_length), "--grad-checkpoint", "--seed", str(seed + seg),
             "--steps-per-report", "10", "--steps-per-eval", str(n), "--save-every", str(n),
         ]  # fmt: skip
-        if seg > 0:
-            args += ["--resume-adapter-file", str(out / "adapters.safetensors")]
-        p = subprocess.run(args, capture_output=True, text=True, env=env)
-        logs.append(f"===== segment {seg + 1}: steps {done + 1}-{done + n} =====\n" + p.stdout + p.stderr)
+        if done > 0:
+            args += ["--resume-adapter-file", str(adapter)]
+        p = run(args, env)
+        seg_log = p.stdout + p.stderr
+        logs.append(f"===== segment {seg + 1}: steps {done + 1}-{done + n} (lr {lr}) =====\n" + seg_log)
         returncode = p.returncode
         if returncode != 0:
             break
-        done += n
         seg += 1
+        if parse_losses(seg_log)["nan"] or not adapter_is_finite(adapter):
+            # Measured on the 27B (2026-11-06): the loss went to NaN mid-way through step 255 and
+            # every weight became NaN. Roll back to the last good segment; retry once, gentler.
+            last = good / f"after_{done:04d}.safetensors"
+            if last.exists():
+                shutil.copy(last, adapter)
+            else:
+                adapter.unlink(missing_ok=True)
+            if retried:
+                stopped = f"loss became NaN twice; kept the adapter after step {done}"
+                break
+            retried, lr = True, lr / 2
+            logs.append(f"===== NaN: rolled back to step {done}, retrying at lr {lr} =====")
+            continue
+        done += n
+        shutil.copy(adapter, good / f"after_{done:04d}.safetensors")
     log = "\n".join(logs)
     (out / "train.log").write_text(log)
     manifest = json.loads((Path(build_dir) / "manifest.json").read_text())
     meta = {
         "version": version, "base_model": model_id, "created": datetime.now().isoformat(timespec="seconds"),
-        "minutes": round((time.time() - t0) / 60, 1), "ok": returncode == 0, "steps_done": done,
+        "minutes": round((time.time() - t0) / 60, 1), "ok": returncode == 0 and done > 0, "steps_done": done,
+        "stopped_early": stopped,
         "settings": {"iters": iters, "num_layers": num_layers, "learning_rate": learning_rate, "batch_size": batch_size,
                      "max_seq_length": max_seq_length, "type": "lora (qlora on 4-bit base)", "mask_prompt": True,
                      "segment": segment},
         "dataset": manifest, "losses": parse_losses(log),
     }  # fmt: skip
     (out / "meta.json").write_text(json.dumps(meta, indent=1, ensure_ascii=False))
-    if returncode != 0:
+    if not meta["ok"]:
         raise RuntimeError(f"training failed, see {out / 'train.log'}")
     return out
 

@@ -33,7 +33,10 @@ def last_adapter_time(cfg, model_id: str) -> datetime | None:
     times = []
     for meta in root.glob("v[0-9][0-9][0-9]/meta.json") if root.exists() else []:
         try:
-            times.append(datetime.fromisoformat(json.loads(meta.read_text())["created"]).replace(tzinfo=UTC))
+            m = json.loads(meta.read_text())
+            if not m.get("ok", True):
+                continue  # a failed run doesn't count: try again next night
+            times.append(datetime.fromisoformat(m["created"]).replace(tzinfo=UTC))
         except (OSError, ValueError, KeyError):
             pass
     return max(times) if times else None

@@ -1,5 +1,7 @@
 import gzip
 import json
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -96,7 +98,9 @@ def test_gate():
 
 def test_parse_losses():
     log = "Iter 10: Train loss 2.31, ...\nIter 20: Val loss 2.10, ...\nIter 20: Train loss 1.80, Peak mem 9.5 GB"
-    assert parse_losses(log) == {"train_first": [2.31], "train_last": [1.8], "val": [2.1], "peak_mem_gb": 9.5}
+    assert parse_losses(log) == {
+        "train_first": [2.31], "train_last": [1.8], "val": [2.1], "peak_mem_gb": 9.5, "nan": False,
+    }  # fmt: skip
 
 
 def test_blind_ab_hides_labels_and_counts_wins(tmp_path):
@@ -125,7 +129,75 @@ def test_parse_losses_new_table_format():
     log = "  iter   train_loss\n     1    val 1.187    7.08s\n    10    1.078 \u25bc  37  2.6k\n   300    0.900 \u25bc  1  1\n   300    val 1.020    4.89s\n  21474836480  maximum resident set size\n"
     out = parse_losses(log)
     assert out["train_first"] == [1.078] and out["train_last"] == [0.9] and out["val"] == [1.187, 1.02]
-    assert out["peak_mem_gb"] == 21.47
+    assert out["peak_mem_gb"] == 21.47 and out["nan"] is False
+
+
+def test_parse_losses_sees_nan_and_true_peak_memory():
+    log = "    50    1.251 \u25bc  32  8.2k\n    60      nan \u25b2  31  9.3k\n   100    val   nan    1s\n"
+    log += "  16613392384  maximum resident set size\n  38621711152  peak memory footprint\n"
+    out = parse_losses(log)
+    assert out["nan"] is True and out["peak_mem_gb"] == 38.62
+
+
+def _fake_trainer(tmp_path, nan_on_calls):
+    """Stands in for `mlx_lm lora`: writes an adapter (NaN on the given call numbers) and a log."""
+    import mlx.core as mx
+
+    calls = []
+
+    def run(args, env):
+        calls.append(args)
+        out = Path(args[args.index("--adapter-path") + 1])
+        bad = len(calls) in nan_on_calls
+        value = float("nan") if bad else float(len(calls))
+        mx.save_safetensors(str(out / "adapters.safetensors"), {"w": mx.array([value, 1.0])})
+        loss = "nan" if bad else "1.000"
+        return subprocess.CompletedProcess(args, 0, f"    10    {loss} \u25bc  1  1\n", "")
+
+    return run, calls
+
+
+def _train(tmp_path, monkeypatch, nan_on_calls, iters=300):
+    import learning.train as tr
+    from core.config import Config
+
+    cfg = Config({"paths": {"adapters_dir": str(tmp_path / "adapters")}})
+    monkeypatch.setattr(tr, "load_config", lambda: cfg)
+    build = tmp_path / "build"
+    build.mkdir()
+    (build / "manifest.json").write_text("{}")
+    run, calls = _fake_trainer(tmp_path, nan_on_calls)
+    return tr, run, calls, build
+
+
+def test_nan_segment_rolls_back_and_retries_gentler(tmp_path, monkeypatch):
+    import mlx.core as mx
+
+    tr, run, calls, build = _train(tmp_path, monkeypatch, nan_on_calls={3})
+    out = tr.train("org/M", build, iters=300, run=run)
+    lrs = [a[a.index("--learning-rate") + 1] for a in calls]
+    assert lrs == ["1e-05", "1e-05", "1e-05", "5e-06"]  # segment 3 diverged, retried at half the rate
+    assert "--resume-adapter-file" in calls[3]  # …from the good adapter after step 200
+    meta = json.loads((out / "meta.json").read_text())
+    assert meta["ok"] and meta["steps_done"] == 300 and meta["stopped_early"] is None
+    assert mx.load(str(out / "adapters.safetensors"))["w"][0].item() == 4.0
+    assert tr.adapter_is_finite(out / "adapters.safetensors")
+
+
+def test_nan_twice_keeps_last_good_adapter(tmp_path, monkeypatch):
+    import mlx.core as mx
+
+    tr, run, calls, build = _train(tmp_path, monkeypatch, nan_on_calls={2, 3})
+    out = tr.train("org/M", build, iters=300, run=run)
+    meta = json.loads((out / "meta.json").read_text())
+    assert meta["steps_done"] == 100 and "NaN twice" in meta["stopped_early"]
+    assert mx.load(str(out / "adapters.safetensors"))["w"][0].item() == 1.0  # the step-100 adapter
+
+
+def test_nan_from_the_start_is_a_failure(tmp_path, monkeypatch):
+    tr, run, calls, build = _train(tmp_path, monkeypatch, nan_on_calls={1, 2})
+    with pytest.raises(RuntimeError):
+        tr.train("org/M", build, iters=300, run=run)
 
 
 def test_cycle_due_and_run(tmp_path):
@@ -162,3 +234,15 @@ def test_cycle_due_and_run(tmp_path):
     res = run_cycle(cfg, store, ab, "org/M", None, train_fn, eval_fn)
     assert res["adapter"] == "v001" and res["comparison"]["regressions"] == [] and res["ab_pairs"] == 1
     assert not due(cfg, store, "org/M", now=datetime.now(UTC) + timedelta(days=3))[0]  # just trained
+
+
+def test_failed_fine_tune_does_not_delay_the_next(tmp_path):
+    from datetime import datetime
+
+    from learning.cycle import last_adapter_time
+
+    cfg = Config({"paths": {"adapters_dir": str(tmp_path)}})
+    v = tmp_path / "M" / "v001"
+    v.mkdir(parents=True)
+    (v / "meta.json").write_text(json.dumps({"created": datetime.now().isoformat(), "ok": False}))
+    assert last_adapter_time(cfg, "org/M") is None
