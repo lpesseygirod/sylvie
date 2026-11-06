@@ -26,6 +26,7 @@ log = logging.getLogger("sylvie.claude_history")
 OFFSETS_KEY = "claude_history.offsets"
 EXPORT_SEEN_KEY = "claude_history.export_seen"
 EXPORT_FILES_KEY = "claude_history.export_files"
+PENDING_KEY = "claude_history.pending"  # read but not learned from yet: survives restarts
 MAX_EXPORT_BYTES = 1_000_000_000
 # Text Lea didn't write herself: system notes, pasted text, IDE selections, command output.
 TAGGED_BLOCK_RE = re.compile(r"<([a-z_-]+)(?:\s[^>]*)?>.*?</\1>", re.S)
@@ -172,6 +173,7 @@ class ClaudeHistory:
             str(cfg.get_path("memory.claude_history.exports_folder", "~/Documents/Sylvie/Claude exports"))
         ).expanduser()
         self._stop = threading.Event()
+        self._lock = threading.Lock()
 
     def _get(self, key: str, default):
         rows = self.s.db.query("SELECT value FROM meta WHERE key = ?", (key,))
@@ -219,20 +221,39 @@ class ClaudeHistory:
             return 0
         offsets = self._get(OFFSETS_KEY, {})
         msgs = read_new(self.folder, offsets, self.exclude) + self._new_from_exports()
-        for m in msgs:
-            source = f"claude:{m.session}#{m.uuid}"
-            self.s.bg.submit(
-                "learn-claude", lambda ev, m=m, source=source: self.s.learn_from_claude(m.text, source, ev)
-            )
+        with self._lock:
+            pending = self._get(PENDING_KEY, [])
+            new = [[f"claude:{m.session}#{m.uuid}", m.text] for m in msgs]
+            self._set(PENDING_KEY, pending + new)
         self._set(OFFSETS_KEY, offsets)
+        for source, text in new:
+            self._queue(source, text)
         if msgs:
             log.info("queued %d of Lea's Claude messages for learning", len(msgs))
         return len(msgs)
+
+    def _queue(self, source: str, text: str) -> None:
+        def job(ev):
+            self.s.learn_from_claude(text, source, ev)
+            if not ev.is_set():
+                with self._lock:
+                    self._set(PENDING_KEY, [p for p in self._get(PENDING_KEY, []) if p[0] != source])
+
+        self.s.bg.submit("learn-claude", job)
+
+    def resume(self) -> int:
+        """After a restart: queue what was read but not learned from yet."""
+        pending = self._get(PENDING_KEY, [])
+        for source, text in pending:
+            self._queue(source, text)
+        return len(pending)
 
     def start(self) -> None:
         if not self.enabled:
             return
         self.exports.mkdir(parents=True, exist_ok=True)
+        if n := self.resume():
+            log.info("resuming %d Claude messages not learned from yet", n)
 
         def loop():
             while not self._stop.is_set():

@@ -150,3 +150,19 @@ def test_export_folder_is_read_once_and_re_exports_skip_old_messages(tmp_path):
     claude_ai_export(exports / "data-2.zip", second)  # a newer export holds the whole history again
     assert h.scan() == 1
     s.bg.drain()
+
+
+def test_unlearned_messages_survive_a_restart(tmp_path):
+    s = make(tmp_path, [extraction()] * 4)
+    folder = tmp_path / "claude"
+    (folder / "p").mkdir(parents=True)
+    (folder / "p" / "a.jsonl").write_text(json.dumps(human("I work best in the mornings, before ten")) + "\n")
+    s.cfg["memory"] = {**s.cfg["memory"], "claude_history": {"enabled": True, "folder": str(folder)}}
+    s.bg.hold = lambda: True  # Sylvie is busy: nothing gets learned yet
+    assert ClaudeHistory(s).scan() == 1
+    s.bg.q.queue.clear()  # the server restarts: the in-memory queue is gone
+    s.bg.hold = lambda: False
+    h = ClaudeHistory(s)
+    assert h.scan() == 0 and h.resume() == 1
+    s.bg.drain()
+    assert h.resume() == 0  # learned, so no longer pending
