@@ -58,6 +58,17 @@ def parse_losses(log: str) -> dict:
     }
 
 
+def finite(obj):
+    """NaN/inf → None, so meta.json stays valid JSON (the dashboard couldn't load NaN losses)."""
+    if isinstance(obj, float) and obj != obj or obj in (float("inf"), float("-inf")):
+        return None
+    if isinstance(obj, dict):
+        return {k: finite(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [finite(v) for v in obj]
+    return obj
+
+
 def adapter_is_finite(path: Path) -> bool:
     """False if any LoRA weight is NaN/inf (a diverged run: its answers would be garbage)."""
     import mlx.core as mx
@@ -144,7 +155,7 @@ def train(
                      "segment": segment},
         "dataset": manifest, "losses": parse_losses(log),
     }  # fmt: skip
-    (out / "meta.json").write_text(json.dumps(meta, indent=1, ensure_ascii=False))
+    (out / "meta.json").write_text(json.dumps(finite(meta), indent=1, ensure_ascii=False, allow_nan=False))
     if not meta["ok"]:
         raise RuntimeError(f"training failed, see {out / 'train.log'}")
     return out

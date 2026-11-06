@@ -186,3 +186,23 @@ def test_voice_turn_skips_documents(tmp_path):
     )()
     spoken = [e["text"] for e in voice_turn(s, b"RIFF") if e["type"] == "speak"]
     assert spoken == ["Done."]
+
+
+def test_background_learning_pauses_before_transcription(tmp_path):
+    """Whisper must not share the GPU with a background job (measured: 55 s for a transcript)."""
+    from tests.test_orchestrator import make
+    from voice.loop import voice_turn
+    from voice.stt import Transcript
+
+    s = make(tmp_path, [])
+    seen = {}
+
+    class STT:
+        def transcribe(self, wav):
+            seen["busy"] = s.bg.busy.is_set()
+            return Transcript("", "en", 0.2, 0.0)
+
+    s._stt = STT()
+    list(voice_turn(s, b""))
+    assert seen["busy"] is True  # background work was told to stop before Whisper ran
+    assert not s.bg.busy.is_set()  # and resumes afterwards (empty transcript: no turn follows)

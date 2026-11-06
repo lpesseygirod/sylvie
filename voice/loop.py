@@ -16,10 +16,19 @@ from voice.speech import DocFilter, SentenceStreamer
 def voice_turn(
     sylvie, wav: bytes, conversation_id: str | None = None, channel: str = "voice"
 ) -> Iterator[dict]:
+    # Pause background learning *before* Whisper runs: otherwise it shares the GPU with a background
+    # job and the transcript took 55 s (measured 2026-11-06, while Sylvie was learning from Lea's
+    # Claude history). sylvie.turn() below keeps it paused until the answer is done.
+    sylvie.bg.turn_started()
     with_stt = sylvie.speech_to_text()
-    tr = with_stt.transcribe(wav)
+    try:
+        tr = with_stt.transcribe(wav)
+    except Exception:
+        sylvie.bg.turn_finished()
+        raise
     yield {"type": "transcript", "text": tr.text, "language": tr.language, "ms": round(tr.ms)}
     if not tr.text:
+        sylvie.bg.turn_finished()
         yield {"type": "done", "message_id": None, "conversation_id": conversation_id, "empty": True}
         return
     lang = tr.language

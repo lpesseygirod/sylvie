@@ -264,3 +264,11 @@ def test_build_drops_examples_that_dont_fit_the_training_length(tmp_path):
     rep = build(store, tmp_path / "builds", name="x", measure=measure, max_tokens=512)
     assert rep.counts["train"] + rep.counts["valid"] == 1
     assert rep.excluded["too_long"] == 1 and rep.excluded["nothing_to_learn"] == 1
+
+
+def test_meta_never_contains_nan():
+    from learning.train import finite
+
+    out = finite({"val": [1.2, float("nan")], "peak": float("inf"), "ok": True, "n": 3})
+    assert out == {"val": [1.2, None], "peak": None, "ok": True, "n": 3}
+    json.dumps(out, allow_nan=False)
