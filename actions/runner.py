@@ -47,7 +47,9 @@ INT = {"type": "integer"}
 TOOLS = {
     "music": _fn(
         "music",
-        "Control Spotify on this Mac: play, pause, next, previous, volume_up, volume_down, set_volume (0-100), now_playing.",
+        "Spotify playback controls with NO song name: play (= resume what was playing), pause, next, previous, "
+        "volume_up, volume_down, set_volume (0-100), now_playing. To play a specific song, artist, album or "
+        "playlist, use play_music instead.",
         {
             "command": {
                 **STR,
@@ -68,8 +70,9 @@ TOOLS = {
     ),
     "play_music": _fn(
         "play_music",
-        "Play something on Spotify. For one of Lea's saved playlists pass its name (e.g. 'study'); a "
-        "spotify: URI or open.spotify.com link plays directly; other words open Spotify's search.",
+        "Play a specific song, artist, album or playlist on Spotify, found by name (e.g. 'Fireball Pitbull', "
+        "'lofi study playlist', 'Rosalía artist', or one of Lea's saved playlist names). It finds it and starts it "
+        "by itself: no key or setup is needed, and Lea doesn't have to click anything.",
         {"query": STR},
         ["query"],
     ),
