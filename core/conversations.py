@@ -64,6 +64,26 @@ class Conversations:
     def rename(self, cid: str, title: str) -> None:
         self.db.execute("UPDATE conversations SET title = ? WHERE id = ?", (title.strip()[:120], cid))
 
+    def turn_used_tool(self, message_id: int, tool: str) -> bool:
+        """Did the turn that produced this answer call `tool`? (Looks back to the user's message.)"""
+        m = self.db.one("SELECT conversation_id FROM messages WHERE id = ?", (message_id,))
+        if m is None:
+            return False
+        start = (
+            self.db.one(
+                "SELECT max(id) i FROM messages WHERE conversation_id = ? AND role = 'user' AND id < ?",
+                (m["conversation_id"], message_id),
+            )["i"]
+            or 0
+        )
+        for r in self.db.query(
+            "SELECT tool_calls FROM messages WHERE conversation_id = ? AND id > ? AND id <= ? AND tool_calls IS NOT NULL",
+            (m["conversation_id"], start, message_id),
+        ):
+            if f'"{tool}"' in (r["tool_calls"] or ""):
+                return True
+        return False
+
     def delete(self, cid: str) -> None:
         """Soft delete: hidden from the list, recoverable from the data folder."""
         self.db.execute("UPDATE conversations SET deleted_at = ? WHERE id = ?", (utcnow(), cid))

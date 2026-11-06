@@ -647,6 +647,8 @@ class Sylvie:
                 for call in calls:
                     if call.name == "research":
                         yield {"type": "status", "text": phrase("research", text)}
+                    elif call.name == "ask_claude":
+                        yield {"type": "status", "text": phrase("claude", text)}
                     result = self._run_tool(call, tools, tctx, trace)
                     if result is None:  # invalid call
                         invalid_calls += 1

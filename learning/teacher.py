@@ -253,16 +253,19 @@ class Teacher:
         diag = c.diagnosis or {}
         rule = c.rule or {}
         tag = "personal" if diag.get("personal") or rule.get("type") == "fact" else "general"
-        self.store.add_example(
-            [{"role": "user", "content": c.question}],
-            chosen=final,
-            rejected=c.original,
-            source=source,
-            license=license_,
-            tag=tag,
-            weight=2.0 if lea_wrote_it else 1.5,  # Lea's corrections weigh most (plan, Phase 5)
-            correction_id=c.id,
-        )
+        # An answer that came from Claude never becomes training data (plan rule 4; Anthropic's terms).
+        from_claude = c.message_id is not None and self.s.convs.turn_used_tool(c.message_id, "ask_claude")
+        if not from_claude:
+            self.store.add_example(
+                [{"role": "user", "content": c.question}],
+                chosen=final,
+                rejected=c.original,
+                source=source,
+                license=license_,
+                tag=tag,
+                weight=2.0 if lea_wrote_it else 1.5,  # Lea's corrections weigh most (plan, Phase 5)
+                correction_id=c.id,
+            )
         saved_rule = None
         if rule.get("type") == "preference" and str(rule.get("text", "")).strip():
             saved_rule = {

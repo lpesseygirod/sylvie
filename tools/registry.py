@@ -76,7 +76,22 @@ def _settings_tools() -> list[dict]:
         {"query": {"type": "string", "description": "what to look for, in a few words"}},
         ["query"],
     )
-    return [change, show, past]
+    tools = [change, show, past]
+    from tools.claude import claude_cli
+
+    if claude_cli() is not None:
+        tools.append(
+            _fn(
+                "ask_claude",
+                "Hand a task to Claude (Anthropic's assistant, in the cloud) and get its answer. ONLY when Lea's "
+                "message explicitly asks for Claude ('ask Claude…', 'pregúntale a Claude', 'delegate this to "
+                "Claude'). Pass her request as a complete, self-contained task. Then give her Claude's answer "
+                "(say it's from Claude), short when spoken.",
+                {"task": {"type": "string", "description": "the full request for Claude"}},
+                ["task"],
+            )
+        )
+    return tools
 
 
 OPEN_URL = _fn(
@@ -154,7 +169,15 @@ def _number_sources(ctx: ToolContext, sources: list[dict]) -> list[dict]:
     return out
 
 
-UNTRUSTED_TOOLS = {"web_search", "open_url", "search_documents", "read_emails", "calendar_events", "research"}
+UNTRUSTED_TOOLS = {
+    "web_search",
+    "open_url",
+    "search_documents",
+    "read_emails",
+    "calendar_events",
+    "research",
+    "ask_claude",
+}
 
 
 def execute(call, ctx: ToolContext) -> ToolResult:
@@ -203,6 +226,16 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
             for s in reversed(sources):
                 text = text.replace(f"[{s['n']}] ", f"[{s['n'] + offset}] ", 1)
         return ToolResult(text, numbered)
+    if call.name == "ask_claude":
+        from tools.claude import ask, asked_for_claude
+
+        if not asked_for_claude(ctx.user_text):
+            return ToolResult(
+                "Not sent: Claude is only asked when Lea's own message asks for Claude. Answer yourself.",
+                ok=False,
+            )
+        ok, answer = ask(str(args["task"]), ctx.cfg.data_dir / "claude-workdir")
+        return ToolResult(("Claude's answer:\n" + answer) if ok else answer, ok=ok)
     if call.name == "search_past_conversations":
         if ctx.settings is None:
             return ToolResult("Past conversations can't be searched here.", ok=False)
