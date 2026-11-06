@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval finetune
+.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval finetune ui-test
 
 setup:
 	uv sync
@@ -49,6 +49,9 @@ index:
 
 app:
 	zsh scripts/build_mac_app.sh
+
+ui-test:   # the web UI in headless Chrome against the dev server; VOICE=1 adds a real spoken round trip
+	VOICE=$(VOICE) $(UV) python scripts/ui_check.py
 
 app-test:
 	swift test --package-path app/SylvieMac --scratch-path "$(HOME)/Library/Caches/SylvieBuild"

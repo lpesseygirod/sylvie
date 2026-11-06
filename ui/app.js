@@ -35,6 +35,20 @@
     return r.headers.get("content-type")?.includes("json") ? r.json() : r;
   }
 
+  // Clipboard: the modern API, or the old way when the browser refuses it (no focus, no permission).
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (_) {}
+    const ta = el("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (_) {}
+    ta.remove();
+    return ok;
+  }
+
   // ---------- status line, version chip, web search switch ----------
   function setStatus(kind, text) {
     $("#status-line .status-dot").className = "status-dot" + (kind ? " " + kind : "");
@@ -249,7 +263,7 @@
   $("#wp-edit").oninput = () => { const d = currentDoc(); if (d) { d.body = $("#wp-edit").value; d.edited = true; } };
   $("#wp-close").onclick = closePanel;
   const flash = (t) => { $("#wp-note").textContent = t; setTimeout(() => ($("#wp-note").textContent = ""), 2500); };
-  $("#wp-copy").onclick = () => { const d = currentDoc(); if (d) navigator.clipboard.writeText(d.body).then(() => flash("Copied")); };
+  $("#wp-copy").onclick = async () => { const d = currentDoc(); if (d) flash((await copyText(d.body)) ? "Copied" : "Couldn't copy"); };
   $("#wp-pdf").onclick = () => {
     $("#wp-tab-preview").click();
     if (window.webkit?.messageHandlers?.sylvie) notifyNative({ type: "print" }); else window.print();
@@ -310,7 +324,7 @@
     a.onclick = async (e) => {
       const b = e.target.closest("button");
       if (!b) return;
-      if (b.dataset.a === "copy") { navigator.clipboard.writeText(p.text); b.innerHTML = icon("check"); setTimeout(() => (b.innerHTML = icon("copy")), 1200); }
+      if (b.dataset.a === "copy" && (await copyText(p.text))) { b.innerHTML = icon("check"); setTimeout(() => (b.innerHTML = icon("copy")), 1200); }
       if (b.dataset.a === "up" || b.dataset.a === "down") {
         const v = b.dataset.a === "up" ? 1 : -1;
         const cur = b.classList.contains("on") ? null : v;
@@ -368,7 +382,7 @@
   // Copy buttons in code blocks + citation clicks
   document.addEventListener("click", (e) => {
     const c = e.target.closest(".copy-code");
-    if (c) { navigator.clipboard.writeText($("code", c.closest(".code")).textContent); c.textContent = "Copied"; setTimeout(() => (c.textContent = "Copy"), 1200); }
+    if (c) copyText($("code", c.closest(".code")).textContent).then((ok) => { c.textContent = ok ? "Copied" : "Couldn't copy"; setTimeout(() => (c.textContent = "Copy"), 1200); });
     const cite = e.target.closest(".cite");
     if (cite) {
       const link = [...(cite.closest(".msg, #wake") || document).querySelectorAll(".sources b")].find((b) => b.textContent === cite.dataset.n);

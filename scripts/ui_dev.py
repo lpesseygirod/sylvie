@@ -26,7 +26,7 @@ from core.orchestrator import Sylvie  # noqa: E402
 from core.server import create_app  # noqa: E402
 from knowledge.embeddings import HashEmbedder  # noqa: E402
 
-PORT = 8766
+PORT = int(os.environ.get("SYLVIE_UI_PORT", "8766"))
 DEMO = """Sure! Here's a quick overview of **NPV** (net present value):
 
 1. Discount each cash flow: `CF_t / (1 + r)^t`
