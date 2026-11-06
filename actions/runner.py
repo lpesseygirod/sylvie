@@ -320,6 +320,11 @@ class ActionRunner:
         if name in ("send_email", "draft_email") and not EMAIL_RE.match(str(a.get("to", "")).strip()):
             return "'to' must be one valid email address."
         if name == "run_command":
+            if re.search(r"make\s+spotify|setup_spotify|make\s+phone|make\s+pair", str(a.get("command", ""))):
+                return (
+                    "This setup needs Lea herself: it asks her to type keys or codes, so it can't run here. "
+                    "Tell her to open the Terminal app and type it there (in the Sylvie folder)."
+                )
             why = shell.never_reason(str(a.get("command", "")))
             if why:
                 return f"Refused: Sylvie never runs this ({why}). Tell Lea plainly; she can do it herself if she really wants."

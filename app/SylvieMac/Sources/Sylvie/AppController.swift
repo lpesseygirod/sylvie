@@ -189,8 +189,13 @@ final class AppController: ObservableObject {
     // MARK: Voice flow
 
     private func wakeWordHeard() {
+        wakeLog.notice("wake handled in state \(String(describing: self.state), privacy: .public)")
         switch state {
         case .idle:
+            beginListening(chime: true)
+        case .listening:
+            // Already listening (e.g. the follow-up window): start over, with the chime, so saying
+            // "Sylvie" always gets a reaction (it used to be ignored here).
             beginListening(chime: true)
         case .speaking, .thinking:
             interrupt()
@@ -262,6 +267,7 @@ final class AppController: ObservableObject {
             case .speechEnded, .maxLengthReached:
                 finishRecording()
             case .noSpeechTimeout:
+                wakeLog.notice("no speech after listening; back to waiting for the name")
                 recordingActive = false
                 state = .idle
             }
@@ -269,6 +275,7 @@ final class AppController: ObservableObject {
     }
 
     private func finishRecording() {
+        wakeLog.notice("recording done: \(String(format: "%.1f", Double(self.recording.count) / 16000), privacy: .public) s, sending")
         recordingActive = false
         let wav = WAV.encode(samples: recording)
         recording.removeAll()  // audio is dropped as soon as it's packaged
@@ -285,12 +292,18 @@ final class AppController: ObservableObject {
         turnTask = Task { [weak self] in
             guard let self else { return }
             do {
+                var first = true
                 for try await event in api.voiceTurn(wav: wav, conversationId: self.conversationId) {
+                    if first, let type = event["type"] as? String {
+                        first = false
+                        wakeLog.notice("server answered (\(type, privacy: .public))")
+                    }
                     if Task.isCancelled { break }
                     if self.voiceModeActive { self.chat?.voiceEvent(event) } else { self.panel?.send(event: event) }
                     self.apply(event)
                 }
             } catch {
+                wakeLog.notice("voice turn failed: \(error.localizedDescription, privacy: .public)")
                 if !Task.isCancelled { self.detail = "Lost the connection to the server." }
             }
             if self.state == .thinking { self.state = .idle }
