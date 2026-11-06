@@ -74,7 +74,14 @@ def test_scan_learns_facts_and_suggests_rules_switched_off(tmp_path):
     (folder / "proj" / "a.jsonl").write_text(
         json.dumps(human("too long, I prefer shorter answers for my Studiply app work")) + "\n"
     )
-    s.cfg["memory"] = {**s.cfg["memory"], "claude_history": {"enabled": True, "folder": str(folder)}}
+    s.cfg["memory"] = {
+        **s.cfg["memory"],
+        "claude_history": {
+            "enabled": True,
+            "folder": str(folder),
+            "exports_folder": str(tmp_path / "no-exports"),
+        },
+    }
     h = ClaudeHistory(s)
     assert h.scan() == 1
     s.bg.drain()
@@ -157,7 +164,14 @@ def test_unlearned_messages_survive_a_restart(tmp_path):
     folder = tmp_path / "claude"
     (folder / "p").mkdir(parents=True)
     (folder / "p" / "a.jsonl").write_text(json.dumps(human("I work best in the mornings, before ten")) + "\n")
-    s.cfg["memory"] = {**s.cfg["memory"], "claude_history": {"enabled": True, "folder": str(folder)}}
+    s.cfg["memory"] = {
+        **s.cfg["memory"],
+        "claude_history": {
+            "enabled": True,
+            "folder": str(folder),
+            "exports_folder": str(tmp_path / "no-exports"),
+        },
+    }
     s.bg.hold = lambda: True  # Sylvie is busy: nothing gets learned yet
     assert ClaudeHistory(s).scan() == 1
     s.bg.q.queue.clear()  # the server restarts: the in-memory queue is gone
