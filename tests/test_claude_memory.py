@@ -33,7 +33,7 @@ def code_note(folder, project, name, description, kind="feedback"):
     d = folder / project / "memory"
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{name}.md").write_text(
-        f'---\nname: {name}\ndescription: "{description}"\nmetadata:\n  type: {kind}\n---\n\nBody text.\n'
+        f'---\nname: {name}\ndescription: "a summary"\nmetadata:\n  type: {kind}\n---\n\n{description}\n'
     )
 
 
@@ -52,19 +52,17 @@ def test_reads_claude_ai_memories_and_claude_code_notes(tmp_path):
     code_note(
         tmp_path / "claude",
         "-Users-lea-Studiply",
-        "files",
-        "Lea never deletes files; she moves them to _to_delete/",
+        "about-lea",
+        "Lea studies CS and BBA and builds apps on her Mac.",
+        kind="user",
     )
-    code_note(
-        tmp_path / "claude",
-        "-Users-lea-Studiply",
-        "docs",
-        "Expo docs live at docs.expo.dev",
-        kind="reference",
-    )
+    for kind in ("feedback", "project", "reference"):  # coding instructions, not about Lea
+        code_note(
+            tmp_path / "claude", "-Users-lea-Studiply", kind, "Never write chart drawing code here.", kind
+        )
     (tmp_path / "claude" / "-Users-lea-Studiply" / "memory" / "MEMORY.md").write_text("- [x](x.md) — index")
     assert read_claude_code_notes(tmp_path / "claude") == [
-        ("Lea never deletes files; she moves them to _to_delete/", "-Users-lea-Studiply")
+        ("Lea studies CS and BBA and builds apps on her Mac.", "-Users-lea-Studiply")
     ]
     assert read_claude_code_notes(tmp_path / "claude", {"-Users-lea-Studiply"}) == []
 

@@ -8,8 +8,8 @@ training examples carry no system prompt (learning/dataset.py refuses any that d
 Two sources, both read locally:
 - claude.ai memory: the `memories-*.zip` part of a claude.ai data export, dropped in the exports
   folder next to the conversations zip.
-- Claude Code memory notes: `~/.claude/projects/*/memory/*.md` (one note per file; the one-line
-  `description` is offered; index files and `reference` notes are skipped).
+- Claude Code memory notes: `~/.claude/projects/*/memory/*.md`, only those about Lea herself
+  (`type: user`); feedback, project and reference notes are coding instructions and are skipped.
 """
 
 from __future__ import annotations
@@ -117,13 +117,13 @@ def read_claude_code_notes(folder: Path, exclude: set[str] = frozenset()) -> lis
         if f.name == "MEMORY.md" or f.parent.parent.name in exclude:
             continue
         try:
-            meta = _frontmatter(f.read_text(encoding="utf-8", errors="replace"))
+            text = f.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        desc = meta.get("description", "")
-        if meta.get("type") == "reference" or not (MIN_CHARS <= len(desc) <= MAX_CHARS):
-            continue
-        out.append((desc, f.parent.parent.name))
+        if _frontmatter(text).get("type") != "user":
+            continue  # feedback / project / reference notes are instructions for coding, not about Lea
+        body = re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S)
+        out += [(n, f.parent.parent.name) for n in split_notes(body)]
     return out
 
 

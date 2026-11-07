@@ -113,7 +113,7 @@ def main():
     cfg["server"] = {**cfg["server"], "port": PORT, "allowed_origins": [f"http://127.0.0.1:{PORT}"]}
     # The UI check exercises the Send? card, whatever Lea chose in config.yaml (she chose "never").
     cfg["actions"] = {**cfg["actions"], "confirm": "delete_or_send"}
-    tmp =Path(tempfile.mkdtemp(prefix="sylvie-ui-dev-"))
+    tmp = Path(tempfile.mkdtemp(prefix="sylvie-ui-dev-"))
     cfg["paths"] = {**cfg["paths"], "data_dir": str(tmp / "data")}  # notes etc. never land in Lea's data
     db = Database(tmp / "dev.db", dim=256)
     # Fake AppleScript and commands: the dev server can never control Lea's real apps.
