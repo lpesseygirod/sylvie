@@ -217,4 +217,4 @@ def test_train_now_ignores_the_window_but_still_stops_for_lea(tmp_path):
     plugged[0] = True
     later.tick()  # plugged in: starts by itself
     assert later.manual and "45" in started[-1]
-    later.proc.kill()
+    sc.proc.kill()  # the fake launcher put the process on `sc`
