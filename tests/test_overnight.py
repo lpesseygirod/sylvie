@@ -67,7 +67,7 @@ def test_good_answers_are_left_alone_and_bloat_is_rejected(tmp_path):
         [good, weak],
     )
     assert o.run_batch(2) == []  # the rewrite was much longer: not a clear improvement
-    assert o.stats == {"questions": 2, "rewritten": 1, "kept": 0, "batches": 1}
+    assert o.stats == {"questions": 2, "rewritten": 1, "kept": 0, "batches": 1, "dropped": {"too_long": 1}}
 
 
 def test_stop_flag_stops_quickly(tmp_path):
@@ -145,3 +145,29 @@ def test_deleted_chats_are_still_used_for_practice(tmp_path):
         "How do I keep my sourdough starter alive in winter?",
         "Write me a packing list for a weekend in Lisbon please.",
     ]
+
+
+def test_thinking_that_runs_out_still_writes_the_answer():
+    """Measured 2026-11-07: rewrites spent their whole budget thinking and came back empty."""
+    from core.llm import LLM, GenChunk
+
+    class Stub(LLM):
+        def __init__(self):
+            self.tokenizer, self.prompts = object(), []
+
+        def render(self, messages, tools=None, thinking=False, effort="low"):
+            return "<prompt><think>\n"
+
+        def stream(self, messages, **kw):
+            yield from (GenChunk(text=t) for t in ["Let me think", " about this…"])
+
+        def stream_prompt(self, prompt, max_tokens=1024, **kw):
+            self.prompts.append((prompt, max_tokens))
+            yield GenChunk(text="The answer is B.")
+
+    llm = Stub()
+    assert llm.complete(
+        [{"role": "user", "content": "q"}], thinking=True, max_tokens=20, answer_tokens=50
+    ) == ("The answer is B.")
+    assert llm.prompts == [("<prompt><think>\nLet me think about this…\n</think>\n\n", 50)]
+    assert llm.complete([{"role": "user", "content": "q"}], thinking=False) == "Let me think about this…"

@@ -292,11 +292,25 @@ def writing_practice(pool, store, cfg, n: int, batch: str, model_name: str, seed
             thinking=True, effort="medium", max_tokens=3000)  # fmt: skip
     auto = cfg.get_path("learning.auto_approve_judged", False)
     min_score = cfg.get_path("learning.auto_approve_min_score", 8)
+    dropped = stats["dropped"] = {}
+
+    def drop(why):
+        dropped[why] = dropped.get(why, 0) + 1
+
     for ex in weak:
-        if stop() or not ex.better:
+        if stop():
+            continue
+        if not ex.better:
+            drop("empty")  # e.g. thinking used up the token budget
             continue
         ex.better_score, _ = grade(pool.use("judge"), ex, ex.better)
-        if ex.better_score - ex.score >= 1.5 and ex.better_score >= 7 and not too_long(ex, ex.better):
+        if too_long(ex, ex.better):
+            drop("too_long")
+        elif ex.better_score - ex.score < 1.5:
+            drop("no_gain")
+        elif ex.better_score < 7:
+            drop("still_weak")
+        else:
             store.add_example(
                 [{"role": "user", "content": ex.prompt}], chosen=ex.better, rejected=ex.draft,
                 source=f"sylvie-local:{model_name}",

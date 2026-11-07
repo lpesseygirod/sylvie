@@ -275,8 +275,12 @@ class Overnight:
             )  # fmt: skip
         judge = self.pool.use("judge")
         kept = []
+        dropped = self.stats.setdefault("dropped", {})
         for it in weak:
-            if self.stop or not it.better:
+            if self.stop:
+                continue
+            if not it.better:
+                dropped["empty"] = dropped.get("empty", 0) + 1  # e.g. thinking used up the token budget
                 continue
             it.better_score, _ = grade(judge, it, it.better, self.rng)
             fixed_check = code_check(it, it.better)
@@ -285,6 +289,9 @@ class Overnight:
             if (fixed_check is not False) and clear_gain and not_bloated:
                 it.meta["verified"] = fixed_check is True
                 kept.append(it)
+            else:
+                why = "still_wrong" if fixed_check is False else "too_long" if not not_bloated else "no_gain"
+                dropped[why] = dropped.get(why, 0) + 1
         model = str(self.cfg.get_path("llm.model")).split("/")[-1]
         for it in kept:
             self.store.add_example(

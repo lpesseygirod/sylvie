@@ -283,7 +283,7 @@ def test_writing_practice_keeps_her_improved_rewrite(tmp_path):
     store = LearningStore(Database(tmp_path / "w.db", dim=8))
     cfg = Config({"learning": {"auto_approve_judged": True, "auto_approve_min_score": 8}})
     stats = writing_practice(pool, store, cfg, n=1, batch="b1", model_name="Qwen-test", seed=3, get=http)
-    assert stats == {"papers": 1, "exercises": 1, "kept": 1}
+    assert stats == {"papers": 1, "exercises": 1, "kept": 1, "dropped": {}}
     [ex] = store.examples(status="ready")
     assert ex["chosen"] == "A clearer, better draft." and ex["rejected"] == "A first draft."
     assert ex["tag"] == "general" and "CC BY 4.0 excerpt: Europe PMC PMC7" in ex["license"]

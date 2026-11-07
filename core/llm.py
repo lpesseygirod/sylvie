@@ -314,17 +314,35 @@ class LLM:
         thinking: bool = False,
         max_tokens: int = 512,
         use_cache: bool = False,
+        answer_tokens: int = 1000,
         **kw,
     ) -> str:
         """Whole answer as a string, thinking removed. Used by background jobs, which skip the
-        prompt cache so they don't push out the snapshots of Lea's conversations."""
+        prompt cache so they don't push out the snapshots of Lea's conversations.
+
+        In thinking mode `max_tokens` is the thinking budget: if she is still thinking when it runs
+        out, the thinking is closed and she writes the answer from what she has so far (up to
+        `answer_tokens` more). Without this, 3 of 4 practice rewrites came back empty (measured
+        2026-11-07: all 2,500 tokens spent thinking), so overnight practice kept almost nothing."""
         from core.toolcall import StreamSplitter
 
         sp = StreamSplitter(thinking=thinking)
+        raw = []
         for chunk in self.stream(
             messages, thinking=thinking, max_tokens=max_tokens, use_cache=use_cache, **kw
         ):
             sp.feed(chunk.text)
+            raw.append(chunk.text)
+        if thinking and answer_tokens and "</think>" not in "".join(raw):
+            close = "\n</think>\n\n"
+            prompt = self.render(
+                messages, tools=kw.get("tools"), thinking=True, effort=kw.get("effort", "low")
+            )
+            sp.feed(close)
+            for chunk in self.stream_prompt(
+                prompt + "".join(raw) + close, max_tokens=answer_tokens, thinking=False, use_cache=use_cache
+            ):
+                sp.feed(chunk.text)
         sp.flush()
         return sp.visible_text.strip()
 

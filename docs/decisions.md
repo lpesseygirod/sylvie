@@ -289,3 +289,13 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   **Dismiss** (never offered again, even from a newer export).
 - Rule 4: Claude-written text never reaches training. Kept notes only live in the system prompt, and
   the dataset builder now refuses any example that carries a system prompt (`excluded.system_prompt`).
+
+### T43 — Practice rewrites always end in an answer (found 2026-11-07, after Lea asked to keep training)
+- Measured: in thinking mode the 9B often spent the whole token budget thinking (2,500 tokens, ~3 min
+  each) and never wrote the rewrite, so it came back empty. Today 237 general questions and 17 writing
+  exercises kept 4 pairs in all; only the code-checked math (~60 per run) was really training her.
+- Now `LLM.complete` treats `max_tokens` as the thinking budget: if the thinking is still open when it
+  runs out, it is closed and she writes the answer from what she has (up to 1,000 more tokens). Her
+  own words only, so rule 4 holds.
+- Each run now records why rewrites were dropped (`dropped`: empty / no_gain / too_long / still_wrong)
+  in the night summary, so a run that keeps nothing explains itself.
