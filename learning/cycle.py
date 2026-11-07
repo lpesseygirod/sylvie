@@ -34,8 +34,8 @@ def last_adapter_time(cfg, model_id: str) -> datetime | None:
     for meta in root.glob("v[0-9][0-9][0-9]/meta.json") if root.exists() else []:
         try:
             m = json.loads(meta.read_text())
-            if not m.get("ok", True):
-                continue  # a failed run doesn't count: try again next night
+            if not m.get("ok", True) or m.get("imported"):
+                continue  # a failed or imported run doesn't count: try again next night
             times.append(datetime.fromisoformat(m["created"]).replace(tzinfo=UTC))
         except (OSError, ValueError, KeyError):
             pass
@@ -56,13 +56,16 @@ def due(cfg, store, model_id: str, now: datetime | None = None) -> tuple[bool, s
     return True, "due"
 
 
-def run_cycle(cfg, store, ab, model_id: str, open_data: Path | None, train_fn, eval_fn, measure=None) -> dict:
+def run_cycle(cfg, store, ab, model_id: str, open_data: Path | None, train_fn, eval_fn, measure=None,
+              privacy=None) -> dict:  # fmt: skip
     """train_fn(model_id, build_dir) -> adapter dir; eval_fn(label, adapter) -> report dict."""
     from evals.run import compare
     from learning.dataset import build
     from learning.promote import active_adapter
 
-    rep = build(store, cfg.data_dir / "datasets" / "builds", open_data=open_data, measure=measure)
+    rep = build(
+        store, cfg.data_dir / "datasets" / "builds", open_data=open_data, measure=measure, privacy=privacy
+    )
     adapter_dir = train_fn(model_id, rep.path)
     current = active_adapter(cfg, model_id)
     old = eval_fn("current", current.name if current else None)
@@ -80,6 +83,7 @@ def run_now(cfg, store, ab, model_id: str) -> dict:
     """The real cycle with Sylvie's settings: used by the overnight loop and `make finetune`."""
     from evals.run import run as run_eval
     from learning.dataset import token_measure
+    from learning.privacy import PersonalTerms
     from learning.train import train
 
     return run_cycle(
@@ -88,6 +92,7 @@ def run_now(cfg, store, ab, model_id: str) -> dict:
         train_fn=lambda m, b: train(m, b, iters=cfg.get_path("learning.iters", 300)),
         eval_fn=lambda label, adapter: run_eval(label, EVAL_SETS, adapter=adapter, model=model_id),
         measure=token_measure(model_id),
+        privacy=PersonalTerms.load(cfg, store.db),  # the weights only ever learn general things
     )  # fmt: skip
 
 

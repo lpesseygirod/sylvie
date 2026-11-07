@@ -1,5 +1,5 @@
 """Tiny authenticated API client for checks from the terminal (token read from Keychain, never printed).
-Usage: python scripts/api.py GET /api/health  |  python scripts/api.py CHAT "message" [conversation_id]
+Usage: python scripts/api.py GET /api/health  |  python scripts/api.py POST /api/x '{"k": 1}'  |  python scripts/api.py CHAT "message" [conversation_id]
        python scripts/api.py WAIT   (waits until Sylvie is ready)"""
 
 import json
@@ -32,6 +32,15 @@ if cmd == "WAIT":
 elif cmd == "GET":
     print(
         json.dumps(httpx.get(BASE + sys.argv[2], headers=H, timeout=30).json(), indent=1, ensure_ascii=False)
+    )
+elif cmd == "POST":
+    body = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
+    print(
+        json.dumps(
+            httpx.post(BASE + sys.argv[2], json=body, headers=H, timeout=60).json(),
+            indent=1,
+            ensure_ascii=False,
+        )
     )
 elif cmd == "CHAT":
     body = {"text": sys.argv[2], "conversation_id": sys.argv[3] if len(sys.argv) > 3 else None}

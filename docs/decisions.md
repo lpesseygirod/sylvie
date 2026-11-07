@@ -201,3 +201,32 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - Delete already only hid the conversation (`deleted_at`), so facts, preferences, style and interests were kept. Two things did skip deleted chats, and now use them: **episodic memory** (search, automatic recall and the backfill), so Sylvie still remembers what was said in them; and **night practice and fine-tune questions** (`learning/practice.py`, `learning/overnight.py`).
 - Still hidden: the conversation list, conversation search and the traces page. The UI's delete prompt now says "Sylvie keeps what she learned from it."
 - To make Sylvie forget something on purpose: "Sylvie, forget that", or the Memory page. Not built: a "delete and forget completely" option for a whole conversation.
+
+### T37 — General learning kept apart from Lea's personal data (Lea's request, 2026-11-07)
+- Lea: the general things Sylvie learns must be stored apart from her personal ones, so a base Sylvie can be given to other people and learn from them.
+- **Already true:** personal facts live in memory, not in the weights (rule 12), and training left out examples tagged personal.
+- **The gap, measured on real data:** 3 of 91 "general" examples still carried her (answers greeting "Hola Lea", written with her profile in the prompt).
+- **Privacy check** (`learning/privacy.py`), built from Sylvie's memory:
+  - Her name and surnames, any phone number or email, domains from her facts.
+  - Distinctive names from her facts (people, projects): capitalised words that aren't common in the open dataset.
+  - Case-sensitive, so the Spanish verb "lea" is not her name.
+  - On her data it flags those 3 and nothing generic (Madrid, Step, sums).
+  - Every fine-tune build runs it; the manifest records `privacy_checked`.
+- **Identity batches** are now tagged personal: they greet her and use her preferences.
+- **The general part** is `~/Library/Application Support/Sylvie/general/`, refreshed after every night or with `make general-pack`:
+  - General examples that pass the check.
+  - Adapters trained only on such data (or only on open datasets).
+  - A manifest with checksums.
+  - Every written line is checked again; any hit means nothing is written.
+- **On another Mac:** `make import-general PACK=…` adds the examples (that Sylvie keeps learning from them plus her new owner) and copies the adapters as candidate versions.
+- **Not done yet:** the code and prompts still say "Lea" in many places. Giving Sylvie to someone else also needs their name, city and voice in the config and the prompts.
+
+### T38 — "Train now", more to learn, judged auto-approval (Lea's request, 2026-11-07)
+- **Train now:**
+  - `make learn-now` (or `POST /api/schedule/now`) runs the night job immediately: practice → grade → rewrite → fine-tune → evals → blind A/B.
+  - It unloads the live models while it runs, only runs plugged in, and stops the moment Lea talks to Sylvie.
+- **More to learn:**
+  - MMLU (MIT; ~15k multiple-choice questions in 57 subjects: law, medicine, economics, history…) joins GSM8K maths and OpenAssistant questions. The letter is checked by code.
+  - Considered and left out: Aya (gated), OpenBookQA and TriviaQA (license "unknown"), ARC (CC BY-SA).
+- **Auto-approval** (`learning.auto_approve_judged: true`, Lea chose autonomy): night pairs on general questions that code verified, or that the local judge re-graded ≥ 8, train without her spot-check. Pairs from her own questions still wait.
+- **Promotion is unchanged:** a new version replaces the current one only with no eval regressions and after Lea's blind A/B.

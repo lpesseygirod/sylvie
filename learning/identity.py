@@ -4,8 +4,9 @@ Both the questions and the answers are written by Sylvie's own local model (plan
 by Claude): it invents everyday messages Lea might send (who are you, greetings, small talk, in
 EN/ES/FR), then answers them with the persona and Lea's saved preferences in the system prompt.
 The examples are stored WITHOUT that system prompt, so the adapter learns the identity itself.
-Personal facts are left out of the generation prompt (rule 12). The batch is staged until Lea
-approves it in the dashboard.
+Personal facts are left out of the generation prompt (rule 12), but the answers are written with
+Lea's persona and preferences and greet her by name, so the batch is tagged personal (2026-11-07:
+only general learning goes into the shared weights). Staged until Lea approves it in the dashboard.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ def generate(llm, store, persona_prompt: str, n: int = 30, model_name: str = "lo
             chosen=answer,
             source=f"sylvie-local:{model_name}",
             license="apache-2.0 (local model output; identity batch)",
-            tag="general",
+            tag="personal",
             status="staged",
             batch=batch,
         )

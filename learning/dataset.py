@@ -144,18 +144,33 @@ def build(
     max_chars: int = 1600,
     measure=None,
     max_tokens: int = 512,
+    privacy=None,
 ) -> BuildReport:
     """`measure(messages, tools) -> (total_tokens, prompt_tokens)` (see `token_measure`) checks each
-    example against the training length exactly as mlx-lm will tokenize it."""
+    example against the training length exactly as mlx-lm will tokenize it.
+    `privacy` (learning/privacy.PersonalTerms): a "general" example that mentions Lea (her name, a
+    phone number, her projects…) is treated as personal and left out (Lea, 2026-11-07)."""
+    from learning.privacy import example_text
+
     guard = EvalGuard()
     examples: list[Example] = []
-    excluded = {"personal": 0, "eval_overlap": 0, "bad_source": 0, "too_long": 0, "nothing_to_learn": 0}
+    excluded = {
+        "personal": 0,
+        "mentions_lea": 0,
+        "eval_overlap": 0,
+        "bad_source": 0,
+        "too_long": 0,
+        "nothing_to_learn": 0,
+    }
     for row in store.examples():
         if not row["source"].startswith(ALLOWED_SOURCE_PREFIXES):
             excluded["bad_source"] += 1
             continue
         if row["tag"] == "personal" and not include_personal:
             excluded["personal"] += 1
+            continue
+        if privacy is not None and not include_personal and privacy.is_personal(*example_text(row)):
+            excluded["mentions_lea"] += 1
             continue
         final = {"role": "assistant", "content": row["chosen"]}
         if row.get("reasoning"):
@@ -227,6 +242,7 @@ def build(
         ):
             counts[key][val] = counts[key].get(val, 0) + 1
     manifest = {"name": name, "created": datetime.now().isoformat(timespec="seconds"), "counts": counts,
-                "excluded": excluded, "include_personal": include_personal, "sha256": hashes}  # fmt: skip
+                "excluded": excluded, "include_personal": include_personal,
+                "privacy_checked": privacy is not None, "sha256": hashes}  # fmt: skip
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
     return BuildReport(out, counts, excluded)

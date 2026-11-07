@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval finetune ui-test
+.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval finetune ui-test general-pack import-general learn-now mmlu
 
 setup:
 	uv sync
@@ -67,6 +67,18 @@ spotify:   # once: lets Sylvie start songs/playlists by name (free Spotify devel
 
 eval:
 	$(UV) python evals/run.py --label base
+
+learn-now:   # practice + fine-tune now instead of waiting for the night (stops when you talk to Sylvie)
+	$(UV) python scripts/api.py POST /api/schedule/now '{"minutes": $(or $(MINUTES),180)}'
+
+mmlu:   # once: download MMLU (MIT), 15k checkable questions in 57 subjects for practice
+	$(UV) python scripts/get_mmlu.py
+
+general-pack:   # the general part of Sylvie (no personal data) → ~/Library/Application Support/Sylvie/general
+	$(UV) python -m learning.general_pack
+
+import-general:   # on another Mac: make import-general PACK=/path/to/general
+	$(UV) python -m learning.general_pack --import "$(PACK)"
 
 finetune:   # stop Sylvie first; ~2 h: build, train, evaluate, prepare the blind A/B
 	$(UV) python -m learning.cycle --force

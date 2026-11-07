@@ -19,6 +19,7 @@ Every model, dataset and dependency with its license. Checked against Hugging Fa
 |---|---|---|---|
 | OpenAssistant/oasst2 (`2023-11-05_oasst2_ready.trees.jsonl.gz`) | human-written chat data mixed into fine-tunes; overnight questions | Apache 2.0 | 2026-11-05 |
 | GSM8K (github.com/openai/grade-school-math, `train.jsonl`) | checkable overnight questions; tool-use and reasoning practice (answers by Sylvie's model, verified by code) | MIT | 2026-11-05 |
+| MMLU (cais/mmlu on Hugging Face, `mmlu.jsonl`) | checkable overnight questions in 57 subjects (multiple choice; Sylvie's answers checked by code) | MIT | 2026-11-07 |
 
 Not named in the plan (the plan asks for "open datasets whose license allows it") — Lea can veto.
 

@@ -74,6 +74,7 @@ class Scheduler:
         self.clock = clock or (lambda: datetime.now(ZoneInfo(cfg.get_path("user.timezone", "Europe/Madrid"))))
         self.proc: subprocess.Popen | None = None
         self.current: Job | None = None
+        self.manual = False  # started by "train now": ignores the night window, still stops for Lea
         self.started_at: float | None = None
         self.used_tonight = 0.0
         self.night: str | None = None
@@ -117,7 +118,7 @@ class Scheduler:
             if self.proc is not None:
                 if self.proc.poll() is not None:
                     self._finished()
-                elif not in_window(self.clock(), *self.window):
+                elif not self.manual and not in_window(self.clock(), *self.window):
                     self._stop("the night window is over")  # safety net; jobs also get a time limit
                 return
             ok, why = self.can_run()
@@ -127,13 +128,29 @@ class Scheduler:
             job = self.next_job()
             if job is None:
                 return
-            log.info("starting heavy job %s", job.name)
-            self.s.bg.interrupt()  # background learning lets go of the model first (it's re-queued)
-            self.s.unload_models()  # frees ~21 GB (LLM, Whisper, Kokoro, embeddings) for the job
-            env = {**os.environ, "HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1"}
-            logf = open(self.s.cfg.data_dir / "logs" / f"{job.name}.log", "a")  # noqa: SIM115
-            self.proc = subprocess.Popen(job.args, cwd=ROOT, env=env, stdout=logf, stderr=subprocess.STDOUT)
-            self.current, self.started_at = job, time.time()
+            self._launch(job)
+
+    def run_now(self, minutes: int = 180, finetune: bool = True) -> tuple[bool, str]:
+        """Lea asked to train now (2026-11-07). Same job as at night; still plugged in only, and it
+        stops the moment she talks to Sylvie (progress is saved per batch)."""
+        with self._lock:
+            if self.proc is not None and self.proc.poll() is None:
+                return False, f"{self.current.name if self.current else 'a job'} is already running"
+            if not self.power():
+                return False, "on battery: plug the Mac in first"
+            args = [sys.executable, "-m", "learning.overnight", "--max-minutes", str(int(minutes))]
+            self._launch(Job("overnight", args + (["--finetune"] if finetune else [])))
+            self.manual = True
+            return True, f"started for up to {minutes} min"
+
+    def _launch(self, job: Job) -> None:
+        log.info("starting heavy job %s", job.name)
+        self.s.bg.interrupt()  # background learning lets go of the model first (it's re-queued)
+        self.s.unload_models()  # frees ~21 GB (LLM, Whisper, Kokoro, embeddings) for the job
+        env = {**os.environ, "HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1"}
+        logf = open(self.s.cfg.data_dir / "logs" / f"{job.name}.log", "a")  # noqa: SIM115
+        self.proc = subprocess.Popen(job.args, cwd=ROOT, env=env, stdout=logf, stderr=subprocess.STDOUT)
+        self.current, self.started_at = job, time.time()
 
     def _finished(self) -> None:
         if self.started_at:
@@ -141,7 +158,7 @@ class Scheduler:
         log.info(
             "heavy job %s ended (code %s)", self.current.name if self.current else "?", self.proc.returncode
         )
-        self.proc, self.current, self.started_at = None, None, None
+        self.proc, self.current, self.started_at, self.manual = None, None, None, False
         threading.Thread(target=self.s.warm, daemon=True).start()  # assistant back, warm
 
     def preempt(self) -> bool:

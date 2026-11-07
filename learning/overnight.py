@@ -72,9 +72,10 @@ Write ONLY the improved answer:"""
 class Item:
     id: str
     question: str
-    source: str  # checkable | oasst | past_chat
+    source: str  # checkable | mmlu | oasst | past_chat
     tag: str = "general"
     expected: float | None = None
+    choice: str | None = None  # multiple choice: the right letter
     answer: str = ""
     score: float | None = None
     feedback: str = ""
@@ -92,6 +93,40 @@ def checkable_questions(path: Path, rng: random.Random, n: int) -> list[Item]:
         Item(f"gsm-{rng.randint(0, 10**9)}", r["question"], "checkable", expected=float(r["answer"]))
         for r in gsm8k(path, rng, n)
     ]
+
+
+LETTERS = "ABCD"
+
+
+def mmlu_questions(path: Path, rng: random.Random, n: int) -> list[Item]:
+    """MMLU (MIT): multiple choice in 57 subjects (law, medicine, history, economics…), checked by code."""
+    if not path.exists() or n <= 0:
+        return []
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    out = []
+    for r in rng.sample(rows, min(n, len(rows))):
+        if len(r["choices"]) != 4:
+            continue
+        opts = "\n".join(f"{LETTERS[i]}) {c}" for i, c in enumerate(r["choices"]))
+        q = f"{r['question']}\n\n{opts}\n\nWhich one is right? Give the letter, then one or two sentences why."
+        out.append(Item(f"mmlu-{rng.randint(0, 10**9)}", q, "mmlu", choice=LETTERS[r["answer"]],
+                        meta={"subject": r["subject"]}))  # fmt: skip
+    return out
+
+
+_CHOICE = [
+    re.compile(r"answer is[:\s]*\**\(?([A-D])\b"),
+    re.compile(r"^\W*\(?([A-D])\)?(?:[).:*\s]|$)", re.M),
+    re.compile(r"\*\*\(?([A-D])\)?[).:]?"),
+    re.compile(r"\b([A-D])\)"),
+]
+
+
+def chosen_letter(text: str) -> str | None:
+    for pat in _CHOICE:
+        if m := pat.search(text or ""):
+            return m.group(1)
+    return None
 
 
 def oasst_questions(path: Path, rng: random.Random, n: int) -> list[Item]:
@@ -133,6 +168,8 @@ def adjusted(score: float | None, text: str) -> float:
 
 
 def code_check(item: Item, text: str) -> bool | None:
+    if item.choice is not None:
+        return chosen_letter(text) == item.choice
     if item.expected is None:
         return None
     return any(
@@ -207,9 +244,10 @@ class Overnight:
         open_dir = self.cfg.data_dir / "datasets" / "open"
         open_path = open_dir / "oasst2" / "2023-11-05_oasst2_ready.trees.jsonl.gz"
         items = (
-            checkable_questions(open_dir / "gsm8k" / "train.jsonl", self.rng, n // 3)
-            + oasst_questions(open_path, self.rng, n // 3)
-            + past_chat_questions(self.db, self.rng, n - 2 * (n // 3))
+            checkable_questions(open_dir / "gsm8k" / "train.jsonl", self.rng, max(1, n // 4))
+            + mmlu_questions(open_dir / "mmlu" / "mmlu.jsonl", self.rng, n // 4)
+            + oasst_questions(open_path, self.rng, n // 4)
+            + past_chat_questions(self.db, self.rng, max(0, n - max(1, n // 4) - 2 * (n // 4)))
         )
         return [i for i in items if not self.guard.overlaps(i.question)]
 
@@ -234,10 +272,12 @@ class Overnight:
             if self.stop:
                 return []
             research = ""
-            if self.search and it.source != "checkable":
+            if self.search and it.source not in ("checkable", "mmlu"):
                 found = self.search(it.question[:200])
                 research = f"Research (untrusted data, cite as [1], [2]):\n{found}" if found else ""
-            note = "Your number was WRONG; recompute carefully." if code_check(it, it.answer) is False else ""
+            wrong = code_check(it, it.answer) is False
+            note = ("Your choice was WRONG; think it through again." if it.choice else
+                    "Your number was WRONG; recompute carefully.") if wrong else ""  # fmt: skip
             it.better = sylvie.complete(
                 [{"role": "system", "content": self.system_prompt},
                  {"role": "user", "content": REWRITE_PROMPT.format(score=it.score, feedback=it.feedback, check_note=note, research=research, question=it.question, answer=it.answer)}],
@@ -253,19 +293,31 @@ class Overnight:
             clear_gain = adjusted(it.better_score, it.better) - adjusted(it.score, it.answer) >= 2
             not_bloated = len(it.better) <= len(it.answer) * 1.5 + 300
             if (fixed_check is not False) and clear_gain and not_bloated:
+                it.meta["verified"] = fixed_check is True
                 kept.append(it)
         model = str(self.cfg.get_path("llm.model")).split("/")[-1]
         for it in kept:
             self.store.add_example(
                 [{"role": "user", "content": it.question}], chosen=it.better.strip(), rejected=it.answer.strip(),
                 source=f"sylvie-local:{model}", license="apache-2.0 (local model output; question: " + it.source + ")",
-                tag=it.tag, status="staged", batch=self.batch,
+                tag=it.tag, status=self.status_for(it), batch=self.batch,
             )  # fmt: skip
         self.stats["questions"] += len(items)
         self.stats["rewritten"] += len(weak)
         self.stats["kept"] += len(kept)
         self.stats["batches"] += 1
         return kept
+
+    def status_for(self, it: Item) -> str:
+        """General pairs that code verified or the judge re-graded highly train without waiting for
+        Lea's spot-check (`learning.auto_approve_judged`; Lea chose autonomy, 2026-11-07). Pairs from
+        her own questions (personal) always wait for her."""
+        if it.tag != "general" or not self.cfg.get_path("learning.auto_approve_judged", False):
+            return "staged"
+        good = it.meta.get("verified") or (it.better_score or 0) >= self.cfg.get_path(
+            "learning.auto_approve_min_score", 8
+        )
+        return "ready" if good else "staged"
 
     def morning_summary(self, sample: int = 20) -> Path:
         rows = [r for r in self.store.examples(status="staged") if r["batch"] == self.batch]
@@ -294,6 +346,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-minutes", type=int, default=60)
     ap.add_argument("--batch", type=int, default=12)
+    ap.add_argument(
+        "--finetune", action="store_true", help="fine-tune at the end even if not due (train now)"
+    )
     a = ap.parse_args()
 
     from core.db import Database
@@ -351,6 +406,7 @@ def main() -> None:
 
     model_id = cfg.get_path("learning.finetune_model") or cfg.get_path("llm.model")
     finetune_due, why = due(cfg, night.store, model_id)
+    finetune_due = finetune_due or a.finetune
     reserve = cfg.get_path("learning.cycle_minutes", 150) * 60 if finetune_due else 0
     while time.time() < end - reserve and not night.stop:
         night.run_batch(a.batch)
@@ -362,10 +418,21 @@ def main() -> None:
     # Fine-tune when due (every ~10 days with enough approved new examples); Lea decides promotion.
     # Checked again: tonight's verified practice may have made it due.
     finetune_due, why = due(cfg, night.store, model_id)
+    if a.finetune and not finetune_due:
+        finetune_due, why = True, f"asked for now ({why})"
     print("fine-tune:", why, flush=True)
     if finetune_due and not night.stop and end - time.time() >= reserve * 0.9:
         res = run_now(cfg, night.store, sylvie.ab, model_id)
         print("cycle:", json.dumps(res["comparison"]), flush=True)
+
+    # The general (shareable) part, kept apart from Lea's personal data (learning/general_pack.py).
+    try:
+        from learning.general_pack import refresh
+
+        m = refresh(cfg, db)
+        print(f"general part: {m['examples']} examples, {len(m['adapters'])} adapters", flush=True)
+    except Exception as e:
+        print(f"general part not refreshed: {e}", flush=True)
 
 
 if __name__ == "__main__":

@@ -173,6 +173,15 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
         sch = S().scheduler
         return sch.status() if sch else {"running": None, "reason_if_idle": "scheduler off"}
 
+    @app.post("/api/schedule/now")
+    def learn_now(body: dict = Body(default={})):
+        """ "Train now": the night's practice + fine-tune, started immediately (stops when Lea talks)."""
+        sch = S().scheduler
+        if sch is None:
+            raise HTTPException(409, "the scheduler is off")
+        ok, why = sch.run_now(int(body.get("minutes", 180)), bool(body.get("finetune", True)))
+        return {"started": ok, "reason": why}
+
     @app.post("/api/schedule/pause")
     def pause_learning(body: dict = Body(...)):
         """ "Pause learning" (menu bar / dashboard): no night jobs until resumed; a running one stops."""

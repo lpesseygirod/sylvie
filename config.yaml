@@ -113,7 +113,13 @@ schedule:
   idle_minutes: 30              # …when Lea hasn't used Sylvie for this long…
   max_hours_per_night: 5        # …plugged in (never on battery), within this cap
   finetune_every_days: 10       # plan: every 1–2 weeks, promoted only if better
-  interest_research: daily      # Lea wants Sylvie to learn more on her own (2026-11-06); off | weekly | daily
+  interest_research: daily
+learning:
+  # Lea chose autonomy (2026-11-07): night pairs on GENERAL questions that code verified, or that the
+  # local judge re-graded at least this high, train without her spot-check. Personal ones still wait.
+  auto_approve_judged: true
+  auto_approve_min_score: 8
+  cycle_minutes: 90             # time kept free at the end of a run for train + evals (9B: ~20 min train)      # Lea wants Sylvie to learn more on her own (2026-11-06); off | weekly | daily
 
 privacy:
   log_conversations: true
