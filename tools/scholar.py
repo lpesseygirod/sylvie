@@ -2,8 +2,8 @@
 
 Only the search words leave the Mac (Lea's name is stripped, as for web search). No account, no
 email address: OpenAlex's free daily budget for anonymous use is plenty for one person (each
-search costs $0.001 of a $0.10/day allowance). An API key in the Keychain (`openalex-api-key`) is
-used if Lea adds one.
+search costs $0.001 of a $0.10/day allowance). An API key in the Keychain (service Sylvie, account
+`openalex-api-key`) is used if Lea adds one.
 
     OpenAlex: https://openalex.org (CC0 data) — 250M+ works, abstracts, citation counts, open PDFs.
     Crossref: https://www.crossref.org (metadata is open) — the registry of DOIs.
@@ -73,10 +73,11 @@ def openalex_ref(w: dict) -> Ref:
 
 
 def _api_key() -> str | None:
+    """Lea's optional OpenAlex key, from the Keychain (service "Sylvie", account "openalex-api-key")."""
     try:
-        from core.auth import get_secret
+        import keyring
 
-        return get_secret("openalex-api-key")
+        return keyring.get_password("Sylvie", "openalex-api-key")
     except Exception:
         return None
 
