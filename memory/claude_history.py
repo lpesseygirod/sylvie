@@ -206,6 +206,9 @@ class ClaudeHistory:
         ).expanduser()
         self._stop = threading.Event()
         self._lock = threading.Lock()
+        from memory.claude_memory import ClaudeMemory
+
+        self.notes = ClaudeMemory(sylvie)  # Claude's own notes about Lea: suggestions only
 
     def _get(self, key: str, default):
         rows = self.s.db.query("SELECT value FROM meta WHERE key = ?", (key,))
@@ -291,6 +294,7 @@ class ClaudeHistory:
             while not self._stop.is_set():
                 try:
                     self.scan()
+                    self.notes.scan(self.folder, self.exports, self.exclude)
                 except Exception:
                     log.exception("reading Claude Code history failed")
                 self._stop.wait(self.every)

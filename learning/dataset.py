@@ -159,12 +159,18 @@ def build(
         "mentions_lea": 0,
         "eval_overlap": 0,
         "bad_source": 0,
+        "system_prompt": 0,
         "too_long": 0,
         "nothing_to_learn": 0,
     }
     for row in store.examples():
         if not row["source"].startswith(ALLOWED_SOURCE_PREFIXES):
             excluded["bad_source"] += 1
+            continue
+        if any(m.get("role") == "system" for m in row["messages"]):
+            # The system prompt carries Lea's profile and memory, including notes Claude wrote
+            # (memory/claude_memory.py): it never goes into training (rule 4).
+            excluded["system_prompt"] += 1
             continue
         if row["tag"] == "personal" and not include_personal:
             excluded["personal"] += 1

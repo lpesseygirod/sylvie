@@ -264,3 +264,13 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   - ~64 GB is streamed and unpacked on the fly; nothing but the library stays.
   - Ranking: the whole question as a title or other name first; then all key words, dropping the most common ones (no slow "any word" search); then re-ranked by popularity. Disambiguation pages are skipped.
   - The new library is built next to the old one and swapped in; the old one goes to `_to_delete/`.
+
+### T40 — Claude's own memory notes, as suggestions (Lea's answer, 2026-11-07: "Yes, as suggestions")
+- Sources, read locally: the `memories-*.zip` of a claude.ai export (dropped in `Claude exports/`) and
+  Claude Code's per-project notes (`~/.claude/projects/*/memory/*.md`, one-line description; index
+  and `reference` notes skipped). Checked with the Claude history scan, every 5 minutes.
+- Claude wrote them, so none is used until Lea decides in About Lea → Facts: **Keep** (becomes a fact,
+  source `claude-memory`), **Use as a rule** (an active preference, scope `claude-memory`) or
+  **Dismiss** (never offered again, even from a newer export).
+- Rule 4: Claude-written text never reaches training. Kept notes only live in the system prompt, and
+  the dataset builder now refuses any example that carries a system prompt (`excluded.system_prompt`).

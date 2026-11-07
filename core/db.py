@@ -88,6 +88,15 @@ CREATE TABLE IF NOT EXISTS preferences (
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
 );
+-- Claude's own memory notes about Lea, waiting for her decision (memory/claude_memory.py)
+CREATE TABLE IF NOT EXISTS memory_suggestions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL UNIQUE,
+    origin TEXT NOT NULL,        -- claude.ai | claude-code:<project>
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending | fact | rule | dismissed
+    created_at TEXT NOT NULL,
+    decided_at TEXT
+);
 CREATE TABLE IF NOT EXISTS interests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     topic TEXT NOT NULL UNIQUE,

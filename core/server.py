@@ -450,6 +450,24 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
         S().memory.restore(fid)
         return {"ok": True}
 
+    # Claude's own notes about Lea: shown as suggestions, used only once she keeps one.
+    @app.get("/api/memory/suggestions")
+    def memory_suggestions():
+        from memory.claude_memory import ClaudeMemory
+
+        return ClaudeMemory(S()).list()
+
+    @app.post("/api/memory/suggestions/{sid}")
+    def memory_suggestion_decide(sid: int, body: dict = Body(...)):
+        from memory.claude_memory import ClaudeMemory
+
+        try:
+            return ClaudeMemory(S()).decide(sid, str(body.get("decision", "")), body.get("text"))
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        except KeyError as e:
+            raise HTTPException(404, "no such suggestion") from e
+
     @app.get("/api/profile")
     def profile():
         s = S()

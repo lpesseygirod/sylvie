@@ -634,8 +634,18 @@
     const item = (html, ...buttons) => { const r = el("div", "item", `<div class="txt">${html}</div>`); buttons.forEach((b) => r.appendChild(b)); return r; };
     body.innerHTML = "";
     if (memTab === "facts") {
-      const facts = await api("/api/memory?all=true");
-      if (!facts.length) body.textContent = "Nothing yet. Sylvie remembers things you tell her about yourself.";
+      const [facts, sugg] = await Promise.all([api("/api/memory?all=true"), api("/api/memory/suggestions")]);
+      if (sugg.length) {
+        body.appendChild(el("p", "meta", `From Claude's memory · ${sugg.length} to review. Claude wrote these, so Sylvie uses one only if you keep it.`));
+        for (const g of sugg) {
+          const decide = (decision) => api(`/api/memory/suggestions/${g.id}`, { method: "POST", body: { decision } });
+          const keep = btn("Keep", () => decide("fact"));
+          keep.className = "btn btn-primary";
+          body.appendChild(item(`<span class="inactive">${esc(g.text)}</span><div class="meta">Suggested from ${g.origin === "claude.ai" ? "claude.ai memory" : "Claude Code notes"}</div>`,
+            keep, btn("Use as a rule", () => decide("rule")), btn("Dismiss", () => decide("dismissed"))));
+        }
+      }
+      if (!facts.length && !sugg.length) body.textContent = "Nothing yet. Sylvie remembers things you tell her about yourself.";
       for (const f of facts.filter((x) => !x.superseded_by)) {
         const r = item(`<span class="${f.active ? "" : "inactive"}">${esc(f.text)}</span><div class="meta">${esc(f.category)} · ${f.updated_at.slice(0, 10)}${f.sensitive ? " · sensitive" : ""}</div>`,
           f.active ? btn("Edit", async () => { const t = prompt("Edit fact", f.text); if (t) await api(`/api/memory/${f.id}`, { method: "PATCH", body: { text: t } }); })
@@ -683,7 +693,8 @@
       body.appendChild(add);
       if (!prof.preferences.length) body.appendChild(el("p", "meta", "Tell Sylvie things like “shorter please” or “no emojis” and they'll show up here."));
       for (const p of prof.preferences) {
-        const from = p.scope === "claude" ? `<div class="meta">${p.active ? "From your Claude chats" : "Suggested from your Claude chats · off until you turn it on"}</div>` : "";
+        const from = p.scope === "claude" ? `<div class="meta">${p.active ? "From your Claude chats" : "Suggested from your Claude chats · off until you turn it on"}</div>`
+          : p.scope === "claude-memory" ? `<div class="meta">From Claude's memory</div>` : "";
         body.appendChild(item(`<span class="${p.active ? "" : "inactive"}">${esc(p.text)}</span>${from}${p.source_quote ? `<div class="meta">“${esc(p.source_quote)}”</div>` : ""}`,
           btn(p.active ? "Turn off" : "Turn on", () => api(`/api/preferences/${p.id}`, { method: "PATCH", body: { active: !p.active } }))));
       }
