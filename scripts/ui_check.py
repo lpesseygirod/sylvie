@@ -270,6 +270,27 @@ async def test_chat(t: Tab, shots: Path):
         r["off"] == "Web search off" and r["infoOff"] and r["on"] == "Web search on",
         r,
     )
+    r = await t.js(
+        HELPERS
+        + """
+      $('#open-memory').click(); await wait(500);
+      $('[data-tab=facts]').click(); await wait(400);
+      const before = $('#memory-body').innerText;
+      const row = [...$$('#memory-body .item')].find((x) => x.innerText.includes('half marathon'));
+      [...row.querySelectorAll('button')].find((b) => b.textContent === 'Keep').click(); await wait(600);
+      const after = $('#memory-body').innerText;
+      const facts = await (await fetch('/api/memory')).json();
+      $('#memory-dialog').close();
+      return { before, after, kept: facts.some((f) => f.text.includes('half marathon') && f.source === 'claude-memory') };"""
+    )
+    check(
+        "Claude's memory notes wait for review; Keep makes one a fact",
+        "From Claude's memory" in r["before"]
+        and "Use as a rule" in r["before"]
+        and "to review" not in r["after"]
+        and r["kept"],
+        r,
+    )
 
     cid = await t.js(
         "return new URLSearchParams($('#voice-btn').search).get('c')".replace("$(", "document.querySelector(")

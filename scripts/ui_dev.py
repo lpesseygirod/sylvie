@@ -129,6 +129,10 @@ def main():
     s.interests.bump("Formula 1", 3)
     s.style.observe("mixes_languages", "Mixes Spanish and English in the same message", "vale, let's go")
     s.prefs.add("Keep answers short unless I ask for detail.", source_quote="shorter please")
+    s.db.execute(  # one of Claude's memory notes, waiting for Lea's decision
+        "INSERT INTO memory_suggestions(text, origin, created_at) VALUES (?, 'claude.ai', '2026-11-07')",
+        ("Lea is training for a half marathon in March.",),
+    )
     app = create_app(sylvie=s, token="dev", warm=False)
     uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
 
