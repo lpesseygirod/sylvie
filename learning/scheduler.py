@@ -75,6 +75,9 @@ class Scheduler:
         self.proc: subprocess.Popen | None = None
         self.current: Job | None = None
         self.manual = False  # started by "train now": ignores the night window, still stops for Lea
+        self.pending_now: tuple[int, bool] | None = (
+            None  # "train now" asked on battery: starts when plugged in
+        )
         self.started_at: float | None = None
         self.used_tonight = 0.0
         self.night: str | None = None
@@ -121,6 +124,9 @@ class Scheduler:
                 elif not self.manual and not in_window(self.clock(), *self.window):
                     self._stop("the night window is over")  # safety net; jobs also get a time limit
                 return
+            if self.pending_now and self.power():
+                self._start_now(*self.pending_now)
+                return
             ok, why = self.can_run()
             self.last_reason = why
             if not ok:
@@ -137,11 +143,15 @@ class Scheduler:
             if self.proc is not None and self.proc.poll() is None:
                 return False, f"{self.current.name if self.current else 'a job'} is already running"
             if not self.power():
-                return False, "on battery: plug the Mac in first"
-            args = [sys.executable, "-m", "learning.overnight", "--max-minutes", str(int(minutes))]
-            self._launch(Job("overnight", args + (["--finetune"] if finetune else [])))
-            self.manual = True
+                self.pending_now = (int(minutes), finetune)
+                return False, "on battery: it will start by itself as soon as the Mac is plugged in"
+            self._start_now(int(minutes), finetune)
             return True, f"started for up to {minutes} min"
+
+    def _start_now(self, minutes: int, finetune: bool) -> None:
+        args = [sys.executable, "-m", "learning.overnight", "--max-minutes", str(minutes)]
+        self._launch(Job("overnight", args + (["--finetune"] if finetune else [])))
+        self.manual, self.pending_now = True, None
 
     def _launch(self, job: Job) -> None:
         log.info("starting heavy job %s", job.name)
@@ -184,6 +194,7 @@ class Scheduler:
             "running": self.current.name if self.current else None,
             "reason_if_idle": self.last_reason,
             "used_tonight_min": round(self.used_tonight / 60, 1),
+            "waiting_for_power": self.pending_now is not None,
             "window": self.window,
         }
 

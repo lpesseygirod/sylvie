@@ -207,4 +207,14 @@ def test_train_now_ignores_the_window_but_still_stops_for_lea(tmp_path):
     sc.tick()  # outside the night window, but asked for: keeps running
     assert sc.status()["running"] == "overnight"
     assert sc.preempt() and sc.status()["running"] is None
-    assert Scheduler(s, power=lambda: False).run_now(60) == (False, "on battery: plug the Mac in first")
+    plugged = [False]
+    later = Scheduler(s, power=lambda: plugged[0], clock=lambda: datetime(2026, 11, 7, 15, 0))
+    later._launch = sc._launch
+    ok, why = later.run_now(45)
+    assert not ok and "plugged in" in why and later.status()["waiting_for_power"]
+    later.tick()
+    assert later.proc is None  # still on battery
+    plugged[0] = True
+    later.tick()  # plugged in: starts by itself
+    assert later.manual and "45" in started[-1]
+    later.proc.kill()
