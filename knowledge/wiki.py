@@ -34,7 +34,8 @@ PASSAGE_CHARS = 1000
 MAX_PASSAGES = 8  # the start of each article; the full article is fetched online when needed
 SNAPSHOT = "20231101"
 LANGS = ("en", "es", "fr")
-POPULARITY_WEIGHT = 0.6  # × log(1 + pages linking to it): Canberra beats "Capital gains tax in Australia"
+POPULARITY_WEIGHT = 0.6
+COMMON_DF = 100_000  # a word in more articles than this doesn't narrow a search down  # × log(1 + pages linking to it): Canberra beats "Capital gains tax in Australia"
 
 # Words that carry no meaning for a search, in the three languages (kept short on purpose).
 STOP = set(
@@ -247,6 +248,21 @@ class Wiki:
             (lang, phrase, lang, phrase),
         ).fetchone()
 
+    def snapshot(self) -> str:
+        """The date of the Wikipedia copy the library was built from, e.g. "2026-11-01"."""
+        dates = [m for (k,) in self.conn.execute("SELECT path FROM indexed_files LIMIT 400")
+                 for m in re.findall(r"(?<!\d)(20\d{6})(?!\d)", k)]  # fmt: skip
+        d = max(dates, default="")
+        return f"{d[:4]}-{d[4:6]}-{d[6:]}" if d else "unknown date"
+
+    def _df(self, words: list[str], lang: str) -> dict[str, int]:
+        out = {}
+        for w in words:
+            r = self.conn.execute(f"SELECT doc FROM vocab_{lang} WHERE term = ?", (_fold(w),)).fetchone()
+            if r:
+                out[w] = r[0]
+        return out
+
     def _rarest_first(self, words: list[str], lang: str) -> list[str]:
         """Drops words the library doesn't have; rarest (most telling) first."""
         df = {}
@@ -268,16 +284,40 @@ class Wiki:
             found[rowid] = Passage(title, url, lang, text, score)
             per_article[aid] = per_article.get(aid, 0) + 1
 
-        # 1. The whole question is a title or another name of one ("marie curie", "jfk").
+        def add_article(r, score: float, passages: int = 1) -> bool:
+            before = len(found)
+            for p in c.execute(
+                f"SELECT rowid, text, article_id FROM {table} WHERE rowid >= ? AND rowid < ? ORDER BY rowid",
+                (r["first_passage"], r["first_passage"] + passages),
+            ).fetchall():
+                if p["article_id"] == r["id"]:
+                    add(p["rowid"], r["id"], r["title"], r["url"], p["text"], score)
+            return len(found) > before
+
+        # 1. The whole question is a title or another name of one ("marie curie", "jfk"): its start.
         if r := self._exact(" ".join(words), lang):
-            p = c.execute(f"SELECT text FROM {table} WHERE rowid = ?", (r["first_passage"],)).fetchone()
-            if p:
-                add(r["first_passage"], r["id"], r["title"], r["url"], p["text"], 1000.0)
-        # 2. All key words, then without the most common ones; re-ranked by popularity.
+            add_article(r, 1000.0, passages=2)
         ranked = self._rarest_first(words, lang)
+        df = self._df(ranked, lang)
+        # 1b. Otherwise the most telling part of it that is a title: "how does photosynthesis work" →
+        # Photosynthesis; "capital of Australia" → Australia (measured: word search alone found neither).
+        if not found and len(words) > 1:
+            grams = [
+                (n, words[i : i + n]) for n in range(len(words) - 1, 0, -1) for i in range(len(words) - n + 1)
+            ]
+            grams.sort(key=lambda g: (-g[0], min(df.get(w, 10**9) for w in g[1])))
+            for _, g in grams[:12]:
+                r = self._exact(" ".join(g), lang)
+                if r is not None and (r["popularity"] or 0) >= 20 and add_article(r, 900.0, passages=2):
+                    break
+        # 2. All key words, then without the most common ones; re-ranked by popularity. A level whose
+        # rarest word is in 100k+ articles is skipped once something was found: slow (bm25 over all of
+        # them, "paris" took 5.6 s) and no better than what's there.
         for m in range(len(ranked), 0, -1):
             if len(found) >= k or (m == 1 and len(ranked) > 2):
                 break
+            if found and (df.get(ranked[0], 0) > COMMON_DF or len(words) == 1):
+                break  # (a one-word question that is a title: the article itself is the answer)
             q = " AND ".join(f'"{w}"' for w in ranked[:m])
             rows = []
             for r in c.execute(

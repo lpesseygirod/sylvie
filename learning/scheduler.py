@@ -58,6 +58,12 @@ class Job:
     args: list[str]
 
 
+def _alive(pid: int) -> bool:
+    """Running (a finished process waiting to be collected, a "zombie", counts as gone)."""
+    stat = subprocess.run(["/bin/ps", "-p", str(pid), "-o", "stat="], capture_output=True, text=True).stdout
+    return bool(stat.strip()) and not stat.strip().startswith("Z")
+
+
 class Scheduler:
     def __init__(self, sylvie, check_every: float = 60.0, power=on_ac_power, clock=None):
         self.s = sylvie
@@ -180,6 +186,8 @@ class Scheduler:
     def _pidfile(self) -> Path:
         return Path(self.s.cfg.data_dir) / "logs" / "heavy-job.pid"
 
+    leftover_grace = 20.0  # seconds a leftover job gets to save and exit before it's killed
+
     def stop_leftover(self) -> None:
         """A job started by a previous server (restarted meanwhile) would keep running unseen and
         double the memory use with the next one (seen 2026-11-07). Stop it; it saves progress."""
@@ -193,6 +201,18 @@ class Scheduler:
         if "learning." in cmd:
             log.info("stopping a leftover heavy job (pid %s)", pid)
             os.kill(pid, signal.SIGTERM)
+            # Like _stop: it gets 20 s to save and exit, then it's killed. Measured 2026-11-07: in the
+            # middle of a long rewrite it didn't stop for 7+ minutes and slowed Lea's chat to minutes.
+            end = time.time() + self.leftover_grace
+            while time.time() < end:
+                time.sleep(0.2)
+                if not _alive(pid):
+                    return
+            log.warning("leftover heavy job %s didn't stop: killing it", pid)
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
 
     def _keep_awake(self, pid: int) -> None:
         """The Mac doesn't fall asleep mid-training (only while this job runs, and only on power)."""

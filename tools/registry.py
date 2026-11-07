@@ -6,6 +6,7 @@ is wrapped in <untrusted> so the model treats it as data.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
 from tools.calc import calculate
@@ -34,10 +35,10 @@ WEB_SEARCH = _fn(
 )
 WIKIPEDIA = _fn(
     "wikipedia",
-    "Look something up in Sylvie's offline Wikipedia (English, Spanish, French; snapshot Nov 2023): instant and "
+    "Look something up in Sylvie's offline Wikipedia (English, Spanish, French; snapshot {snapshot}): instant and "
     "private, nothing leaves the Mac. Use FIRST for facts about the world: people, history, places, science, "
     "definitions, how things work. Use web_search instead for anything recent or changing (news, prices, "
-    "schedules, weather, after 2023). Each result has the article's URL: open_url it if you need the full article.",
+    "schedules, weather, after the snapshot). Each result has the article's URL: open_url it if you need the full article.",
     {
         "query": {"type": "string", "description": "the topic or question, a few key words"},
         "language": {"type": "string", "description": "en, es or fr (the language of Lea's question)"},
@@ -197,8 +198,12 @@ def available_tools(ctx: ToolContext) -> list[dict]:
             tools.append(RESEARCH)
     if _scholar_on(ctx):
         tools += [FIND_PAPERS, CHECK_REFERENCE]
-    if _wiki(ctx) is not None:
-        tools.insert(0, WIKIPEDIA)
+    if (wiki := _wiki(ctx)) is not None:
+        spec = json.loads(json.dumps(WIKIPEDIA))
+        spec["function"]["description"] = spec["function"]["description"].replace(
+            "{snapshot}", wiki.snapshot()
+        )
+        tools.insert(0, spec)
     if _zotero(ctx) is not None:
         tools.append(ZOTERO)
     if ctx.docs is not None and ctx.docs.stats()["chunks"] > 0:
@@ -388,7 +393,7 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
         numbered = _number_sources(ctx, srcs)
         blocks = [f"[{s['n']}] {h.title} ({h.url})\n{h.text}" for s, h in zip(numbered, hits, strict=True)]
         return ToolResult(
-            "From the offline Wikipedia (snapshot Nov 2023; cite as [n]):\n<untrusted>\n"
+            f"From the offline Wikipedia (snapshot {wiki.snapshot()}; cite as [n]):\n<untrusted>\n"
             + "\n\n".join(blocks)
             + "\n</untrusted>",
             numbered,

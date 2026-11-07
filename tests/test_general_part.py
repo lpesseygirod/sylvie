@@ -280,3 +280,11 @@ def test_a_job_left_by_a_previous_server_is_stopped(tmp_path):
     time.sleep(0.3)
     assert other.poll() is None
     other.kill()
+    # One that ignores the request to stop (busy in a long generation) is killed after the grace time.
+    stubborn = subprocess.Popen([sys.executable, "-c", "import signal, time; signal.signal(signal.SIGTERM, "
+                                 "signal.SIG_IGN); time.sleep(60)", "learning.fake"])  # fmt: skip
+    time.sleep(0.5)
+    sc._pidfile().write_text(str(stubborn.pid))
+    sc.leftover_grace = 1.0
+    sc.stop_leftover()
+    assert stubborn.wait(timeout=5) == -9

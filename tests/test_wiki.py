@@ -112,6 +112,8 @@ DUMP = [
     {"title": "Marie Curie", "namespace": 0, "text": "Marie Curie was a physicist and chemist.", "incoming_links": 9000,
      "redirect": [{"namespace": 0, "title": "Madame Curie"}, {"namespace": 0, "title": "Maria Skłodowska"}]},
     {"title": "Mercury (disambiguation)", "namespace": 0, "text": "Mercury may refer to: a planet, an element."},
+    {"title": "Photosynthesis", "namespace": 0, "text": "Photosynthesis is how plants turn light into chemical energy.", "incoming_links": 30000},
+    {"title": "Robin Hill (biochemist)", "namespace": 0, "text": "Robin Hill's work on photosynthesis: the Hill reaction.", "incoming_links": 50},
     {"title": "Talk:Canberra", "namespace": 1, "text": "Discussion."},
 ]  # fmt: skip
 
@@ -135,6 +137,8 @@ def test_dump_lines_are_parsed_across_bz2_streams_and_chunks():
         "Capital gains tax in Australia",
         "Marie Curie",
         "Mercury (disambiguation)",
+        "Photosynthesis",
+        "Robin Hill (biochemist)",
     ]
     assert got[0]["redirects"] == ["Canberra, Australia"] and got[0]["popularity"] == 50000
 
@@ -152,10 +156,13 @@ def test_build_from_dump_swaps_in_the_new_library_and_ranks_by_popularity(tmp_pa
 
     stats = wiki_dump.build(data, ["en"], date="20261101", fetch=fetch, pool_cls=ThreadPoolExecutor,
                             list_shards=lambda d, lang: [f"https://x/{lang}-0.json.bz2"])  # fmt: skip
-    assert stats == {"en": 3}  # the disambiguation page and the talk page are left out
+    assert stats == {"en": 5}  # the disambiguation page and the talk page are left out
     assert list((data / "_to_delete").glob("wikipedia-replaced-*.db"))  # old one kept, not deleted
     w = Wiki(data / "wikipedia.db")
     assert w.search("capital of Australia", "en")[0].title == "Canberra"  # popular beats wordy
     assert w.search("Madame Curie", "en")[0].title == "Marie Curie"  # another name of the article
     assert w.search("Madame Curie", "en")[0].url == "https://en.wikipedia.org/wiki/Marie_Curie"
     assert w.done("en/cirrus-20261101/en-0.json.bz2")
+    # A title inside the question beats articles that merely share its words.
+    assert w.search("how does photosynthesis work", "en")[0].title == "Photosynthesis"
+    assert w.snapshot() == "2026-11-01"

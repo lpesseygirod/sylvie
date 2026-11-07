@@ -264,6 +264,10 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   - ~64 GB is streamed and unpacked on the fly; nothing but the library stays.
   - Ranking: the whole question as a title or other name first; then all key words, dropping the most common ones (no slow "any word" search); then re-ranked by popularity. Disambiguation pages are skipped.
   - The new library is built next to the old one and swapped in; the old one goes to `_to_delete/`.
+- **Built, 2026-11-07 (16:00–18:12):** 103 shards, 14.7M articles (en 9,991,780, fr 2,719,392, es 2,026,320), 66 GB. Paris, DNA, Moon, Marie Curie are all there now.
+  - Two search fixes after testing on it: (1) when the whole question isn't a title, its most telling part that is one comes first ("how does photosynthesis work" → Photosynthesis, "capital of Australia" → Australia, whose start names Canberra); (2) words found in 100k+ articles no longer trigger a full word search once a title matched ("Paris" took 5.6 s, now 14 ms; DNA 2.1 s → 3 ms).
+  - The tool states the library's real snapshot date (read from the library).
+  - The old library (45 GB) and the 2023 parquet download (18 GB) are in `_to_delete/`.
 
 ### T42 — Academic writing: Lea's Zotero, research papers, real citations, writing practice (Lea's request, 2026-11-07)
 - Lea: add scientific sources "like Zotero and JSTOR" so Sylvie writes better essays; and rather than downloading papers, let her learn *how* to write from them.
