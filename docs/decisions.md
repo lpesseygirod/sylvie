@@ -195,3 +195,9 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **Measured on the 9B (same day):** 62–74 tokens/s, first word 0.2–0.6 s in chat, voice first sentence 0.8 s (transcription 0.3 s); the calculator and web search still work (compound interest correct via the calculator; Madrid weather from 5 sources in 5.3 s).
 - **Trade-offs:** less capable on hard questions; it follows formatting rules less well (it wrapped one-line results in a document, so the chat now shows documents of a line or two inline and only opens the panel for real ones). The 27B fine-tune v004 doesn't apply to the 9B; night training now targets the 9B (`learning.finetune_model` follows `llm.model`). Going back is one line in `config.yaml` (the 27B is still downloaded).
 - **Also:** Sylvie's server now starts SearXNG itself (it only ran in a Terminal tab, so search was off after the Mac restarted). Lea's English voice is Isabella.
+
+### T36 — Deleting a conversation keeps what Sylvie learned (Lea's request, 2026-11-07)
+- Lea: "I want to be able to delete conversations but Sylvie not to have lost the knowledge learned from it."
+- Delete already only hid the conversation (`deleted_at`), so facts, preferences, style and interests were kept. Two things did skip deleted chats, and now use them: **episodic memory** (search, automatic recall and the backfill), so Sylvie still remembers what was said in them; and **night practice and fine-tune questions** (`learning/practice.py`, `learning/overnight.py`).
+- Still hidden: the conversation list, conversation search and the traces page. The UI's delete prompt now says "Sylvie keeps what she learned from it."
+- To make Sylvie forget something on purpose: "Sylvie, forget that", or the Memory page. Not built: a "delete and forget completely" option for a whole conversation.

@@ -4,7 +4,9 @@ Facts (memory/store.py) keep what Sylvie learned about Lea; this keeps the conve
 Lea, 2026-11-06: "if I said something even 2 months ago she should remember". Each exchange (Lea's
 message + Sylvie's answer) is one episode, indexed with FTS5 and an embedding. Every turn, the few
 most relevant episodes from *other* conversations are given to Sylvie with their dates, and she has
-a tool to search on purpose. Episodes of deleted conversations are never returned.
+a tool to search on purpose. Deleting a conversation only hides it from the list: Sylvie still
+remembers what was said in it (Lea, 2026-11-07: "delete conversations but Sylvie not lose the
+knowledge learned from it").
 """
 
 from __future__ import annotations
@@ -108,8 +110,7 @@ class Episodes:
         out = []
         for eid, sim in sorted(sims.items(), key=lambda x: -x[1]):
             r = self.db.one(
-                "SELECT e.* FROM episodes e JOIN conversations c ON c.id = e.conversation_id "
-                "WHERE e.id = ? AND c.deleted_at IS NULL",
+                "SELECT * FROM episodes WHERE id = ?",
                 (eid,),
             )
             if r is None or r["conversation_id"] == exclude_conversation:
@@ -133,8 +134,7 @@ class Episodes:
         """Indexes past exchanges that aren't episodes yet (conversations before this feature)."""
         rows = self.db.query(
             "SELECT m.id, m.conversation_id, m.content, m.created_at FROM messages m "
-            "JOIN conversations c ON c.id = m.conversation_id "
-            "WHERE m.role = 'user' AND c.deleted_at IS NULL "
+            "WHERE m.role = 'user' "
             "AND m.id NOT IN (SELECT user_message_id FROM episodes WHERE user_message_id IS NOT NULL) "
             "ORDER BY m.id LIMIT ?",
             (limit,),

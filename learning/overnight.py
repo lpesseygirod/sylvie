@@ -112,7 +112,7 @@ def oasst_questions(path: Path, rng: random.Random, n: int) -> list[Item]:
 def past_chat_questions(db, rng: random.Random, n: int) -> list[Item]:
     rows = db.query(
         "SELECT content FROM messages WHERE role = 'user' AND channel IN ('chat','voice','phone') AND length(content) > 25 "
-        "AND conversation_id IN (SELECT id FROM conversations WHERE deleted_at IS NULL) ORDER BY id DESC LIMIT 400"
+        "ORDER BY id DESC LIMIT 400"
     )
     qs = [r["content"] for r in rows]
     return [

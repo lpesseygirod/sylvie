@@ -85,7 +85,8 @@ class Conversations:
         return False
 
     def delete(self, cid: str) -> None:
-        """Soft delete: hidden from the list, recoverable from the data folder."""
+        """Soft delete: hidden from the list, recoverable from the data folder. What Sylvie learned from
+        it (facts, profile, episodes, night practice) is kept on purpose."""
         self.db.execute("UPDATE conversations SET deleted_at = ? WHERE id = ?", (utcnow(), cid))
 
     def set(self, cid: str, **fields) -> None:

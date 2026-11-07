@@ -109,7 +109,7 @@
       const [ren, del] = row.querySelectorAll("button");
       ren.onclick = () => renameConv(row, c);
       del.onclick = async () => {
-        if (!confirm(`Delete "${c.title}"?`)) return;
+        if (!confirm(`Delete "${c.title}"? Sylvie keeps what she learned from it.`)) return;
         await api(`/api/conversations/${c.id}`, { method: "DELETE" });
         if (S.cid === c.id) newChat();
         loadConvs();
