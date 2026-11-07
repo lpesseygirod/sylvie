@@ -345,7 +345,7 @@ def main() -> None:
     from core.orchestrator import Sylvie
     from core.toolcall import ToolCall
     from learning.store import LearningStore
-    from tools.registry import execute
+    from tools.registry import available_tools, execute
 
     cfg = load_config()
     sylvie = Sylvie.build(cfg)  # for prompts/stores only; its LLM stays unloaded (the pool loads models)
@@ -353,8 +353,17 @@ def main() -> None:
     ctx = sylvie.tool_context()
 
     def search(q: str) -> str | None:
-        r = execute(ToolCall("web_search", {"query": q}), ctx)
-        return r.content if r.ok else None
+        # Offline Wikipedia first (instant, nothing leaves the Mac), the web when it has nothing.
+        found = []
+        if any(t["function"]["name"] == "wikipedia" for t in available_tools(ctx)):
+            r = execute(ToolCall("wikipedia", {"query": q}), ctx)
+            if r.ok and r.sources:
+                found.append(r.content)
+        if not found:
+            r = execute(ToolCall("web_search", {"query": q}), ctx)
+            if r.ok:
+                found.append(r.content)
+        return "\n\n".join(found) or None
 
     night = Overnight(
         cfg, LearningStore(db), db, ModelPool(cfg), sylvie.current_system_prompt(), search=search

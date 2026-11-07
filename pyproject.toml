@@ -13,6 +13,7 @@ dependencies = [
     "mlx-lm>=0.32.2",
     "mlx-whisper>=0.4.3",
     "phonemizer-fork>=3.3.2",
+    "pyarrow>=26.0.1",
     "pypdf>=6.21.4",
     "python-multipart>=0.0.33",
     "pyyaml>=6.0.3",

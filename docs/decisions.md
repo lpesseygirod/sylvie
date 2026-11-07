@@ -245,3 +245,17 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **Also:**
   - A server restart left its training job running unseen, so a second job doubled memory use. The scheduler now writes a pid file and stops a leftover job when it starts.
   - Some MMLU lines contain Unicode line separators, so they are now read with `split("\n")`, not `splitlines()`.
+
+### T41 — Offline Wikipedia, plus the internet for the rest (Lea's request, 2026-11-07)
+- Lea: "can we add her knowledge?", then: rather than loading the shareable base, Sylvie should pull what she needs from online and build the answer locally, so nothing leaks.
+- **Knowledge goes in a library, not in the weights:** a small model fine-tuned on facts mixes them up.
+- **Local:** Wikipedia in English, Spanish and French (`wikimedia/wikipedia` 2023-11-01, CC BY-SA, 18 GB download), in `<data dir>/wikipedia.db`.
+  - One SQLite FTS5 table per language. The title is weighted, and an article whose title is what was asked comes first.
+  - Only the first ~8 passages of each article are kept, which is where most answers are and keeps the size down.
+  - Measured on 141k Spanish articles: indexed in 52 s; searches take 1–75 ms and found Simón Bolívar, Fotosíntesis, Frida Kahlo, Teorema de Pitágoras and Guerra civil española.
+- **Online for the rest:**
+  - Every result carries the article's URL, which Sylvie can `open_url` for the full text.
+  - `web_search` covers anything recent.
+  - Only generic search words leave the Mac, with her name stripped; never the conversation or her memory.
+- **Privacy:** the tool is called `wikipedia`, offered first, and marked untrusted. The persona now says "Wikipedia first for facts about the world, web for anything recent". Night rewrites also research offline first.
+- **Not in the shareable `general/` pack:** another Sylvie installs the same library with `make wikipedia`.

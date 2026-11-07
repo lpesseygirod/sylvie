@@ -32,6 +32,18 @@ WEB_SEARCH = _fn(
     {"query": {"type": "string", "description": "search query, in the most useful language"}},
     ["query"],
 )
+WIKIPEDIA = _fn(
+    "wikipedia",
+    "Look something up in Sylvie's offline Wikipedia (English, Spanish, French; snapshot Nov 2023): instant and "
+    "private, nothing leaves the Mac. Use FIRST for facts about the world: people, history, places, science, "
+    "definitions, how things work. Use web_search instead for anything recent or changing (news, prices, "
+    "schedules, weather, after 2023). Each result has the article's URL: open_url it if you need the full article.",
+    {
+        "query": {"type": "string", "description": "the topic or question, a few key words"},
+        "language": {"type": "string", "description": "en, es or fr (the language of Lea's question)"},
+    },
+    ["query"],
+)
 SEARCH_DOCS = _fn(
     "search_documents",
     "Search Lea's own indexed files (course PDFs, slides, notes). Use for questions about her courses or documents.",
@@ -125,12 +137,20 @@ class ToolResult:
     pending: dict | None = None  # an action waiting for Lea's "yes"
 
 
+def _wiki(ctx: ToolContext):
+    from knowledge.wiki import get
+
+    return get(ctx.cfg)
+
+
 def available_tools(ctx: ToolContext) -> list[dict]:
     tools = [CALCULATOR]
     if ctx.cfg.get_path("search.enabled", True):
         tools = [WEB_SEARCH, OPEN_URL] + tools
         if ctx.llm is not None:
             tools.append(RESEARCH)
+    if _wiki(ctx) is not None:
+        tools.insert(0, WIKIPEDIA)
     if ctx.docs is not None and ctx.docs.stats()["chunks"] > 0:
         tools.append(SEARCH_DOCS)
     if ctx.actions is not None:
@@ -171,6 +191,7 @@ def _number_sources(ctx: ToolContext, sources: list[dict]) -> list[dict]:
 
 UNTRUSTED_TOOLS = {
     "web_search",
+    "wikipedia",
     "open_url",
     "search_documents",
     "read_emails",
@@ -297,6 +318,27 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
         return ToolResult(
             f"[{src['n']}] {page['title']}\nURL: {page['url']}\n<untrusted>\n{page['text']}\n</untrusted>",
             [src],
+        )
+    if call.name == "wikipedia":
+        wiki = _wiki(ctx)
+        if wiki is None:
+            return ToolResult("The offline Wikipedia isn't installed; use web_search.", ok=False)
+        from core.lang import guess_language
+
+        lang = str(args.get("language") or guess_language(ctx.user_text or args["query"], default="en"))[:2]
+        hits = wiki.search(args["query"], lang=lang, k=4)
+        if not hits:
+            return ToolResult("Nothing found in the offline Wikipedia. Try other key words, or web_search.")
+        srcs = [{"title": f"Wikipedia: {h.title}", "url": h.url} for h in hits]
+        for s in srcs:
+            ctx.allowed_urls.add(s["url"])
+        numbered = _number_sources(ctx, srcs)
+        blocks = [f"[{s['n']}] {h.title} ({h.url})\n{h.text}" for s, h in zip(numbered, hits, strict=True)]
+        return ToolResult(
+            "From the offline Wikipedia (snapshot Nov 2023; cite as [n]):\n<untrusted>\n"
+            + "\n\n".join(blocks)
+            + "\n</untrusted>",
+            numbered,
         )
     if call.name == "search_documents":
         hits = ctx.docs.search(args["query"], k=5) if ctx.docs else []

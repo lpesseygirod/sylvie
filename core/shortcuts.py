@@ -23,7 +23,7 @@ import numpy as np
 
 from memory.store import utcnow
 
-SAFE_TOOLS = {"web_search", "search_documents", "calendar_events", "read_emails"}
+SAFE_TOOLS = {"web_search", "wikipedia", "search_documents", "calendar_events", "read_emails"}
 SIMILAR = 0.90
 MIN_REPEATS = 3
 KEEP_USES = 500

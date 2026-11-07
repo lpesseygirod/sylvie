@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval finetune ui-test general-pack import-general learn-now mmlu
+.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval finetune ui-test general-pack import-general learn-now mmlu wikipedia wikipedia-index
 
 setup:
 	uv sync
@@ -73,6 +73,13 @@ learn-now:   # practice + fine-tune now instead of waiting for the night (stops 
 
 mmlu:   # once: download MMLU (MIT), 15k checkable questions in 57 subjects for practice
 	$(UV) python scripts/get_mmlu.py
+
+wikipedia:   # once (~20 GB download, ~1 h to index): offline Wikipedia en/es/fr for Sylvie to look things up
+	$(UV) python scripts/get_wikipedia.py
+	$(UV) python -m knowledge.wiki
+
+wikipedia-index:   # (re)index downloaded Wikipedia files; resumes where it stopped
+	$(UV) python -m knowledge.wiki
 
 general-pack:   # the general part of Sylvie (no personal data) → ~/Library/Application Support/Sylvie/general
 	$(UV) python -m learning.general_pack
