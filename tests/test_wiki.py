@@ -96,3 +96,66 @@ def test_tool_is_offered_only_when_installed_and_returns_cited_passages(tmp_path
     assert r.sources[0]["title"] == "Wikipedia: Simón Bolívar" and r.sources[0]["n"] == 1
     assert r.sources[0]["url"] in ctx.allowed_urls  # she may open the full article online
     assert ctx.read_untrusted
+
+
+# ---------- Wikimedia's own dumps ----------
+import bz2  # noqa: E402
+import json as _json  # noqa: E402
+from concurrent.futures import ThreadPoolExecutor  # noqa: E402
+
+from knowledge import wiki_dump  # noqa: E402
+
+DUMP = [
+    {"title": "Canberra", "namespace": 0, "text": "Canberra is the capital city of Australia.", "incoming_links": 50000,
+     "redirect": [{"namespace": 0, "title": "Canberra, Australia"}]},
+    {"title": "Capital gains tax in Australia", "namespace": 0, "text": "Capital gains tax in Australia is a tax on the capital.", "incoming_links": 40},
+    {"title": "Marie Curie", "namespace": 0, "text": "Marie Curie was a physicist and chemist.", "incoming_links": 9000,
+     "redirect": [{"namespace": 0, "title": "Madame Curie"}, {"namespace": 0, "title": "Maria Skłodowska"}]},
+    {"title": "Mercury (disambiguation)", "namespace": 0, "text": "Mercury may refer to: a planet, an element."},
+    {"title": "Talk:Canberra", "namespace": 1, "text": "Discussion."},
+]  # fmt: skip
+
+
+def dump_bytes(docs, streams=2):
+    lines = b"".join(
+        _json.dumps({"index": {}}).encode() + b"\n" + _json.dumps(d).encode() + b"\n" for d in docs
+    )
+    half = len(lines) // 2
+    cut = lines.index(b"\n", half) + 1
+    parts = [lines[:cut], lines[cut:]] if streams == 2 else [lines]
+    return b"".join(bz2.compress(p) for p in parts)  # Wikimedia shards can hold several bz2 streams
+
+
+def test_dump_lines_are_parsed_across_bz2_streams_and_chunks():
+    raw = dump_bytes(DUMP)
+    chunks = [raw[i : i + 7] for i in range(0, len(raw), 7)]
+    got = list(wiki_dump.pages(wiki_dump.bz2_lines(chunks)))
+    assert [p["title"] for p in got] == [
+        "Canberra",
+        "Capital gains tax in Australia",
+        "Marie Curie",
+        "Mercury (disambiguation)",
+    ]
+    assert got[0]["redirects"] == ["Canberra, Australia"] and got[0]["popularity"] == 50000
+
+
+def test_build_from_dump_swaps_in_the_new_library_and_ranks_by_popularity(tmp_path):
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "wikipedia.db").write_text("old library")
+
+    def fetch(url, out, keep):
+        with open(out, "w") as f:
+            for p in wiki_dump.pages(wiki_dump.bz2_lines([dump_bytes(DUMP)])):
+                f.write(_json.dumps(p) + "\n")
+        return url, 4
+
+    stats = wiki_dump.build(data, ["en"], date="20261101", fetch=fetch, pool_cls=ThreadPoolExecutor,
+                            list_shards=lambda d, lang: [f"https://x/{lang}-0.json.bz2"])  # fmt: skip
+    assert stats == {"en": 3}  # the disambiguation page and the talk page are left out
+    assert list((data / "_to_delete").glob("wikipedia-replaced-*.db"))  # old one kept, not deleted
+    w = Wiki(data / "wikipedia.db")
+    assert w.search("capital of Australia", "en")[0].title == "Canberra"  # popular beats wordy
+    assert w.search("Madame Curie", "en")[0].title == "Marie Curie"  # another name of the article
+    assert w.search("Madame Curie", "en")[0].url == "https://en.wikipedia.org/wiki/Marie_Curie"
+    assert w.done("en/cirrus-20261101/en-0.json.bz2")

@@ -2,26 +2,31 @@
 
 Lea, 2026-11-07: "can we add her knowledge?" Facts belong in a library, not in the weights (a small
 model trained on facts mixes them up). So Sylvie searches this first for facts about the world
-(history, science, people, places, definitions) — in well under a second, offline, without her
-question leaving the Mac — and keeps web search for what is recent (news, prices, schedules).
+(history, science, people, places, definitions) — fast, offline, without her question leaving the
+Mac — and keeps web search for what is recent (news, prices, schedules).
 
-- Source: Hugging Face `wikimedia/wikipedia`, snapshot 2023-11-01 (CC BY-SA 3.0 / GFDL), downloaded
-  by `scripts/get_wikipedia.py`. Used for lookup and quoting with credit only, never as training data.
-- Stored apart from Lea's data, in `<data dir>/wikipedia.db`: it's general, and it's big (~40 GB).
-- Each article is cut into passages of ~1000 characters, keeping only its start (MAX_PASSAGES): that's
-  where most answers are, and it keeps the library a manageable size. When Sylvie needs more, she
-  opens the article's URL online (Lea, 2026-11-07: pull what's needed from the internet, build the
-  answer locally; only the article's address leaves the Mac, never her question or context).
-- Not part of the shareable general pack: anyone installs the same library with the same script. Search: SQLite FTS5 with BM25, titles weigh more,
-  and an article whose title is what was asked ("Who was Marie Curie?") comes first.
-- Indexing runs file by file and resumes where it stopped: `make wikipedia-index`.
+- Sources (CC BY-SA; used for lookup and quoting with credit, never as training data):
+  - Wikimedia's own CirrusSearch dumps (`knowledge/wiki_dump.py`, `make wikipedia`): complete and
+    recent, with each article's other names (redirects) and how many pages link to it (popularity).
+  - Hugging Face `wikimedia/wikipedia` 2023-11-01 (parquet): the first version; it turned out to miss
+    about half of the big English articles (Paris, DNA, Moon…), so it's replaced by the above.
+- Stored apart from Lea's data, in `<data dir>/wikipedia.db`, and not part of the shareable general
+  pack: anyone installs the same library with the same command.
+- Only the start of each article is kept (MAX_PASSAGES × ~1000 characters): that's where most answers
+  are. For more, Sylvie opens the article online — only its address leaves the Mac.
+- Search: an article whose title (or other name) is exactly what was asked comes first; then SQLite
+  FTS5 (BM25, titles weigh more) with all the key words, dropping the most common ones if needed,
+  re-ranked by popularity. Disambiguation pages are skipped.
 """
 
 from __future__ import annotations
 
+import math
 import re
 import sqlite3
 import threading
+import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,6 +34,7 @@ PASSAGE_CHARS = 1000
 MAX_PASSAGES = 8  # the start of each article; the full article is fetched online when needed
 SNAPSHOT = "20231101"
 LANGS = ("en", "es", "fr")
+POPULARITY_WEIGHT = 0.6  # × log(1 + pages linking to it): Canberra beats "Capital gains tax in Australia"
 
 # Words that carry no meaning for a search, in the three languages (kept short on purpose).
 STOP = set(
@@ -37,7 +43,11 @@ STOP = set(
     its his her their there than then into over under el la los las un una unos unas de del en y o que
     quien quién cual cuál cuando cuándo donde dónde por qué como cómo es son fue era para con sobre al lo
     le les des du et ou qui quoi quel quelle quand où pourquoi comment est sont était pour avec sur au aux
-    ce cette dans par moi dime dis explique""".split()
+    ce cette dans par moi dime dis explique best way""".split()
+)
+DISAMBIGUATION = re.compile(r"\((disambiguation|desambiguación|homonymie)\)$", re.I)
+DISAMBIGUATION_TEXT = re.compile(
+    r"may refer to|puede referirse a|puede hacer referencia a|peut (désigner|faire référence)", re.I
 )
 
 
@@ -53,14 +63,18 @@ class Passage:
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS articles (
     id INTEGER PRIMARY KEY, lang TEXT NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL,
-    first_passage INTEGER NOT NULL  -- rowid of its first passage in passages_<lang>
+    first_passage INTEGER NOT NULL,  -- rowid of its first passage in passages_<lang>
+    popularity REAL NOT NULL DEFAULT 0  -- pages linking to it (0 when the source doesn't say)
 );
 CREATE INDEX IF NOT EXISTS articles_title ON articles(lang, title COLLATE NOCASE);
+CREATE TABLE IF NOT EXISTS redirects (lang TEXT NOT NULL, title TEXT NOT NULL, article_id INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS redirects_title ON redirects(lang, title COLLATE NOCASE);
 CREATE TABLE IF NOT EXISTS indexed_files (path TEXT PRIMARY KEY, articles INTEGER NOT NULL, done_at TEXT NOT NULL);
 """ + "".join(
     f"CREATE VIRTUAL TABLE IF NOT EXISTS passages_{lang} USING fts5("
     "title, text, article_id UNINDEXED, tokenize='unicode61 remove_diacritics 2');\n"
-    for lang in ("en", "es", "fr")
+    f"CREATE VIRTUAL TABLE IF NOT EXISTS vocab_{lang} USING fts5vocab(passages_{lang}, 'row');\n"
+    for lang in LANGS
 )  # one table per language: a Spanish search never scans English text
 
 
@@ -78,6 +92,8 @@ def split_passages(text: str) -> list[str]:
             cut = para.rfind(". ", 0, PASSAGE_CHARS) + 1 or PASSAGE_CHARS
             out.append(((cur + "\n") if cur else "") + para[:cut].strip())
             cur, para = "", para[cut:].strip()
+            if len(out) >= MAX_PASSAGES:
+                return out[:MAX_PASSAGES]
         if len(cur) + len(para) > PASSAGE_CHARS and cur:
             out.append(cur)
             cur = para
@@ -90,9 +106,22 @@ def split_passages(text: str) -> list[str]:
     return out[:MAX_PASSAGES]
 
 
+def _fold(w: str) -> str:
+    """As the index stores words: lower case, no accents."""
+    return "".join(c for c in unicodedata.normalize("NFKD", w.lower()) if not unicodedata.combining(c))
+
+
 def query_words(text: str) -> list[str]:
     words = [w for w in re.findall(r"\w+", text.lower()) if w not in STOP and (len(w) > 1 or w.isdigit())]
     return list(dict.fromkeys(words))[:12]
+
+
+def is_disambiguation(title: str, text: str) -> bool:
+    return bool(DISAMBIGUATION.search(title) or DISAMBIGUATION_TEXT.search(text[:300]))
+
+
+def article_url(lang: str, title: str) -> str:
+    return f"https://{lang}.wikipedia.org/wiki/{title.replace(' ', '_')}"
 
 
 class Wiki:
@@ -100,58 +129,90 @@ class Wiki:
         self.path = Path(path)
         self.conn = sqlite3.connect(self.path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(articles)")}
+        if cols and "popularity" not in cols:  # a library built before popularity existed
+            self.conn.execute("ALTER TABLE articles ADD COLUMN popularity REAL NOT NULL DEFAULT 0")
         self.conn.executescript(SCHEMA)
+        for lang in LANGS:  # titles weigh 3×; "ORDER BY rank" lets FTS5 sort without a temp table
+            self.conn.execute(
+                f"INSERT INTO passages_{lang}(passages_{lang}, rank) VALUES ('rank', 'bm25(3.0, 1.0)')"
+            )
+        self.conn.commit()
         self.lock = threading.Lock()
 
     # ---------- building ----------
-    def index_parquet(self, file: Path, lang: str, stop=None, batch_rows: int = 2000) -> int:
-        """Adds one downloaded parquet file. Returns the number of articles (0 if already done)."""
-        import pyarrow.parquet as pq
+    def done(self, key: str) -> bool:
+        return self.conn.execute("SELECT 1 FROM indexed_files WHERE path = ?", (key,)).fetchone() is not None
 
+    def index_rows(self, rows: Iterable[dict], lang: str, key: str, stop=None) -> int:
+        """rows: {title, text, url?, redirects?: [titles], popularity?}. One source file = one
+        transaction, so an interrupted file is simply redone. Returns the number of articles."""
         assert lang in LANGS
-        key = f"{lang}/{Path(file).name}"
-        if self.conn.execute("SELECT 1 FROM indexed_files WHERE path = ?", (key,)).fetchone():
+        if self.done(key):
             return 0
         c = self.conn
         c.execute("PRAGMA synchronous = OFF")
         n = 0
-        start_id = (c.execute("SELECT max(id) FROM articles").fetchone()[0] or 0) + 1
+        next_id = (c.execute("SELECT max(id) FROM articles").fetchone()[0] or 0) + 1
+        table = f"passages_{lang}"
         try:
             c.execute("BEGIN")
-            for batch in pq.ParquetFile(file).iter_batches(
-                batch_size=batch_rows, columns=["title", "url", "text"]
-            ):
+            for row in rows:
                 if stop is not None and stop.is_set():
                     raise InterruptedError
-                cols = batch.to_pydict()
-                for title, url, text in zip(cols["title"], cols["url"], cols["text"], strict=True):
-                    if not text or not title:
-                        continue
-                    parts = split_passages(text)
-                    if not parts:
-                        continue
-                    aid = start_id + n
-                    first = c.execute(
-                        f"INSERT INTO passages_{lang}(title, text, article_id) VALUES (?,?,?)",
-                        (title, parts[0], aid),
-                    ).lastrowid
-                    c.executemany(
-                        f"INSERT INTO passages_{lang}(title, text, article_id) VALUES (?,?,?)",
-                        [(title, p, aid) for p in parts[1:]],
-                    )
-                    c.execute(
-                        "INSERT INTO articles(id, lang, title, url, first_passage) VALUES (?,?,?,?,?)",
-                        (aid, lang, title, url, first),
-                    )
-                    n += 1
+                title, text = row.get("title"), row.get("text")
+                if not title or not text or is_disambiguation(title, text):
+                    continue
+                parts = split_passages(text)
+                if not parts:
+                    continue
+                aid = next_id
+                next_id += 1
+                first = c.execute(
+                    f"INSERT INTO {table}(title, text, article_id) VALUES (?,?,?)", (title, parts[0], aid)
+                ).lastrowid
+                c.executemany(
+                    f"INSERT INTO {table}(title, text, article_id) VALUES (?,?,?)",
+                    [(title, p, aid) for p in parts[1:]],
+                )
+                c.execute(
+                    "INSERT INTO articles(id, lang, title, url, first_passage, popularity) VALUES (?,?,?,?,?,?)",
+                    (
+                        aid,
+                        lang,
+                        title,
+                        row.get("url") or article_url(lang, title),
+                        first,
+                        row.get("popularity") or 0,
+                    ),
+                )
+                c.executemany(
+                    "INSERT INTO redirects(lang, title, article_id) VALUES (?,?,?)",
+                    [(lang, r, aid) for r in dict.fromkeys(row.get("redirects") or []) if r and r != title],
+                )
+                n += 1
             c.execute(
                 "INSERT INTO indexed_files(path, articles, done_at) VALUES (?, ?, datetime('now'))", (key, n)
             )
-            c.execute("COMMIT")  # one file = one transaction: an interrupted file is simply redone
+            c.execute("COMMIT")
         except BaseException:
             c.execute("ROLLBACK")
             raise
         return n
+
+    def index_parquet(self, file: Path, lang: str, stop=None, batch_rows: int = 2000) -> int:
+        """Adds one Hugging Face parquet file (title, url, text)."""
+        import pyarrow.parquet as pq
+
+        def rows():
+            for batch in pq.ParquetFile(file).iter_batches(
+                batch_size=batch_rows, columns=["title", "url", "text"]
+            ):
+                cols = batch.to_pydict()
+                for title, url, text in zip(cols["title"], cols["url"], cols["text"], strict=True):
+                    yield {"title": title, "url": url, "text": text}
+
+        return self.index_rows(rows(), lang, f"{lang}/{Path(file).name}", stop=stop)
 
     def optimize(self) -> None:
         for lang in LANGS:
@@ -172,54 +233,67 @@ class Wiki:
         with self.lock:
             out: list[Passage] = []
             for lg in langs:
-                out += self._search_lang(words, lg, k)
+                out += self._search_lang(words, lg, k - len(out))
                 if len(out) >= k:
                     break
         return out[:k]
 
+    def _exact(self, phrase: str, lang: str):
+        """The most popular article titled (or also known as) exactly `phrase`."""
+        return self.conn.execute(
+            "SELECT a.* FROM articles a WHERE a.lang = ? AND a.title = ? COLLATE NOCASE "
+            "UNION SELECT a.* FROM redirects r JOIN articles a ON a.id = r.article_id "
+            "WHERE r.lang = ? AND r.title = ? COLLATE NOCASE ORDER BY popularity DESC LIMIT 1",
+            (lang, phrase, lang, phrase),
+        ).fetchone()
+
+    def _rarest_first(self, words: list[str], lang: str) -> list[str]:
+        """Drops words the library doesn't have; rarest (most telling) first."""
+        df = {}
+        for w in words:
+            r = self.conn.execute(f"SELECT doc FROM vocab_{lang} WHERE term = ?", (_fold(w),)).fetchone()
+            if r:
+                df[w] = r[0]
+        return sorted(df, key=df.get)
+
     def _search_lang(self, words: list[str], lang: str, k: int) -> list[Passage]:
         c = self.conn
-        # 1. An article whose title is exactly what was asked about ("marie curie", "photosynthesis").
-        exact = []
-        for n in range(min(len(words), 4), 0, -1):
-            for i in range(len(words) - n + 1):
-                phrase = " ".join(words[i : i + n])
-                r = c.execute(
-                    "SELECT id, title, url, first_passage FROM articles WHERE lang = ? AND title = ? COLLATE NOCASE LIMIT 1",
-                    (lang, phrase),
-                ).fetchone()
-                if r:
-                    exact.append(r)
-            if exact:
-                break
-        # 2. Full-text search: all words first (precise), then any of them (broad).
+        table = f"passages_{lang}"
         found: dict[int, Passage] = {}
         per_article: dict[int, int] = {}
-        table = f"passages_{lang}"
-        for r in exact[:2]:
+
+        def add(rowid: int, aid: int, title: str, url: str, text: str, score: float) -> None:
+            if rowid in found or per_article.get(aid, 0) >= 2 or is_disambiguation(title, text):
+                return
+            found[rowid] = Passage(title, url, lang, text, score)
+            per_article[aid] = per_article.get(aid, 0) + 1
+
+        # 1. The whole question is a title or another name of one ("marie curie", "jfk").
+        if r := self._exact(" ".join(words), lang):
             p = c.execute(f"SELECT text FROM {table} WHERE rowid = ?", (r["first_passage"],)).fetchone()
             if p:
-                found[r["first_passage"]] = Passage(r["title"], r["url"], lang, p["text"], 100.0)
-                per_article[r["id"]] = 1
-        for joiner in (" AND ", " OR "):
-            if len(found) >= k:
+                add(r["first_passage"], r["id"], r["title"], r["url"], p["text"], 1000.0)
+        # 2. All key words, then without the most common ones; re-ranked by popularity.
+        ranked = self._rarest_first(words, lang)
+        for m in range(len(ranked), 0, -1):
+            if len(found) >= k or (m == 1 and len(ranked) > 2):
                 break
-            q = joiner.join(f'"{w}"' for w in words)
-            rows = c.execute(
-                f"SELECT rowid, title, text, article_id, bm25({table}, 6.0, 1.0) s FROM {table} "
-                f"WHERE {table} MATCH ? ORDER BY s LIMIT 40",
+            q = " AND ".join(f'"{w}"' for w in ranked[:m])
+            rows = []
+            for r in c.execute(
+                f"SELECT rowid, title, text, article_id, rank FROM {table} WHERE {table} MATCH ? ORDER BY rank LIMIT 60",
                 (q,),
-            ).fetchall()
-            for r in rows:
-                aid = r["article_id"]
-                if r["rowid"] in found or per_article.get(aid, 0) >= 2:
-                    continue
-                url = c.execute("SELECT url FROM articles WHERE id = ?", (aid,)).fetchone()
-                found[r["rowid"]] = Passage(r["title"], url["url"] if url else "", lang, r["text"], -r["s"])
-                per_article[aid] = per_article.get(aid, 0) + 1
+            ).fetchall():
+                a = c.execute(
+                    "SELECT url, popularity FROM articles WHERE id = ?", (r["article_id"],)
+                ).fetchone()
+                pop = a["popularity"] if a else 0
+                rows.append((r["rank"] - POPULARITY_WEIGHT * math.log1p(pop), r, a["url"] if a else ""))
+            for score, r, url in sorted(rows, key=lambda x: x[0]):
+                add(r["rowid"], r["article_id"], r["title"], url, r["text"], -score)
                 if len(found) >= k:
                     break
-        return list(found.values())
+        return list(found.values())[:k]
 
 
 _open: dict[str, Wiki] = {}
@@ -232,37 +306,15 @@ def get(cfg) -> Wiki | None:
     p = db_path(cfg)
     if not p.exists():
         return None
-    w = _open.get(str(p))
+    key = f"{p}:{p.stat().st_ino}"  # a rebuilt library swapped in is a new file: open the new one
+    w = _open.get(key)
     if w is None:
-        w = _open[str(p)] = Wiki(p)
+        for old in [k for k in _open if k.startswith(f"{p}:")]:
+            _open.pop(old).conn.close()
+        w = _open[key] = Wiki(p)
     try:
         if not w.conn.execute("SELECT 1 FROM indexed_files LIMIT 1").fetchone():
             return None
     except sqlite3.Error:
         return None
     return w
-
-
-def main() -> None:
-    """make wikipedia-index: indexes every downloaded file not indexed yet (resumable)."""
-    import sys
-    import time
-
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from core.config import load_config
-
-    cfg = load_config()
-    root = Path(cfg.data_dir) / "datasets" / "wikipedia"
-    w = Wiki(db_path(cfg))
-    for lang in ("es", "fr", "en"):
-        for f in sorted((root / f"{SNAPSHOT}.{lang}").glob("*.parquet")):
-            t = time.time()
-            n = w.index_parquet(f, lang)
-            if n:
-                print(f"{lang} {f.name}: {n} articles in {time.time() - t:.0f} s", flush=True)
-    w.optimize()
-    print("done:", w.stats(), flush=True)
-
-
-if __name__ == "__main__":
-    main()

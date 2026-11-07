@@ -259,3 +259,8 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   - Only generic search words leave the Mac, with her name stripped; never the conversation or her memory.
 - **Privacy:** the tool is called `wikipedia`, offered first, and marked untrusted. The persona now says "Wikipedia first for facts about the world, web for anything recent". Night rewrites also research offline first.
 - **Not in the shareable `general/` pack:** another Sylvie installs the same library with `make wikipedia`.
+- **Update, same night:** on the full Hugging Face library (10.8M articles, 45 GB, indexed in 30 min), half of 20 big English articles were missing: Paris, DNA, Moon, Gravity, Roman Empire, Marie Curie, Photosynthesis… So Sylvie now builds from **Wikimedia's own CirrusSearch dumps** (`knowledge/wiki_dump.py`, `make wikipedia`; snapshot 2026-11-01).
+  - They're complete and recent, and they carry each article's other names (redirects) and how many pages link to it (popularity).
+  - ~64 GB is streamed and unpacked on the fly; nothing but the library stays.
+  - Ranking: the whole question as a title or other name first; then all key words, dropping the most common ones (no slow "any word" search); then re-ranked by popularity. Disambiguation pages are skipped.
+  - The new library is built next to the old one and swapped in; the old one goes to `_to_delete/`.
