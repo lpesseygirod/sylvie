@@ -21,6 +21,10 @@ Every model, dataset and dependency with its license. Checked against Hugging Fa
 | GSM8K (github.com/openai/grade-school-math, `train.jsonl`) | checkable overnight questions; tool-use and reasoning practice (answers by Sylvie's model, verified by code) | MIT | 2026-11-05 |
 | MMLU (cais/mmlu on Hugging Face, `mmlu.jsonl`) | checkable overnight questions in 57 subjects (multiple choice; Sylvie's answers checked by code) | MIT | 2026-11-07 |
 | Wikipedia en/es/fr (`wikimedia/wikipedia`, snapshot 20231101) | offline library Sylvie looks things up in and cites (`knowledge/wiki.py`); **not** training data | CC BY-SA 3.0 / GFDL (share-alike: credit each article; fine for lookup) | 2026-11-07 |
+| Europe PMC open-access articles (CC BY / CC0 only, fetched a few per night) | writing practice (`learning/writing.py`): excerpts in exercise prompts, published text as the judge's yardstick; targets are Sylvie's own rewrites | CC BY 4.0 / CC0 (source PMCID recorded on each example) | 2026-11-07 |
+| OpenAlex (api.openalex.org) | `find_papers` lookups (titles, authors, abstracts); **not** training data | CC0 | 2026-11-07 |
+| Crossref (api.crossref.org) | `check_reference` lookups; **not** training data | metadata open (facts, no license needed) | 2026-11-07 |
+| Lea's Zotero library (`~/Zotero`, read-only copy) | `zotero_library` lookups; personal, **never** training data or the general pack | Lea's own | 2026-11-07 |
 
 Not named in the plan (the plan asks for "open datasets whose license allows it") — Lea can veto.
 

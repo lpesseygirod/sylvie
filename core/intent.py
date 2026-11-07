@@ -52,3 +52,30 @@ def looks_like_action(text: str) -> bool:
 
 def claims_done(text: str) -> bool:
     return bool(CLAIM_RE.search(text))
+
+
+# Essays, reports, literature reviews, bibliographies: academic writing from real sources (T42).
+WRITING_RE = re.compile(
+    r"\b(essays?|dissertations?|literature review|research paper|term paper|thesis|theses|"
+    r"bibliograph\w*|citations?|references|works cited|apa|mla|chicago style|harvard style|"
+    r"ensayos?|monograf[ií]as?|tesis|tesina|trabajo (escrito|de investigaci[oó]n|final)|revisi[oó]n bibliogr[aá]fica|"
+    r"citas|referencias|m[ée]moire|revue de (la )?litt[ée]rature|r[ée]f[ée]rences)\b",
+    re.I,
+)
+
+WRITING_NOTE = (
+    "This is academic writing. Build it from real sources: search zotero_library (Lea's own saved sources) "
+    "first, then find_papers if you need more. Use only what the passages and abstracts actually say. Cite "
+    "in the text exactly as each result says ('Cite in text as'), and end with a References list made ONLY "
+    "of the entries the tools gave you for the works you cited (every one of them), copied exactly, in one "
+    "style (APA unless Lea asked for another). "
+    "Never cite a source from memory without check_reference; never invent authors, years, pages or "
+    "quotes. If the sources don't cover a point, say so or leave the claim uncited and cautious. Put the "
+    "WHOLE essay, References list included, inside ONE <doc> block and write it only once: START your reply "
+    "with the <doc title=…> tag (no text before it, the essay is never repeated in the chat), and after "
+    "</doc> say one or two sentences at most (which sources you used, anything missing)."
+)
+
+
+def looks_like_writing(text: str) -> bool:
+    return bool(WRITING_RE.search(text))

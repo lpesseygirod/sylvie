@@ -380,7 +380,9 @@ class FakeLLM:
     def stream(
         self, messages, tools=None, thinking=False, effort="low", max_tokens=None, stop=None, use_cache=True
     ):
-        self.calls.append({"messages": messages, "tools": tools, "thinking": thinking})
+        self.calls.append(
+            {"messages": messages, "tools": tools, "thinking": thinking, "max_tokens": max_tokens}
+        )
         text = self._next(messages)
         if thinking and "</think>" not in text:
             text = "hmm</think>" + text

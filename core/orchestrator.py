@@ -21,7 +21,14 @@ from core.context import history_messages, maybe_summarize, system_with_summary
 from core.conversations import Conversations
 from core.db import Database
 from core.devices import Devices
-from core.intent import ACTION_NOTE, CLAIM_NUDGE, claims_done, looks_like_action
+from core.intent import (
+    ACTION_NOTE,
+    CLAIM_NUDGE,
+    WRITING_NOTE,
+    claims_done,
+    looks_like_action,
+    looks_like_writing,
+)
 from core.lang import guess_language, phrase
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
 from core.quick import GreetingStripper, greets, quick_reply
@@ -219,6 +226,26 @@ class Sylvie:
             llm=self.llm if self.cfg.get_path("search.research", True) else None,
             settings=self,
         )
+
+    @staticmethod
+    def _check_references(answer: str, tctx) -> str:
+        """A note for Lea when an essay's references don't match what was looked up: entries no tool
+        found (possibly invented), and works cited in the text but missing from the list."""
+        from knowledge.cite import missing_references, reference, unverified_references
+        from tools.registry import turn_style
+
+        out = ""
+        bad = unverified_references(answer, tctx.refs)
+        if bad:
+            out += ("\n\n**Check before using:** I couldn't match these references to any source I looked up, "
+                    "so they may be wrong or invented:\n" + "\n".join(f"- {b}" for b in bad))  # fmt: skip
+        missing = missing_references(answer, tctx.refs)
+        if missing:
+            st = turn_style(tctx)
+            out += "\n\nAlso cited, missing from the references:\n" + "\n".join(
+                f"- {reference(r, st)}" for r in missing
+            )
+        return out
 
     def speech_to_text(self):
         if self._stt is None:
@@ -422,6 +449,10 @@ class Sylvie:
             action_request = looks_like_action(text)
             if action_request:
                 notes.append(ACTION_NOTE)
+            # 1f. Essays and reports: real sources, exact citations, room for a long answer (core/intent.py)
+            writing = looks_like_writing(text)
+            if writing:
+                notes.append(WRITING_NOTE)
 
             # 1c. "Hello" / "thanks" / "bye": an instant answer, no model (core/quick.py)
             reply = None
@@ -544,6 +575,26 @@ class Sylvie:
                     self.convs.add_message(cid, "tool", "", model_content=content)
                     tool_chars += len(content)
 
+            # 5c. An essay: look in Lea's Zotero library before the first word, so the essay is built on
+            # her sources (measured 2026-11-07: without it the 9B once wrote two invented references).
+            if writing and any(t["function"]["name"] == "zotero_library" for t in tools):
+                call = ToolCall("zotero_library", {"query": text[:300]})
+                announced = True
+                trace.mark("first_status")
+                yield {"type": "status", "text": phrase("checking", text)}
+                result = self._run_tool(call, tools, tctx, trace)
+                if result is not None:
+                    assistant_msg = {"role": "assistant", "content": "", "tool_calls": [call.to_message()]}
+                    messages.append(assistant_msg)
+                    self.convs.add_message(cid, "assistant", "", model_content="",
+                                           tool_calls=assistant_msg["tool_calls"], mode=mode)  # fmt: skip
+                    yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
+                    if result.sources:
+                        yield {"type": "sources", "sources": tctx.sources}
+                    messages.append({"role": "tool", "content": result.content})
+                    self.convs.add_message(cid, "tool", "", model_content=result.content)
+                    tool_chars += len(result.content)
+
             called_tools = False
             nudged = False
             greeting = GreetingStripper(active=not greets(text))
@@ -557,7 +608,12 @@ class Sylvie:
                 sp = StreamSplitter(thinking=r.thinking)
                 with trace.stage("llm"):
                     for chunk in self.llm.stream(
-                        messages, tools=use_tools, thinking=r.thinking, effort=r.effort, stop=stop
+                        messages,
+                        tools=use_tools,
+                        thinking=r.thinking,
+                        effort=r.effort,
+                        stop=stop,
+                        max_tokens=self.cfg.get_path("llm.max_tokens_writing", 3072) if writing else None,
                     ):
                         if chunk.done:
                             if chunk.stats:
@@ -621,6 +677,12 @@ class Sylvie:
                         # Never leave Lea with silence: say plainly that this one didn't work out.
                         visible = phrase("lost", text)
                         yield {"type": "text", "text": visible}
+                    if writing and visible:
+                        # Every reference must be one a tool found this turn (knowledge/cite.py).
+                        extra = self._check_references(visible, tctx)
+                        if extra:
+                            yield {"type": "text", "text": extra}
+                            visible += extra
                     display_parts.append(visible)
                     final_mid = self.convs.add_message(
                         cid,

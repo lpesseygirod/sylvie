@@ -397,6 +397,13 @@ def main() -> None:
                 night.pool.use("sylvie"), _LazyJudge(night.pool), night.store, db, style, sylvie.current_system_prompt(),
                 RUBRIC, batch=night.batch, model_name=str(cfg.get_path("llm.model")).split("/")[-1],
             )  # fmt: skip
+        if not night.stop:
+            from learning.writing import writing_practice
+
+            print("writing:", writing_practice(
+                night.pool, night.store, cfg, n=cfg.get_path("writing.practice_per_night", 6), batch=night.batch,
+                model_name=str(cfg.get_path("llm.model")).split("/")[-1], stop=lambda: night.stop,
+            ), flush=True)  # fmt: skip
     except Exception as e:  # extras must never stop the main loop
         print(f"extras failed: {e}", flush=True)
 
