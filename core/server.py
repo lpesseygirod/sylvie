@@ -341,6 +341,10 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
     def speak(body: dict = Body(...)):
         """Body: {text, language}. One sentence as WAV, spoken by Kokoro. 404 when speech is set to
         the system voice (or Kokoro failed to load) — the client then speaks with its own voice."""
+        sch = S().scheduler
+        if sch is not None and sch.proc is not None:
+            # She just said "Sylvie": stop training now, while the greeting plays, not after her question.
+            threading.Thread(target=sch.preempt, daemon=True).start()
         tts = S().text_to_speech()
         if tts is None:
             raise HTTPException(404, "system voice")

@@ -230,3 +230,11 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   - Considered and left out: Aya (gated), OpenBookQA and TriviaQA (license "unknown"), ARC (CC BY-SA).
 - **Auto-approval** (`learning.auto_approve_judged: true`, Lea chose autonomy): night pairs on general questions that code verified, or that the local judge re-graded ≥ 8, train without her spot-check. Pairs from her own questions still wait.
 - **Promotion is unchanged:** a new version replaces the current one only with no eval regressions and after Lea's blind A/B.
+
+### T39 — Permanent training (Lea's request, 2026-11-07)
+- Lea: "keep training until I start talking or using Sylvie, then when I finish train again".
+- **`schedule.always: true`:** the practice + fine-tune job runs at any hour once Sylvie has been unused for 5 minutes. There is no nightly cap, and each run lasts up to 4 h before the next one starts.
+- **Still never on battery.** The Mac is kept awake only while a job runs (`caffeinate -w <pid>`).
+- **Training stops as soon as she hears "Sylvie"** (the greeting request), so the models reload while the greeting plays.
+- **Fine-tunes may come every 3 days** instead of 10. Promotion still needs no regressions and Lea's blind A/B.
+- **Trade-off:** while training, the Mac's memory is mostly taken (judge model ~18 GB), so other heavy apps can feel slower. The first answer after training stops takes a few seconds longer while she reloads. "Pause learning" in the menu bar turns it off.

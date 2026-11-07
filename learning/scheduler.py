@@ -66,7 +66,15 @@ class Scheduler:
             cfg.get_path("schedule.window_start", "01:00"),
             cfg.get_path("schedule.window_end", "07:00"),
         )
-        self.idle_minutes = cfg.get_path("schedule.idle_minutes", 30)
+        # Permanent mode (Lea, 2026-11-07: "keep training until I start using Sylvie, then when I
+        # finish train again"): any time of day, after a short quiet spell, no nightly cap.
+        self.always = bool(cfg.get_path("schedule.always", False))
+        self.idle_minutes = (
+            cfg.get_path("schedule.always_idle_minutes", 5)
+            if self.always
+            else cfg.get_path("schedule.idle_minutes", 30)
+        )
+        self.job_minutes = cfg.get_path("schedule.always_job_minutes", 240)
         self.max_hours = cfg.get_path("schedule.max_hours_per_night", 5)
         self.enabled = cfg.get_path("schedule.enabled", True)
         self.check_every = check_every
@@ -90,7 +98,7 @@ class Scheduler:
         if not self.enabled:
             return False, "scheduler disabled in config"
         now = self.clock()
-        if not in_window(now, *self.window):
+        if not self.always and not in_window(now, *self.window):
             return False, f"outside the {self.window[0]}–{self.window[1]} window"
         if not self.power():
             return False, "on battery"
@@ -102,14 +110,19 @@ class Scheduler:
         )  # 01:00 on the 6th belongs to the night of the 5th
         if night != self.night:
             self.night, self.used_tonight = night, 0.0
-        if self.used_tonight >= self.max_hours * 3600:
+        if not self.always and self.used_tonight >= self.max_hours * 3600:
             return False, "tonight's time cap is used up"
         return True, "ok"
 
     def next_job(self) -> Job | None:
         """Overnight loop first; the fine-tune/eval cycle is started by the loop when it's due."""
         # Never past the window's end or tonight's cap: a job started at 06:55 gets 5 minutes, not 5 hours.
-        left = min(self.max_hours * 60 - self.used_tonight / 60, minutes_until(self.clock(), self.window[1]))
+        if self.always:
+            left = self.job_minutes  # then it simply starts again while Sylvie stays unused
+        else:
+            left = min(
+                self.max_hours * 60 - self.used_tonight / 60, minutes_until(self.clock(), self.window[1])
+            )
         if left < 5:
             return None
         py = [sys.executable, "-m", "learning.overnight", "--max-minutes", str(int(left))]
@@ -120,8 +133,8 @@ class Scheduler:
         with self._lock:
             if self.proc is not None:
                 if self.proc.poll() is not None:
-                    self._finished()
-                elif not self.manual and not in_window(self.clock(), *self.window):
+                    self._finished(warm=not self.always)  # permanent mode: the next job starts soon
+                elif not self.manual and not self.always and not in_window(self.clock(), *self.window):
                     self._stop("the night window is over")  # safety net; jobs also get a time limit
                 return
             if self.pending_now and self.power():
@@ -161,15 +174,27 @@ class Scheduler:
         logf = open(self.s.cfg.data_dir / "logs" / f"{job.name}.log", "a")  # noqa: SIM115
         self.proc = subprocess.Popen(job.args, cwd=ROOT, env=env, stdout=logf, stderr=subprocess.STDOUT)
         self.current, self.started_at = job, time.time()
+        self._keep_awake(self.proc.pid)
 
-    def _finished(self) -> None:
+    def _keep_awake(self, pid: int) -> None:
+        """The Mac doesn't fall asleep mid-training (only while this job runs, and only on power)."""
+        if not Path("/usr/bin/caffeinate").exists() or "PYTEST_CURRENT_TEST" in os.environ:
+            return
+        try:
+            subprocess.Popen(["/usr/bin/caffeinate", "-i", "-s", "-w", str(pid)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # fmt: skip
+        except OSError:
+            pass
+
+    def _finished(self, warm: bool = True) -> None:
         if self.started_at:
             self.used_tonight += time.time() - self.started_at
         log.info(
             "heavy job %s ended (code %s)", self.current.name if self.current else "?", self.proc.returncode
         )
         self.proc, self.current, self.started_at, self.manual = None, None, None, False
-        threading.Thread(target=self.s.warm, daemon=True).start()  # assistant back, warm
+        if warm:
+            threading.Thread(target=self.s.warm, daemon=True).start()  # assistant back, warm
 
     def preempt(self) -> bool:
         """Lea is talking to Sylvie: stop the heavy job now (it saves progress) and reload."""

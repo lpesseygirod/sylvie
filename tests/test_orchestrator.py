@@ -27,6 +27,8 @@ def make(tmp_path, replies, osa=None, locked=False):
     cfg["search"] = {**cfg["search"], "enabled": False}
     # Tests exercise the confirmation flow, whatever Lea chose in config.yaml (she chose "never").
     cfg["actions"] = {**cfg["actions"], "confirm": "delete_or_send"}
+    # …and night-only learning (Lea chose permanent training; tests set it where they need it).
+    cfg["schedule"] = {**cfg["schedule"], "always": False}
     cfg["paths"] = {
         **cfg["paths"],
         "data_dir": str(tmp_path / "data"),

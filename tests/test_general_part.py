@@ -218,3 +218,30 @@ def test_train_now_ignores_the_window_but_still_stops_for_lea(tmp_path):
     later.tick()  # plugged in: starts by itself
     assert later.manual and "45" in started[-1]
     sc.proc.kill()  # the fake launcher put the process on `sc`
+
+
+def test_permanent_mode_trains_any_hour_after_a_short_quiet_spell(tmp_path):
+    from datetime import datetime
+
+    from learning.scheduler import Scheduler
+    from tests.test_orchestrator import make
+
+    s = make(tmp_path, [])
+    s.cfg["schedule"] = {
+        **s.cfg["schedule"],
+        "always": True,
+        "always_idle_minutes": 5,
+        "always_job_minutes": 240,
+    }
+    sc = Scheduler(s, power=lambda: True, clock=lambda: datetime(2026, 11, 7, 15, 0))  # afternoon
+    s.bg.last_activity = time.time() - 2 * 60
+    assert "used Sylvie" in sc.can_run()[1]  # she was talking 2 minutes ago
+    s.bg.last_activity = time.time() - 6 * 60
+    sc.used_tonight = 99 * 3600  # no nightly cap in this mode
+    assert sc.can_run() == (True, "ok")
+    assert "240" in sc.next_job().args
+    assert not Scheduler(s, power=lambda: False).can_run()[0]  # never on battery
+    s.cfg["schedule"] = {**s.cfg["schedule"], "always": False}
+    assert (
+        "window" in Scheduler(s, power=lambda: True, clock=lambda: datetime(2026, 11, 7, 15, 0)).can_run()[1]
+    )
