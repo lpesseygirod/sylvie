@@ -21,6 +21,7 @@ EVAL_SETS = [
     "multilingual",
     "tools",
     "general",
+    "knowledge",  # 150 held-out MMLU questions, 57 subjects (2026-11-07)
     "style",
     "memory",
     "lea_questions",

@@ -53,6 +53,21 @@ def number_candidates(text: str) -> list[float]:
     return out
 
 
+_CHOICE = [
+    re.compile(r"answer is[:\s]*\**\(?([A-D])\b"),
+    re.compile(r"^\W*\(?([A-D])\)?(?:[).:*\s]|$)", re.M),
+    re.compile(r"\*\*\(?([A-D])\)?[).:]?"),
+    re.compile(r"\b([A-D])\)"),
+]
+
+
+def chosen_letter(text: str) -> str | None:
+    for pat in _CHOICE:
+        if m := pat.search(text or ""):
+            return m.group(1)
+    return None
+
+
 def score(item: dict, answer: str, tools: list[str]) -> bool | None:
     c = item["check"]
     kind = c["type"]
@@ -69,6 +84,8 @@ def score(item: dict, answer: str, tools: list[str]) -> bool | None:
         if ok and c.get("lang"):
             ok = guess_language(answer, default=c["lang"]) == c["lang"]
         return ok
+    if kind == "choice":  # multiple choice (MMLU): the letter she picked
+        return chosen_letter(answer) == c["value"]
     if kind == "tool":
         first = tools[0] if tools else None
         return first == c["value"]

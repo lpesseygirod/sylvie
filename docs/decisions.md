@@ -238,3 +238,10 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **Training stops as soon as she hears "Sylvie"** (the greeting request), so the models reload while the greeting plays.
 - **Fine-tunes may come every 3 days** instead of 10. Promotion still needs no regressions and Lea's blind A/B.
 - **Trade-off:** while training, the Mac's memory is mostly taken (judge model ~18 GB), so other heavy apps can feel slower. The first answer after training stops takes a few seconds longer while she reloads. "Pause learning" in the menu bar turns it off.
+
+### T40 — A bigger, held-out general-knowledge test (2026-11-07)
+- Lea asked whether the tests change. **Practice questions change every run:** random draws from ~30k questions (GSM8K, MMLU, OpenAssistant). **The tests stay fixed on purpose,** so versions are compared fairly. The eval guard keeps them out of practice and training.
+- The fixed sets were small (~80 items), so a new `knowledge` set was added: 150 MMLU test questions, a few from each of the 57 subjects, with a fixed seed and scored by the letter (`evals/make_knowledge.py`).
+- **Also:**
+  - A server restart left its training job running unseen, so a second job doubled memory use. The scheduler now writes a pid file and stops a leftover job when it starts.
+  - Some MMLU lines contain Unicode line separators, so they are now read with `split("\n")`, not `splitlines()`.

@@ -245,3 +245,38 @@ def test_permanent_mode_trains_any_hour_after_a_short_quiet_spell(tmp_path):
     assert (
         "window" in Scheduler(s, power=lambda: True, clock=lambda: datetime(2026, 11, 7, 15, 0)).can_run()[1]
     )
+
+
+def test_knowledge_eval_set_is_scored_by_letter_and_kept_out_of_practice():
+    from evals.run import score
+    from learning.dataset import EvalGuard
+
+    rows = [json.loads(x) for x in Path("evals/sets/knowledge.jsonl").read_text().split("\n") if x.strip()]
+    assert len(rows) == 150 and len({r["subject"] for r in rows}) == 57
+    item = rows[0]
+    right = item["check"]["value"]
+    wrong = next(x for x in "ABCD" if x != right)
+    assert score(item, f"{right}) because…", []) is True
+    assert score(item, f"**{wrong}**", []) is False
+    assert EvalGuard().overlaps(item["prompt"])  # practice never sees it
+
+
+def test_a_job_left_by_a_previous_server_is_stopped(tmp_path):
+    import subprocess
+
+    from learning.scheduler import Scheduler
+    from tests.test_orchestrator import make
+
+    s = make(tmp_path, [])
+    (s.cfg.data_dir / "logs").mkdir(parents=True, exist_ok=True)
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "learning.fake"])
+    sc = Scheduler(s, power=lambda: True)
+    sc._pidfile().write_text(str(p.pid))
+    sc.stop_leftover()
+    assert p.wait(timeout=5) != 0
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])  # not ours: left alone
+    sc._pidfile().write_text(str(other.pid))
+    sc.stop_leftover()
+    time.sleep(0.3)
+    assert other.poll() is None
+    other.kill()

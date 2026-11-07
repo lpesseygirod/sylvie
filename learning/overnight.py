@@ -25,7 +25,7 @@ from pathlib import Path
 
 from core.config import ROOT, load_config
 from core.jsonutil import extract_json
-from evals.run import number_candidates
+from evals.run import chosen_letter, number_candidates
 from learning.dataset import EvalGuard
 
 RUBRIC = (ROOT / "core" / "prompts" / "rubric.md").read_text(encoding="utf-8")
@@ -98,35 +98,25 @@ def checkable_questions(path: Path, rng: random.Random, n: int) -> list[Item]:
 LETTERS = "ABCD"
 
 
+def mmlu_prompt(r: dict) -> str:
+    """Same wording in practice and in the held-out eval set (so the eval guard recognises it)."""
+    opts = "\n".join(f"{LETTERS[i]}) {c}" for i, c in enumerate(r["choices"]))
+    return f"{r['question']}\n\n{opts}\n\nWhich one is right? Give the letter, then one or two sentences why."
+
+
 def mmlu_questions(path: Path, rng: random.Random, n: int) -> list[Item]:
     """MMLU (MIT): multiple choice in 57 subjects (law, medicine, history, economics…), checked by code."""
     if not path.exists() or n <= 0:
         return []
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").split("\n") if line.strip()]
     out = []
     for r in rng.sample(rows, min(n, len(rows))):
         if len(r["choices"]) != 4:
             continue
-        opts = "\n".join(f"{LETTERS[i]}) {c}" for i, c in enumerate(r["choices"]))
-        q = f"{r['question']}\n\n{opts}\n\nWhich one is right? Give the letter, then one or two sentences why."
+        q = mmlu_prompt(r)
         out.append(Item(f"mmlu-{rng.randint(0, 10**9)}", q, "mmlu", choice=LETTERS[r["answer"]],
                         meta={"subject": r["subject"]}))  # fmt: skip
     return out
-
-
-_CHOICE = [
-    re.compile(r"answer is[:\s]*\**\(?([A-D])\b"),
-    re.compile(r"^\W*\(?([A-D])\)?(?:[).:*\s]|$)", re.M),
-    re.compile(r"\*\*\(?([A-D])\)?[).:]?"),
-    re.compile(r"\b([A-D])\)"),
-]
-
-
-def chosen_letter(text: str) -> str | None:
-    for pat in _CHOICE:
-        if m := pat.search(text or ""):
-            return m.group(1)
-    return None
 
 
 def oasst_questions(path: Path, rng: random.Random, n: int) -> list[Item]:

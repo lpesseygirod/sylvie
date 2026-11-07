@@ -174,7 +174,25 @@ class Scheduler:
         logf = open(self.s.cfg.data_dir / "logs" / f"{job.name}.log", "a")  # noqa: SIM115
         self.proc = subprocess.Popen(job.args, cwd=ROOT, env=env, stdout=logf, stderr=subprocess.STDOUT)
         self.current, self.started_at = job, time.time()
+        self._pidfile().write_text(str(self.proc.pid))
         self._keep_awake(self.proc.pid)
+
+    def _pidfile(self) -> Path:
+        return Path(self.s.cfg.data_dir) / "logs" / "heavy-job.pid"
+
+    def stop_leftover(self) -> None:
+        """A job started by a previous server (restarted meanwhile) would keep running unseen and
+        double the memory use with the next one (seen 2026-11-07). Stop it; it saves progress."""
+        try:
+            pid = int(self._pidfile().read_text())
+        except (OSError, ValueError):
+            return
+        cmd = subprocess.run(
+            ["/bin/ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True
+        ).stdout
+        if "learning." in cmd:
+            log.info("stopping a leftover heavy job (pid %s)", pid)
+            os.kill(pid, signal.SIGTERM)
 
     def _keep_awake(self, pid: int) -> None:
         """The Mac doesn't fall asleep mid-training (only while this job runs, and only on power)."""
@@ -224,6 +242,8 @@ class Scheduler:
         }
 
     def start(self) -> None:
+        self.stop_leftover()
+
         def loop():
             while True:
                 try:
