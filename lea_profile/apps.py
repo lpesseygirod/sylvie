@@ -88,6 +88,16 @@ APPS = {
             "Leave it in Downloads. Sylvie picks it up by herself.",
         ],
     },
+    "photos": {
+        "name": "Photos",
+        "what": "who and where you photograph; ask her “show me the photos with…”",
+        "how": [
+            "Open System Settings → Privacy & Security → Full Disk Access.",
+            "Press +, press ⌘⇧G, type ~/Library/Caches/SylvieBuild and choose Sylvie. Turn it on.",
+            "Quit Sylvie from the menu bar and open her again. When she asks to use Photos, press Allow.",
+            "In the Photos app, name the people you want her to know (People & Pets → Add Name).",
+        ],
+    },
     "whatsapp": {
         "name": "WhatsApp",
         "what": "who you talk to, and your chats when you ask about them (read on this Mac, never sent)",
@@ -493,8 +503,37 @@ class AppLearning:
             learned.append(sig.app)
         if self._learn_whatsapp(files):
             learned.append("whatsapp")
+        if self._learn_photos(files):
+            learned.append("photos")
         self._set(FILES_KEY, files)
         return learned
+
+    def _learn_photos(self, files: dict) -> bool:
+        """Who's in Lea's photos most, once per library copy (lea_profile/photos.py). Only names and
+        counts go to memory; the photos stay in Photos."""
+        from lea_profile.photos import get
+
+        try:
+            lib = get(self.s.cfg)
+            if lib is None:
+                return False
+            key = f"photos:{lib.version}"
+            if files.get("photos") == key:
+                return False
+            files["photos"] = key
+            people = [n for n, _ in lib.people()[:10]]
+            dates = [p.when for p in lib.photos.values() if p.when]
+        except (OSError, sqlite3.DatabaseError) as e:
+            log.warning("couldn't read the photo library copy: %s", e)
+            return False
+        if people:
+            self.s.memory.add(
+                f"The people in Lea's photos most often are: {', '.join(people)}.",
+                key="lea.photos.people", category="people", source="app:photos",
+            )  # fmt: skip
+        self._record("photos", lib.main_db, {"photos": len(lib.photos), "top": people,
+                     "since": f"{min(dates):%Y}" if dates else None}, [], None)  # fmt: skip
+        return True
 
     def _learn_whatsapp(self, files: dict) -> bool:
         """Who Lea writes to most, once per WhatsApp update. Only that goes to memory: the messages

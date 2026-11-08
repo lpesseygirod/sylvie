@@ -91,8 +91,11 @@ final class AppController: ObservableObject {
     /// (Lea, 2026-11-08: "when I ask for a song I don't want her to wait").
     private var musicThisTurn = false
 
+    private let photosSync = PhotosSync()
+
     func start() {
         hotKey = HotKey { [weak self] in self?.hotKeyPressed() }
+        photosSync.start()  // the Photos index, once Lea gave Sylvie Full Disk Access
         Task { await connect() }
         // Keep listening for "Sylvie" at all times: picks up permissions granted after launch and a
         // listener that stopped. (Measured 2026-11-06: the app was opened before Lea allowed Speech

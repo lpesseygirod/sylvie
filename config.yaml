@@ -129,6 +129,9 @@ zotero:
   enabled: true
   data_dir: ~/Zotero            # read only; Sylvie indexes a copy (knowledge/zotero.py)
 
+photos:                         # Lea, 2026-11-08: find photos by people/places/things (needs Full Disk Access for the Mac app)
+  enabled: true
+
 whatsapp:                       # Lea, 2026-11-08: read her chats on this Mac (read-only, never sent anywhere)
   enabled: true
   folder: ~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared

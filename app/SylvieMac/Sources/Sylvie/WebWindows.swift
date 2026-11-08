@@ -8,6 +8,7 @@ enum WebSetup {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.userContentController.add(handler, name: "sylvie")
+        config.setURLSchemeHandler(PhotoSchemeHandler.shared, forURLScheme: "sylvie-photo")  // Lea's photos
         return config
     }
 

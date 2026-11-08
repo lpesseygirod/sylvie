@@ -290,8 +290,24 @@
     return m;
   }
 
+  // Lea's photos (find_photos): shown by the Mac app through PhotoKit (sylvie-photo://), never copied.
+  function photosHtml(cards) {
+    if (!cards || !cards.length) return "";
+    return cards.map((c) => `<button class="photo" data-uuid="${esc(c.uuid)}" title="${esc(c.caption || "")}">
+      <img loading="lazy" alt="${esc(c.caption || "")}" src="sylvie-photo://thumb/${encodeURIComponent(c.uuid)}?s=360"
+        onerror="this.closest('.photo').classList.add('broken')"></button>`).join("");
+  }
+
+  function showPhoto(uuid, caption) {
+    const box = el("div", "photo-view");
+    box.innerHTML = `<img alt="" src="sylvie-photo://thumb/${encodeURIComponent(uuid)}?s=1600"><div class="caption">${esc(caption || "")}</div>`;
+    box.addEventListener("click", () => box.remove());
+    document.body.appendChild(box);
+  }
+
   function sourcesHtml(sources) {
-    if (!sources || !sources.length) return "";
+    sources = (sources || []).filter((s) => !s.photo);
+    if (!sources.length) return "";
     return sources.map((s) => s.url
       ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.url)}"><b>${s.n}</b>${esc(s.title || s.url)}</a>`
       : `<span title="${esc(s.path || "")}"><b>${s.n}</b>${esc(s.title || s.path || "")}</span>`).join("");
@@ -299,15 +315,18 @@
 
   function partsFor(root, m = {}) {
     root.innerHTML = `<div class="notes"></div><details class="thinking" hidden><summary>Thinking</summary><div></div></details>
-      <div class="status" hidden></div><div class="bubble"></div><div class="confirm-slot"></div><div class="sources"></div><div class="actions" hidden></div>`;
+      <div class="status" hidden></div><div class="bubble"></div><div class="confirm-slot"></div><div class="photos"></div><div class="sources"></div><div class="actions" hidden></div>`;
     const p = {
       root, bubble: $(".bubble", root), status: $(".status", root), notes: $(".notes", root), confirm: $(".confirm-slot", root),
       sources: $(".sources", root), actions: $(".actions", root), thinking: $("details.thinking", root),
+      photos: $(".photos", root),
       text: m.content || "", think: "", id: m.id || null, docs: [],
     };
     p.bubble.addEventListener("click", (e) => { const c = e.target.closest(".doc-card"); if (c) showDoc(p, +c.dataset.doc); });
     renderAnswer(p);
     if (m.sources) p.sources.innerHTML = sourcesHtml(m.sources);
+    if (m.sources) p.photos.innerHTML = photosHtml(m.sources.filter((s) => s.photo).map((s) => s.photo));
+    p.photos.addEventListener("click", (e) => { const b = e.target.closest(".photo"); if (b) showPhoto(b.dataset.uuid, b.title); });
     if (m.tool_calls) for (const t of m.tool_calls) addToolNote(p, t.name, t.arguments || t.args);
     if (m.id) renderActions(p, m);
     return p;
@@ -530,6 +549,9 @@
         break;
       case "sources":
         p.sources.innerHTML = sourcesHtml(ev.sources);
+        break;
+      case "photos":
+        p.photos.insertAdjacentHTML("beforeend", photosHtml(ev.items));
         break;
       case "notice":
         if (ev.kind === "preference") p.notes.appendChild(el("div", "note", icon("star", "i-14") + "Remembered: " + esc(ev.item.preference)));

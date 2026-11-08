@@ -348,3 +348,12 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   message contents are never stored, never training data. The copy on this Mac stops at 21 Nov 2025
   (WhatsApp Desktop isn't installed any more): reinstalling and linking it makes it current.
 - Instagram/TikTok stay download-only: no way to act in them for her (no API; automated use forbidden).
+- Photos: Apple Photos already names people, labels things and knows places. The Mac app (which has
+  Full Disk Access) copies the library's two index databases (Photos.sqlite, search/psi.sqlite) into
+  Sylvie's data folder at most every 6 h (Photos.sqlite is 867 MB here); `lea_profile/photos.py` searches
+  the copy (person, place, thing, dates, favourites) and the `find_photos` tool shows the matches in the
+  chat. The pictures themselves come from PhotoKit through `sylvie-photo://thumb/<uuid>` in the app's web
+  views (one "Allow Photos" prompt); none is copied or sent anywhere. Things are labelled in English by
+  Photos ("beach" 170 photos vs "playa" 28), so the tool asks for English things and local place names.
+  Memory gets only who appears most. Lea's library: 17,019 photos (1980–2026), 6,519 with a place,
+  4 people named — naming more people in Photos makes "photos with X" work for them.

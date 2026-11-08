@@ -160,6 +160,21 @@ WHATSAPP = _fn(
      "days": {"type": "integer", "description": "only the last N days (optional)"}},
     [],
 )  # fmt: skip
+FIND_PHOTOS = _fn(
+    "find_photos",
+    "Find photos and videos in Lea's Photos library and show them to her on screen. Use when she asks to "
+    "see photos (of someone, somewhere, of something, from a time). person: names as tagged in Photos "
+    "(several: comma-separated). query: places by their name ('Madrid', 'Mojácar') or things IN ENGLISH, "
+    "whatever language Lea speaks ('beach' not 'playa', 'food' not 'comida', 'snow', 'birthday', 'dog'): "
+    "that's how Photos labels them. "
+    "Dates as YYYY, YYYY-MM or YYYY-MM-DD.",
+    {"person": {"type": "string", "description": "who is in the photos (optional)"},
+     "query": {"type": "string", "description": "places or things (optional)"},
+     "date_from": {"type": "string", "description": "from this date (optional)"},
+     "date_to": {"type": "string", "description": "until this date (optional)"},
+     "favorites": {"type": "boolean", "description": "only her favourites (optional)"}},
+    [],
+)  # fmt: skip
 # After reading private messages, nothing may leave the Mac this turn (a query could carry them).
 LEAVES_THE_MAC = {"web_search", "open_url", "research", "ask_claude", "find_papers", "check_reference"}
 
@@ -189,6 +204,7 @@ class ToolResult:
     sources: list[dict] = field(default_factory=list)
     ok: bool = True
     pending: dict | None = None  # an action waiting for Lea's "yes"
+    photos: list[dict] | None = None  # photos to show Lea (uuid, date, caption)
 
 
 def _wiki(ctx: ToolContext):
@@ -205,6 +221,12 @@ def _zotero(ctx: ToolContext):
 
 def _whatsapp(ctx: ToolContext):
     from lea_profile.whatsapp import get
+
+    return get(ctx.cfg)
+
+
+def _photos(ctx: ToolContext):
+    from lea_profile.photos import get
 
     return get(ctx.cfg)
 
@@ -233,6 +255,8 @@ def available_tools(ctx: ToolContext) -> list[dict]:
         tools.append(SEARCH_DOCS)
     if _whatsapp(ctx) is not None:
         tools.append(WHATSAPP)
+    if _photos(ctx) is not None:
+        tools.append(FIND_PHOTOS)
     if ctx.actions is not None:
         tools += ctx.actions.tool_defs()
     if ctx.settings is not None:
@@ -300,6 +324,17 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
             "Mac. Answer from what you have.",
             ok=False,
         )
+    if call.name == "find_photos":
+        from lea_profile.photos import answer
+
+        lib = _photos(ctx)
+        if lib is None:
+            return ToolResult("Lea's Photos library isn't available to Sylvie yet.", ok=False)
+        fav = args.get("favorites") in (True, "true", "True", 1, "1")
+        text, cards = answer(
+            lib, *(str(args.get(k) or "") for k in ("query", "person", "date_from", "date_to")), fav
+        )
+        return ToolResult(text, photos=cards or None)
     if call.name == "whatsapp":
         from lea_profile.whatsapp import answer_lines
 

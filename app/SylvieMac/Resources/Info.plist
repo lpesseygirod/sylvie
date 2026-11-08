@@ -17,6 +17,8 @@
     <string>Sylvie turns Spotify down while she listens to you, and back up afterwards.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Sylvie uses on-device speech recognition to notice when you say “Sylvie”. Nothing is sent to Apple.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Sylvie shows you the photos you ask for (“show me the photos with Ana”). They stay on your Mac.</string>
     <key>NSAppTransportSecurity</key>
     <dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict>

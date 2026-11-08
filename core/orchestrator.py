@@ -627,9 +627,11 @@ class Sylvie:
                     tool_chars += len(result.content)
 
             called_tools = False
-            searched = (
-                False  # web_search ran this turn (Wikipedia alone isn't enough for prices or the weather)
-            )
+            # web_search ran this turn (Wikipedia alone isn't enough for prices or the weather)
+            searched = False
+            shown_photos: list[
+                dict
+            ] = []  # photos shown this turn: saved with the answer, shown again on reload
             nudged = False
             greeting = GreetingStripper(active=not greets(text))
             answer_nudged = False
@@ -749,7 +751,7 @@ class Sylvie:
                         "assistant",
                         "\n\n".join(p for p in display_parts if p),
                         model_content=visible,
-                        sources=tctx.sources or None,
+                        sources=(tctx.sources + [{"photo": c} for c in shown_photos]) or None,
                         trace=trace.to_dict(),
                         mode=mode,
                         channel=channel,
@@ -815,6 +817,9 @@ class Sylvie:
                                 )
                         if result.pending:
                             yield {"type": "action", "status": "pending", **result.pending}
+                        if result.photos:
+                            shown_photos += result.photos
+                            yield {"type": "photos", "items": result.photos}
                         if result.sources:
                             yield {"type": "sources", "sources": tctx.sources}
                     messages.append({"role": "tool", "content": content + turn_note})  # note: this turn only
