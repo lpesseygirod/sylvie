@@ -299,7 +299,7 @@ def test_not_a_clear_yes(text):
 def test_play_by_name_without_a_key_uses_web_search(tmp_path):
     from actions.runner import find_on_spotify
 
-    def searx(url, q, max_results):
+    def searx(url, q, max_results, engines=None):
         assert "site:open.spotify.com" in q
         return [
             {"url": "https://open.spotify.com/album/A1", "title": "Fireball - Single"},
@@ -371,3 +371,31 @@ def test_she_is_told_the_language_of_the_message_last(tmp_path):
     s = make(tmp_path, ["Fine, thanks!", "{}"])
     run(s, "Sylvie, how are you doing today?")
     assert s.llm.calls[0]["messages"][-1]["content"].endswith("(Reply in English.)")
+
+
+def test_song_lookup_asks_yahoo_when_the_usual_engines_refuse(tmp_path):
+    """2026-11-08: DuckDuckGo/Brave/Google blocked the search, so "Bloodline" found nothing."""
+    import actions.runner as r
+    from actions.runner import find_on_spotify
+
+    asked = []
+
+    def searx(url, q, max_results, engines=None):
+        asked.append(engines)
+        if engines != "yahoo":
+            return [{"url": "https://www.zhihu.com/question/1", "title": "unrelated"}]
+        return [
+            {
+                "url": "https://open.spotify.com/track/B1",
+                "title": "Bloodline - song and lyrics by Alex Warren",
+            }
+        ]
+
+    s = make(tmp_path, [])
+    original = r._web_api_search
+    r._web_api_search = lambda q: (_ for _ in ()).throw(r.SpotifyNotSetUp())
+    try:
+        assert find_on_spotify(s.cfg, "Bloodline", searx=searx) == ("spotify:track:B1", "Bloodline")
+    finally:
+        r._web_api_search = original
+    assert asked == [None, "yahoo"]

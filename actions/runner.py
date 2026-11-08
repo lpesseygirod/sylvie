@@ -201,11 +201,13 @@ def find_on_spotify(cfg, query: str, searx=None) -> tuple[str, str] | None:
     words = re.sub(
         r"\b(playlist|lista|album|álbum|artist|artista|songs by|canciones de)\b", " ", query, flags=re.I
     )
-    results = (searx or searxng)(
-        cfg.get_path("search.searxng_url", "http://127.0.0.1:8888"),
-        f"{words.strip()} site:open.spotify.com",
-        max_results=8,
-    )
+    url = cfg.get_path("search.searxng_url", "http://127.0.0.1:8888")
+    query_words = f"{words.strip()} site:open.spotify.com"
+    results = (searx or searxng)(url, query_words, max_results=8)
+    if not any(SPOTIFY_LINK.search(r.get("url", "")) for r in results):
+        # 2026-11-08: the default engines refused (CAPTCHA, rate limits), so "Bloodline" found nothing.
+        # Yahoo honours site: and still answered: ask it alone before giving up.
+        results = (searx or searxng)(url, query_words, max_results=8, engines="yahoo")
     found = []
     for r in results:
         m = SPOTIFY_LINK.search(r.get("url", ""))

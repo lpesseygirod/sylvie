@@ -43,6 +43,11 @@ search:
 outgoing:
   request_timeout: 7.0          # first connection to each engine takes ~2.4 s here (DNS + TLS)
   max_request_timeout: 9.0
+engines:                        # 2026-11-08: DuckDuckGo (CAPTCHA), Brave (too many requests) and Google (denied)
+  - name: yahoo                 # blocked automated searches; Yahoo and Bing still answered
+    disabled: false
+  - name: bing
+    disabled: false
 EOF
   chmod 600 "$SETTINGS"
 fi

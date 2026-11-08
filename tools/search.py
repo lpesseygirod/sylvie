@@ -31,11 +31,18 @@ def sanitize_query(query: str, private_terms: list[str]) -> str:
 
 
 def searxng(
-    base_url: str, query: str, max_results: int = 5, language: str | None = None, get=httpx.get
+    base_url: str,
+    query: str,
+    max_results: int = 5,
+    language: str | None = None,
+    get=httpx.get,
+    engines: str | None = None,
 ) -> list[dict]:
     params = {"q": query, "format": "json", "safesearch": 0}
     if language:
         params["language"] = language
+    if engines:
+        params["engines"] = engines
     for attempt in range(2):
         try:
             # SearXNG allows each engine 7 s; this waits a little longer for its answer.
