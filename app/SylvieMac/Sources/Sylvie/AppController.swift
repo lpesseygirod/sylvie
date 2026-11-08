@@ -259,7 +259,10 @@ final class AppController: ObservableObject {
 
     private func handle(_ samples: [Float]) {
         preRoll.append(samples)
-        guard recordingActive else { return }
+        guard recordingActive else {
+            if !speaker.isSpeaking { vad.trackBackground(samples) }  // keep the noise floor current
+            return
+        }
         // Without echo cancellation the mic hears Sylvie herself (her "Hello Lea", the chime): measured
         // 2026-11-06, her greeting ended up in Lea's question ("Sylvie. Hello Lea."). Leave those out.
         if !pipeline.echoCancelled && (speaker.isSpeaking || Date() < ignoreMicUntil) { return }

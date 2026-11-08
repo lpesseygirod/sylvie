@@ -41,6 +41,25 @@ final class SylvieCoreTests: XCTestCase {
         XCTAssertEqual(vad.process(silence), [.speechEnded])
     }
 
+    /// 2026-11-08: a floor learned in a quiet room, then louder room noise: the "utterance" never ended.
+    func testVADEndsWhenTheBackgroundGotLouder() {
+        let vad = VoiceActivityDetector()
+        XCTAssertEqual(vad.process([Float](repeating: 0.0005, count: 16000)), [])  // quiet night
+        let room = (0..<16000 * 3).map { Float(sin(Double($0) * 0.9)) * 0.01 }   // steady daytime noise
+        let speech = (0..<16000).map { Float(sin(Double($0) * 0.05)) * 0.3 }
+        let events = vad.process(speech) + vad.process(room)
+        XCTAssertEqual(events, [.speechStarted, .speechEnded])
+    }
+
+    func testVADFloorFollowsTheRoomBetweenQuestions() {
+        let vad = VoiceActivityDetector()
+        XCTAssertEqual(vad.process([Float](repeating: 0.0005, count: 16000)), [])
+        vad.reset()
+        let room = (0..<16000 * 3).map { Float(sin(Double($0) * 0.9)) * 0.01 }
+        vad.trackBackground(room)  // while she isn't recording
+        XCTAssertEqual(vad.process(room), [])  // the room alone is not speech
+    }
+
     func testVADNoSpeechTimeout() {
         var settings = VoiceActivityDetector.Settings()
         settings.noSpeechTimeoutSeconds = 1
