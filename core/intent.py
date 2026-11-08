@@ -43,8 +43,23 @@ ACTION_NOTE = (
     "or artist: pick something yourself from what you know she likes (her interests, earlier requests, "
     "saved playlists) or the mood she describes, play it with play_music (it finds and starts anything by "
     "name; no Spotify key is needed any more, whatever earlier conversations said), and say in a few words "
-    "what you put on. If she corrects you, just play what she says. Never ask her to click anything herself."
+    "what you put on. If she corrects you, just play what she says. Never ask her to click anything herself. "
+    "Only if her request is really unclear, ask ONE short question instead of acting."
 )
+
+# Appended to a successful music tool result (Lea, 2026-11-08: "just say done", no questions after a song).
+MUSIC_DONE_NOTE = (
+    '\n(Done. Answer Lea in one short sentence in {lang}, e.g. "{example}" '
+    "Don't ask her anything and don't offer anything else.)"
+)
+MUSIC_DONE_EXAMPLE = {
+    "English": "Done: La Reina, by Maluma.",
+    "Spanish": "Listo: La Reina, de Maluma.",
+    "French": "C'est parti : La Reina, de Maluma.",
+}
+# After a tool result the 9B drifted back to the conversation's earlier language (2026-11-08: asked in
+# English, answered in Spanish), so every tool result ends with the language of her last message.
+REPLY_LANGUAGE_NOTE = "\n(Answer Lea in {lang}, the language of her last message.)"
 
 CLAIM_NUDGE = (
     "(Check: you said you did it, but you didn't call any tool, so nothing happened. Call the right tool "

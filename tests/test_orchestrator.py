@@ -100,7 +100,7 @@ def test_tool_call_round_trip(tmp_path):
     ev = run(s, "what is 17% of 2340 euros")
     assert any(e["type"] == "tool" and e["name"] == "calculator" for e in ev)
     tool_msgs = [m for m in s.llm.calls[1]["messages"] if m["role"] == "tool"]
-    assert tool_msgs and tool_msgs[0]["content"] == "397.8"
+    assert tool_msgs and tool_msgs[0]["content"].startswith("397.8\n(Answer Lea in English")
     shown = s.convs.visible_messages(ev[0]["conversation_id"])[-1]["content"]
     assert "397.80" in shown and "tool_call" not in shown
 

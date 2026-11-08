@@ -54,5 +54,17 @@ def guess_language(text: str, default: str = "en") -> str:
     return best if scores[best] > 0 else default
 
 
+def clear_language(text: str) -> str | None:
+    """The language of `text` when it's clear (2+ telling words and a clear lead), else None.
+    Mixed or very short messages get None, so she may mix the way Lea does (persona)."""
+    words = re.findall(r"[\w']+", text.lower())
+    scores = {lang: sum(w in vocab for w in words) for lang, vocab in _WORDS.items()}
+    ranked = sorted(scores.values(), reverse=True)
+    best = max(scores, key=scores.get)
+    if ranked[0] >= 2 and ranked[0] >= 2 * ranked[1] and best == guess_language(text):
+        return best
+    return None
+
+
 def phrase(key: str, text: str) -> str:
     return PHRASES[key][guess_language(text)]

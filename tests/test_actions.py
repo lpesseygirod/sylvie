@@ -335,3 +335,39 @@ def test_spanish_claims_and_volume_requests_are_caught():
         assert looks_like_action(asked), asked
     for plain in ["¿Quieres que la suba un poco?", "What would you like to hear?"]:
         assert not claims_done(plain), plain
+
+
+def test_after_a_song_she_just_says_done(tmp_path):
+    """Lea, 2026-11-08: no "¿Te gusta el ritmo?" after a song, just done."""
+    play = "<tool_call>\n<function=play_music>\n<parameter=query>\nReina Maluma\n</parameter>\n</function>\n</tool_call>"
+    s = make(
+        tmp_path,
+        [play, "Listo: La Reina, de Maluma.", "{}"],
+        osa=FakeOSA({"play track": "La Reina — Maluma"}),
+    )
+    run(s, "Sylvie, pon Reina de Maluma")
+    tool_msgs = [m["content"] for m in s.llm.calls[1]["messages"] if m["role"] == "tool"]
+    assert tool_msgs and "Don't ask her anything" in tool_msgs[-1] and "in Spanish" in tool_msgs[-1]
+
+
+def test_tool_results_keep_her_language(tmp_path):
+    """2026-11-08: asked in English after Spanish turns, the answer came back in Spanish."""
+    play = "<tool_call>\n<function=play_music>\n<parameter=query>\nReina Maluma\n</parameter>\n</function>\n</tool_call>"
+    s = make(
+        tmp_path, [play, "Done: La Reina, by Maluma.", "{}"], osa=FakeOSA({"play track": "La Reina — Maluma"})
+    )
+    run(s, "Sylvie, can you play the song Reina by Maluma?")
+    tool_msgs = [m["content"] for m in s.llm.calls[1]["messages"] if m["role"] == "tool"]
+    assert "in English" in tool_msgs[-1] and "Done: La Reina, by Maluma." in tool_msgs[-1]
+
+
+def test_she_is_told_the_language_of_the_message_last(tmp_path):
+    """2026-11-08: English questions in a Spanish conversation got Spanish answers."""
+    from core.lang import clear_language
+
+    assert clear_language("Sylvie, what is 17 percent of 2340 euros?") == "en"
+    assert clear_language("Hola Sylvie, ¿qué tal?") == "es"
+    assert clear_language("ok") is None  # too short to tell: no instruction
+    s = make(tmp_path, ["Fine, thanks!", "{}"])
+    run(s, "Sylvie, how are you doing today?")
+    assert s.llm.calls[0]["messages"][-1]["content"].endswith("(Reply in English.)")

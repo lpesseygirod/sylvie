@@ -87,6 +87,9 @@ final class AppController: ObservableObject {
     private var startingAudio = false
     private var turnDone = false  // the server sent "done": once speech ends, listen for a follow-up
     private var spokeThisTurn = false
+    /// A song was put on (or the volume changed): don't keep the music down listening for more
+    /// (Lea, 2026-11-08: "when I ask for a song I don't want her to wait").
+    private var musicThisTurn = false
 
     func start() {
         hotKey = HotKey { [weak self] in self?.hotKeyPressed() }
@@ -298,6 +301,7 @@ final class AppController: ObservableObject {
         guard let api else { return }
         turnDone = false
         spokeThisTurn = false
+        musicThisTurn = false
         turnTask?.cancel()
         turnTask = Task { [weak self] in
             guard let self else { return }
@@ -328,6 +332,9 @@ final class AppController: ObservableObject {
         case "transcript":
             if let lang = event["language"] as? String { lastLanguage = lang }
             if (event["text"] as? String ?? "").isEmpty { state = .idle }
+        case "tool":
+            let name = event["name"] as? String ?? ""
+            if (name == "play_music" || name == "music"), event["ok"] as? Bool == true { musicThisTurn = true }
         case "speak":
             guard let text = event["text"] as? String else { return }
             spokeThisTurn = true
@@ -340,14 +347,14 @@ final class AppController: ObservableObject {
                 self.wake.listensForStop = false
                 self.wake.deaf = false
                 self.wake.restart()  // fresh transcript: what she said herself doesn't count
-                if self.turnDone { self.listenForFollowUp() }  // not between sentences, only at the end
+                if self.turnDone && !self.musicThisTurn { self.listenForFollowUp() }  // only at the end
             }
             speaker.say(text, language: event["language"] as? String ?? lastLanguage)
         case "done":
             turnDone = true
             if !speaker.isSpeaking && state == .thinking {
                 state = .idle
-                if spokeThisTurn { listenForFollowUp() }
+                if spokeThisTurn && !musicThisTurn { listenForFollowUp() }
             }
         case "error":
             detail = event["text"] as? String ?? "Something went wrong."

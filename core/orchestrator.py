@@ -24,12 +24,15 @@ from core.devices import Devices
 from core.intent import (
     ACTION_NOTE,
     CLAIM_NUDGE,
+    MUSIC_DONE_EXAMPLE,
+    MUSIC_DONE_NOTE,
+    REPLY_LANGUAGE_NOTE,
     WRITING_NOTE,
     claims_done,
     looks_like_action,
     looks_like_writing,
 )
-from core.lang import guess_language, phrase
+from core.lang import clear_language, guess_language, phrase
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
 from core.quick import GreetingStripper, greets, quick_reply
 from core.router import route
@@ -517,6 +520,11 @@ class Sylvie:
                     f'\n\n<untrusted source="file {a.name}">\n{a.text[:MAX_ATTACHMENT_CHARS]}\n</untrusted>'
                 )
             user_model = wrap_user_message(model_text, context)
+            # Last thing she reads before answering: the language Lea used. Measured 2026-11-08: in a Spanish
+            # conversation, English questions got Spanish answers (the note above, before her message, wasn't enough).
+            said_in = clear_language(text)
+            if said_in:
+                user_model += f"\n\n(Reply in {LANG_NAMES[said_in]}.)"
             self.db.execute("UPDATE messages SET model_content = ? WHERE id = ?", (user_model, user_mid))
 
             # 5. Route
@@ -722,6 +730,7 @@ class Sylvie:
                     elif call.name == "ask_claude":
                         yield {"type": "status", "text": phrase("claude", text)}
                     result = self._run_tool(call, tools, tctx, trace)
+                    turn_note = ""
                     if result is None:  # invalid call
                         invalid_calls += 1
                         err = validate(call, tools) or "Invalid tool call format."
@@ -737,6 +746,13 @@ class Sylvie:
                                 + "\n…(trimmed: you have enough material now; answer Lea with it)"
                             )
                         yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
+                        reply_lang = LANG_NAMES.get(guess_language(text), "English")
+                        if call.name in ("play_music", "music") and result.ok:
+                            # Lea, 2026-11-08: a song request gets "done", not questions ("¿Te gusta el ritmo?").
+                            example = MUSIC_DONE_EXAMPLE.get(reply_lang, MUSIC_DONE_EXAMPLE["English"])
+                            turn_note = MUSIC_DONE_NOTE.format(lang=reply_lang, example=example)
+                        else:
+                            turn_note = REPLY_LANGUAGE_NOTE.format(lang=reply_lang)
                         if call.name == "play_music" and result.ok:
                             # What she plays is her taste: it feeds the interests Sylvie picks music from.
                             q = str(call.arguments.get("query", "")).strip()
@@ -748,7 +764,7 @@ class Sylvie:
                             yield {"type": "action", "status": "pending", **result.pending}
                         if result.sources:
                             yield {"type": "sources", "sources": tctx.sources}
-                    messages.append({"role": "tool", "content": content})
+                    messages.append({"role": "tool", "content": content + turn_note})  # note: this turn only
                     self.convs.add_message(cid, "tool", "", model_content=content)
                     tool_chars += len(content)
 
