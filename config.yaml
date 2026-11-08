@@ -112,9 +112,9 @@ schedule:
   window_start: "01:00"         # heavy jobs only at night…
   window_end: "07:00"
   idle_minutes: 30              # …when Lea hasn't used Sylvie for this long…
-  max_hours_per_night: 5        # …plugged in (never on battery), within this cap
+  max_hours_per_night: 4        # …plugged in (never on battery), within this cap (Lea, 2026-11-08: 4 h)
   finetune_every_days: 3        # was 10; with permanent training there's enough new data sooner
-  always: true                  # Lea, 2026-11-07: train whenever Sylvie is unused (any hour), stop when she's used
+  always: false                 # Lea, 2026-11-08: back to nights only (was: any hour Sylvie is unused, from 2026-11-07)
   always_idle_minutes: 5        # …after this many quiet minutes (plugged in only; never on battery)
   always_job_minutes: 240       # one practice run, then the next starts while she's still unused
   interest_research: daily
