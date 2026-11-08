@@ -358,7 +358,11 @@ def test_tool_results_keep_her_language(tmp_path):
     )
     run(s, "Sylvie, can you play the song Reina by Maluma?")
     tool_msgs = [m["content"] for m in s.llm.calls[1]["messages"] if m["role"] == "tool"]
-    assert "in English" in tool_msgs[-1] and "Done: La Reina, by Maluma." in tool_msgs[-1]
+    assert (
+        "in English" in tool_msgs[-1]
+        and 'starting "Done"' in tool_msgs[-1]
+        and "Maluma" not in tool_msgs[-1].split("(Done")[1]
+    )
 
 
 def test_she_is_told_the_language_of_the_message_last(tmp_path):
@@ -399,3 +403,11 @@ def test_song_lookup_asks_yahoo_when_the_usual_engines_refuse(tmp_path):
     finally:
         r._web_api_search = original
     assert asked == [None, "yahoo"]
+
+
+def test_short_spanish_commands_are_spanish():
+    """2026-11-08 (make apps): "Llama a mamá" was answered in English ("a" counted as English)."""
+    from core.lang import reply_language
+
+    assert reply_language("Llama a mamá") == "es" and reply_language("Abre Spotify") == "es"
+    assert reply_language("Next song please") == "en"

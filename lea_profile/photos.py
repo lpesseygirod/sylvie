@@ -251,7 +251,8 @@ _libraries: dict[str, PhotoLibrary] = {}
 
 
 def folder(cfg) -> Path:
-    return cfg.data_dir / "app-data" / "photos"
+    custom = cfg.get_path("photos.folder", "")  # the evals point it at a made-up library
+    return Path(custom).expanduser() if custom else cfg.data_dir / "app-data" / "photos"
 
 
 def get(cfg) -> PhotoLibrary | None:

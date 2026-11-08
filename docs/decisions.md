@@ -361,3 +361,16 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   never called a tool. Now: an answer that promises a search (EN/ES/FR) without one sends her back to
   call web_search; "búscame", "look it up", "datos/estadísticas/data" count as look-up requests; a "sí"
   to her own "¿quieres que lo busque?" does too. `make everyday` has these cases: 35/35.
+
+### T47 — More things she can do in apps (Lea, 2026-11-08: "put Bridgerton on Netflix… send a message… and see that she does it")
+- New actions: `watch` (Netflix, YouTube, Prime Video, Disney+, Max, Movistar Plus+, Apple TV: starts the
+  exact title when SearXNG finds its Netflix/YouTube page, else opens the service's search),
+  `send_message` (Messages/iMessage, to a contact found in Contacts by how Lea calls them — "mamá" finds
+  "Mama"; WhatsApp opens the chat with the text written for her to send, once WhatsApp is installed),
+  `call` (FaceTime, which shows the call first), `directions` (Apple Maps), `create_note` (Notes, undoable).
+  send_message follows Lea's confirm setting like send_email (she chose "never": it sends at once).
+  Several contacts with the same name → she asks which one.
+- `make apps`: 28 requests across all app actions, checked for the tool and a key argument, with fake
+  apps, a made-up photo library and made-up WhatsApp chats. First run 25/28 ("Llama a mamá" answered in
+  English; she copied the example song "La Reina, by Maluma" from her own instructions; "Abre Spotify"
+  played music) → fixed → 28/28; everyday 35/35.

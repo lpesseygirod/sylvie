@@ -69,7 +69,7 @@ def chosen_letter(text: str) -> str | None:
     return None
 
 
-def score(item: dict, answer: str, tools: list[str]) -> bool | None:
+def score(item: dict, answer: str, tools: list[str], calls: list | None = None) -> bool | None:
     c = item["check"]
     kind = c["type"]
     if kind == "number":
@@ -96,13 +96,20 @@ def score(item: dict, answer: str, tools: list[str]) -> bool | None:
         emoji = bool(EMOJI.search(answer)) and not EMOJI.search(item["prompt"])
         return words <= c.get("max_words", 120) and not BANNED.search(answer) and same_lang and not emoji
     if kind == "everyday":
-        return not everyday_problems(item, answer, tools)
+        return not everyday_problems(item, answer, tools, calls)
     return None  # "judge" items are rated by Lea in the blind A/B
 
 
-def everyday_problems(item: dict, answer: str, tools: list[str]) -> list[str]:
+def everyday_problems(item: dict, answer: str, tools: list[str], calls: list | None = None) -> list[str]:
     """What went wrong with an everyday question (empty: she did it)."""
     c, problems = item["check"], []
+    if c.get("arg") and calls is not None:  # [name, text]: some call of the tool carries it
+        key, want = c["arg"]
+        if not any(
+            n == c.get("tool") and _norm(want) in _norm(str((a or {}).get(key, ""))) for n, a in calls
+        ):
+            got = [a for n, a in calls if n == c.get("tool")]
+            problems.append(f"{c.get('tool')} without {key} ~ '{want}' (got {got[:2]})")
     wanted = [c["tool"]] if isinstance(c.get("tool"), str) else c.get("tool") or []
     if wanted and not set(wanted) & set(tools):  # any of them (looking it up in Wikipedia is fine for facts)
         problems.append(f"didn't call {' or '.join(wanted)} (called {', '.join(tools) or 'nothing'})")
@@ -182,6 +189,18 @@ def run(
     limit: int | None = None,
 ) -> dict:
     s = build_sylvie(adapter, model)
+    if "apps" in sets:  # a made-up photo library and WhatsApp (tests/), never Lea's own
+        from tests.test_photos import fake_library
+        from tests.test_whatsapp import fake_whatsapp
+
+        fake = Path(tempfile.mkdtemp(prefix="sylvie-eval-apps-"))
+        s.cfg["photos"] = {"enabled": True, "folder": str(fake_library(fake / "photos"))}
+        s.cfg["whatsapp"] = {"enabled": True, "folder": str(fake_whatsapp(fake / "wa"))}
+        from actions.scripts import CONTACTS_ALL, MESSAGES_SEND, NOTE_CREATE
+        from tests.test_app_actions import CONTACTS
+
+        s.actions.osa.outputs.update({CONTACTS_ALL.strip()[:40]: CONTACTS + "Ana García\t+34 600 777 888,\t\n",
+                                      MESSAGES_SEND.strip()[:40]: "sent", NOTE_CREATE.strip()[:40]: "note-1"})  # fmt: skip
     s.warm()
     results = []
     for item in load_items(sets, limit):
@@ -192,7 +211,7 @@ def run(
             for ev in s.turn(before, conversation_id=cid):
                 cid = ev["conversation_id"] if ev["type"] == "meta" else cid
         t0 = time.perf_counter()
-        answer, tools, first = "", [], None
+        answer, tools, first, calls = "", [], None, []
         for ev in s.turn(
             item["prompt"],
             conversation_id=cid,
@@ -204,14 +223,15 @@ def run(
                 answer += ev["text"]
             elif ev["type"] == "tool":
                 tools.append(ev["name"])
-        ok = score(item, answer, tools)
+                calls.append((ev["name"], ev.get("args")))
+        ok = score(item, answer, tools, calls)
         results.append(
-            {"id": item["id"], "set": item["set"], "prompt": item["prompt"], "answer": answer, "tools": tools, "ok": ok,
+            {"id": item["id"], "set": item["set"], "prompt": item["prompt"], "answer": answer, "tools": tools, "calls": calls, "ok": ok,
              "first_word_s": round(first or 0, 2), "total_s": round(time.perf_counter() - t0, 2)}
         )  # fmt: skip
         mark = {True: "✓", False: "✗", None: "·"}[ok]
         why = (
-            "  <- " + "; ".join(everyday_problems(item, answer, tools))
+            "  <- " + "; ".join(everyday_problems(item, answer, tools, calls))
             if ok is False and item["check"]["type"] == "everyday"
             else ""
         )
@@ -263,7 +283,7 @@ def rescore(path: Path) -> dict:
     items = {i["id"]: i for i in load_items(sorted({r["set"] for r in report["results"]}), None)}
     for r in report["results"]:
         if r["id"] in items:
-            r["ok"] = score(items[r["id"]], r["answer"], r["tools"])
+            r["ok"] = score(items[r["id"]], r["answer"], r["tools"], r.get("calls"))
     summary = {}
     for r in report["results"]:
         sm = summary.setdefault(r["set"], {"n": 0, "scored": 0, "correct": 0})

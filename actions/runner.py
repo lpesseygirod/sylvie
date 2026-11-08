@@ -18,6 +18,7 @@ import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -47,7 +48,8 @@ INT = {"type": "integer"}
 TOOLS = {
     "music": _fn(
         "music",
-        "Spotify playback controls with NO song name: play (= resume what was playing), pause, next, previous, "
+        "Spotify playback controls with NO song name (to just open an app, Spotify too, use open_app): "
+        "play (= resume what was playing), pause, next, previous, "
         "volume_up, volume_down, set_volume (0-100; 'max' = 100), now_playing. Volume is the Mac's volume. To play a specific song, artist, album or "
         "playlist, use play_music instead.",
         {
@@ -143,9 +145,120 @@ TOOLS = {
         {"to": STR, "subject": STR, "body": STR},
         ["to", "subject", "body"],
     ),
+    # Lea, 2026-11-08: "put Bridgerton on Netflix", "send a message to…", "and much more"
+    "watch": _fn(
+        "watch",
+        "Put on a series, film or video for Lea: Netflix (default), YouTube, Prime Video, Disney+, Max, "
+        "Movistar Plus+ or Apple TV. It opens in her browser and starts by itself when the exact title is "
+        "found (Netflix, YouTube); otherwise the service's search for it opens.",
+        {
+            "title": STR,
+            "service": {
+                **STR,
+                "enum": ["netflix", "youtube", "prime", "disney", "max", "movistar", "appletv"],
+            },
+        },
+        ["title"],
+    ),
+    "send_message": _fn(
+        "send_message",
+        "Send a text message to someone. app 'messages' (default: iMessage/SMS with the Messages app) sends it; "
+        "app 'whatsapp' opens the WhatsApp chat with the message written, and Lea presses send. to: the "
+        "person as Lea calls them ('Mamá', 'Inés') or a phone number. Write the text as Lea would, in her words.",
+        {"to": STR, "text": STR, "app": {**STR, "enum": ["messages", "whatsapp"]}},
+        ["to", "text"],
+    ),
+    "call": _fn(
+        "call",
+        "Call someone with FaceTime (audio unless video is true). FaceTime shows the call before it starts. "
+        "to: the person as Lea calls them, or a phone number.",
+        {"to": STR, "video": {"type": "boolean"}},
+        ["to"],
+    ),
+    "directions": _fn(
+        "directions",
+        "Open Apple Maps with directions to a place. mode: driving (default), walking or transit.",
+        {"destination": STR, "mode": {**STR, "enum": ["driving", "walking", "transit"]}},
+        ["destination"],
+    ),
+    "create_note": _fn(
+        "create_note",
+        "Write a note in the Notes app (a list, an idea, something to keep).",
+        {"title": STR, "body": STR},
+        ["title", "body"],
+    ),
 }
 
-NEEDS_YES = {"send_email", "run_shortcut"}
+# Where each service's search lives (the fallback when the exact title isn't found).
+WATCH_SEARCH = {
+    "netflix": "https://www.netflix.com/search?q={q}",
+    "youtube": "https://www.youtube.com/results?search_query={q}",
+    "prime": "https://www.primevideo.com/search/ref=atv_nb_sr?phrase={q}",
+    "disney": "https://www.disneyplus.com/search?q={q}",
+    "max": "https://play.max.com/search?q={q}",
+    "movistar": "https://ver.movistarplus.es/busqueda/?q={q}",
+    "appletv": "https://tv.apple.com/search?term={q}",
+}
+NETFLIX_TITLE = re.compile(r"netflix\.com/(?:[a-z]{2}(?:-[a-z]{2})?/)?(?:title|watch)/(\d+)", re.I)
+YOUTUBE_VIDEO = re.compile(r"youtube\.com/watch\?v=([\w-]{11})|youtu\.be/([\w-]{11})", re.I)
+
+
+def find_to_watch(cfg, service: str, title: str, searx=None) -> str | None:
+    """A link that starts `title` right away (Netflix /watch/<id>, a YouTube video), found through
+    Lea's local SearXNG like songs are (find_on_spotify). None: open the service's search instead."""
+    from tools.search import searxng
+
+    site = {"netflix": "netflix.com/title", "youtube": "youtube.com/watch"}.get(service)
+    if not site:
+        return None
+    url = cfg.get_path("search.searxng_url", "http://127.0.0.1:8888")
+    try:
+        results = (searx or searxng)(url, f"{title} site:{site}", max_results=8)
+        if not results:
+            results = (searx or searxng)(url, f"{title} site:{site}", max_results=8, engines="yahoo")
+    except Exception:
+        return None
+    for r in results:
+        u = r.get("url", "")
+        if service == "netflix" and (m := NETFLIX_TITLE.search(u)):
+            return f"https://www.netflix.com/watch/{m.group(1)}"
+        if service == "youtube" and (m := YOUTUBE_VIDEO.search(u)):
+            return f"https://www.youtube.com/watch?v={m.group(1) or m.group(2)}"
+    return None
+
+
+def _fold(s: str) -> str:
+    s = unicodedata.normalize("NFKD", (s or "").lower())
+    return "".join(c for c in s if not unicodedata.combining(c)).strip()
+
+
+# What Lea calls someone → how Contacts may spell it
+NICKNAMES = {
+    "mama": ["mama", "mamá", "mum", "mom", "madre", "maman"],
+    "papa": ["papa", "papá", "dad", "padre", "papi"],
+}
+
+
+def match_contacts(
+    people: list[tuple[str, list[str], list[str]]], wanted: str
+) -> list[tuple[str, list[str], list[str]]]:
+    """Contacts matching how Lea named someone: the whole name, then a first name, then a nickname."""
+    w = _fold(wanted)
+    exact = [p for p in people if _fold(p[0]) == w]
+    if exact:
+        return exact
+    words = [p for p in people if w in _fold(p[0]).split() or _fold(p[0]).startswith(w + " ")]
+    if words:
+        return words
+    for key, names in NICKNAMES.items():
+        if w in names or w == key:
+            hits = [p for p in people if any(n in _fold(p[0]).split() for n in names)]
+            if hits:
+                return hits
+    return [p for p in people if len(w) > 3 and w in _fold(p[0])]
+
+
+NEEDS_YES = {"send_email", "run_shortcut", "send_message"}
 
 
 @dataclass
@@ -247,7 +360,10 @@ class ActionRunner:
         has_spotify: Callable[[], bool] | None = None,
         spotify_search: Callable[[str], tuple[str, str] | None] | None = None,
         shell_runner: Callable | None = None,
+        find_title: Callable[[str, str], str | None] | None = None,
     ):
+        self.find_title = find_title or (lambda service, title: find_to_watch(self.cfg, service, title))
+        self._contacts: tuple[float, list] | None = None
         self.has_spotify = has_spotify or spotify_installed
         self.shell_runner = shell_runner or subprocess.run
         self.spotify_search = spotify_search or (lambda q: find_on_spotify(self.cfg, q))
@@ -270,7 +386,7 @@ class ActionRunner:
             return True
         if mode == "never":
             return False
-        if name == "send_email":
+        if name in ("send_email", "send_message"):
             return True
         if name == "run_command":
             return shell.deletes_or_sends(cmd) if mode == "delete_or_send" else not shell.is_read_only(cmd)
@@ -353,6 +469,8 @@ class ActionRunner:
                 self.osa.run(scripts.CALENDAR_DELETE, rec.undo["uid"])
             elif rec.undo["kind"] == "reminder":
                 self.osa.run(scripts.REMINDER_DELETE, rec.undo["id"])
+            elif rec.undo["kind"] == "note":
+                self.osa.run(scripts.NOTE_DELETE, rec.undo["id"])
             elif rec.undo["kind"] == "timer":
                 t = self.timers.pop(action_id, None)
                 if t:
@@ -408,7 +526,61 @@ class ActionRunner:
                 return "a timer must be between a few seconds and 24 hours."
         return None
 
+    # ---------- people ----------
+    def contacts(self) -> list[tuple[str, list[str], list[str]]]:
+        """Lea's Contacts (name, phones, emails), read with AppleScript and kept for 10 minutes."""
+        import time
+
+        if self._contacts and time.time() - self._contacts[0] < 600:
+            return self._contacts[1]
+        raw = self.osa.run(scripts.CONTACTS_ALL, timeout=60)
+        people = []
+        for line in raw.splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 3 and parts[0].strip():
+                people.append((parts[0].strip(), [x for x in parts[1].split(",") if x.strip()],
+                               [x for x in parts[2].split(",") if x.strip()]))  # fmt: skip
+        self._contacts = (time.time(), people)
+        return people
+
+    def _whatsapp_phone(self, wanted: str) -> str | None:
+        """The phone number of a WhatsApp chat named like `wanted` (lea_profile/whatsapp.py)."""
+        from lea_profile.whatsapp import get
+
+        wa = get(self.cfg)
+        if wa is None:
+            return None
+        try:
+            jid = wa.phone_for(wanted)
+        except Exception:
+            return None
+        return jid
+
+    def _resolve(self, wanted: str, want_email: bool = False) -> tuple[str | None, str]:
+        """(phone or email, name) for a person, or (None, why not)."""
+        w = str(wanted).strip()
+        if re.fullmatch(r"\+?[\d\s().-]{6,}", w):
+            return re.sub(r"[^\d+]", "", w), w
+        try:
+            hits = match_contacts(self.contacts(), w)
+        except OSAError as e:
+            return None, f"couldn't read Contacts ({e})"
+        if not hits:
+            return None, f"there's no contact called {w} in Contacts"
+        if len({h[0] for h in hits}) > 1:
+            return None, "several contacts match: " + ", ".join(
+                sorted({h[0] for h in hits})[:6]
+            ) + ". Ask Lea which one."
+        name, phones, emails = hits[0]
+        handle = (emails or phones)[0] if want_email else (phones or emails or [None])[0]
+        if not handle:
+            return None, f"{name} has no phone number or email in Contacts"
+        return handle.strip(), name
+
     def _summary(self, name: str, a: dict) -> str:
+        if name == "send_message":
+            app = "WhatsApp" if a.get("app") == "whatsapp" else "Messages"
+            return f'Send a message to {a["to"]} ({app}): "{a["text"]}"'
         if name == "send_email":
             body = str(a["body"])
             preview = body if len(body) < 400 else body[:400] + "…"
@@ -544,6 +716,83 @@ class ActionRunner:
                     + (raw or "(none)")
                     + "\n</untrusted>"
                 )
+            if name == "watch":
+                service = str(a.get("service") or "netflix").lower()
+                service = service if service in WATCH_SEARCH else "netflix"
+                title = str(a["title"]).strip()
+                link = self.find_title(service, title)
+                url = link or WATCH_SEARCH[service].format(q=quote(title))
+                p = self.run_cmd(["open", url])
+                if p.returncode != 0:
+                    return ActionOutcome("Couldn't open the browser.", ok=False)
+                where = {"netflix": "Netflix", "youtube": "YouTube", "prime": "Prime Video", "disney": "Disney+",
+                         "max": "Max", "movistar": "Movistar Plus+", "appletv": "Apple TV"}[service]  # fmt: skip
+                if link:
+                    return ActionOutcome(f"{title} is starting on {where} in the browser.")
+                return ActionOutcome(
+                    f"Opened {where}'s search for {title} in the browser (couldn't find the exact title to start "
+                    "it directly): Lea picks it there."
+                )
+            if name == "send_message":
+                text = str(a["text"]).strip()
+                if a.get("app") == "whatsapp":
+                    phone = self._whatsapp_phone(str(a["to"])) or self._resolve(str(a["to"]))[0]
+                    if not phone or "@" in phone:
+                        return ActionOutcome(f"Couldn't find a WhatsApp number for {a['to']}.", ok=False)
+                    if not any(
+                        Path(d).exists()
+                        for d in (
+                            "/Applications/WhatsApp.app",
+                            str(Path.home() / "Applications/WhatsApp.app"),
+                        )
+                    ):
+                        return ActionOutcome(
+                            "WhatsApp isn't installed on this Mac, so the message can't be written there. Tell Lea; "
+                            "Messages works, or she can install WhatsApp from the App Store.",
+                            ok=False,
+                        )
+                    digits = re.sub(r"\D", "", phone)
+                    p = self.run_cmd(["open", f"whatsapp://send?phone={digits}&text={quote(text)}"])
+                    return ActionOutcome(
+                        f"WhatsApp is open with the message to {a['to']} written; Lea presses send.",
+                        ok=p.returncode == 0,
+                    )
+                handle, who = self._resolve(str(a["to"]))
+                if handle is None:
+                    return ActionOutcome(f"Not sent: {who}.", ok=False)
+                res = self.osa.run(scripts.MESSAGES_SEND, text, handle, timeout=30)
+                if res == "sent":
+                    return ActionOutcome(f"Message sent to {who}.")
+                return ActionOutcome("Messages didn't confirm it was sent.", ok=False)
+            if name == "call":
+                handle, who = self._resolve(str(a["to"]))
+                if handle is None:
+                    return ActionOutcome(f"No call: {who}.", ok=False)
+                scheme = "facetime" if a.get("video") in (True, "true", 1) else "facetime-audio"
+                p = self.run_cmd(["open", f"{scheme}://{quote(handle)}"])
+                return ActionOutcome(
+                    f"FaceTime is calling {who}." if p.returncode == 0 else "Couldn't open FaceTime.",
+                    ok=p.returncode == 0,
+                )
+            if name == "directions":
+                flag = {"walking": "w", "transit": "r"}.get(str(a.get("mode") or ""), "d")
+                p = self.run_cmd(["open", f"maps://?daddr={quote(str(a['destination']))}&dirflg={flag}"])
+                return ActionOutcome(
+                    f"Maps is open with directions to {a['destination']}."
+                    if p.returncode == 0
+                    else "Couldn't open Maps.",
+                    ok=p.returncode == 0,
+                )
+            if name == "create_note":
+                import html
+
+                body = "<br>".join(html.escape(line) for line in str(a["body"]).splitlines())
+                nid = self.osa.run(
+                    scripts.NOTE_CREATE, str(a["title"]), f"<h1>{html.escape(str(a['title']))}</h1>{body}"
+                )
+                out = ActionOutcome(f'Note "{a["title"]}" written in Notes.')
+                out.undo = {"kind": "note", "id": nid}
+                return out
             if name in ("draft_email", "send_email"):
                 sender = self.cfg.get_path("actions.mail_from", "") or ""
                 res = self.osa.run(

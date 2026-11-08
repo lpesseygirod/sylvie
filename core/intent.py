@@ -17,7 +17,16 @@ ACTION_RE = re.compile(
     r"volume|volumen|louder|quieter|turn (it )?(up|down)|sube|s[uú]bele|baja|b[aá]jale|monte|baisse|"
     r"calendar|event|meeting|appointment|remind|reminder|timer|alarm|open|"
     r"calendario|agenda|evento|cita|reuni[oó]n|recu[eé]rdame|recordatorio|temporizador|alarma|abre|"
-    r"rendez-vous|rappelle|rappel|minuteur|ouvre)\b",
+    r"rendez-vous|rappelle|rappel|minuteur|ouvre|"
+    # 2026-11-08: series, messages, calls, directions, notes. Specific phrases only: "ver", "películas" or
+    # "text" alone are questions too ("¿qué películas hay hoy?" must still be looked up, not acted on).
+    r"netflix|youtube|prime video|disney\+?|hbo|movistar|"
+    r"pon(me)? (la serie|la peli(cula)?|el capítulo)|put on (the )?(series|show|movie|film)|mets(-moi)? (la s[ée]rie|le film)|"
+    r"(send|m[aá]nda(le)?|env[ií]a(le)?|envoie(-lui)?) (a |an |un |una )?(message|mensaje|text|whatsapp|sms)|"
+    r"escr[ií]be(le)? a|dile a|text (my|her|him)|[ée]cris [àa]|"
+    r"call (my|her|him|mom|mum|dad)|ll[aá]ma(le)? a|appelle|facetime|"
+    r"directions|ruta (a|para|hasta)|c[oó]mo (llego|voy) a|how do i get to|navigate to|itin[ée]raire|"
+    r"(make|write|take|create) a note|apunta|(crea|haz|escribe) una nota|prends note)\b",
     re.I,
 )
 
@@ -48,15 +57,13 @@ ACTION_NOTE = (
 )
 
 # Appended to a successful music tool result (Lea, 2026-11-08: "just say done", no questions after a song).
+# 2026-11-08 (make apps): with a concrete example song ("La Reina, by Maluma") she copied it when the
+# result named no song. Now: the opening word only, and the song only if the result names it.
 MUSIC_DONE_NOTE = (
-    '\n(Done. Answer Lea in one short sentence in {lang}, e.g. "{example}" '
-    "Don't ask her anything and don't offer anything else.)"
+    '\n(Done. Answer Lea in one short sentence in {lang}, starting "{example}", and name the song only if '
+    "the result above names it. Don't ask her anything and don't offer anything else.)"
 )
-MUSIC_DONE_EXAMPLE = {
-    "English": "Done: La Reina, by Maluma.",
-    "Spanish": "Listo: La Reina, de Maluma.",
-    "French": "C'est parti : La Reina, de Maluma.",
-}
+MUSIC_DONE_EXAMPLE = {"English": "Done", "Spanish": "Listo", "French": "C'est fait"}
 # After a tool result the 9B drifted back to the conversation's earlier language (2026-11-08: asked in
 # English, answered in Spanish), so every tool result ends with the language of her last message.
 REPLY_LANGUAGE_NOTE = "\n(Answer Lea in {lang}, the language of her last message.)"

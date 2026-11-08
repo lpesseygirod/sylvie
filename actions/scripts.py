@@ -198,3 +198,52 @@ on run argv
     display notification (item 2 of argv) with title (item 1 of argv) sound name "Glass"
 end run
 """
+
+# Every contact: "name<TAB>phone,phone<TAB>email,email" per line (Lea's Contacts, read on the Mac).
+CONTACTS_ALL = """
+on run argv
+    set out to ""
+    tell application "Contacts"
+        repeat with p in people
+            set ph to ""
+            repeat with x in phones of p
+                set ph to ph & (value of x) & ","
+            end repeat
+            set em to ""
+            repeat with x in emails of p
+                set em to em & (value of x) & ","
+            end repeat
+            set out to out & (name of p) & tab & ph & tab & em & linefeed
+        end repeat
+    end tell
+    return out
+end run
+"""
+
+# iMessage (or SMS through her iPhone) with the Messages app.
+MESSAGES_SEND = """
+on run argv
+    set theText to item 1 of argv
+    set theHandle to item 2 of argv
+    tell application "Messages"
+        set svc to 1st account whose service type = iMessage
+        send theText to participant theHandle of svc
+    end tell
+    return "sent"
+end run
+"""
+
+NOTE_CREATE = """
+on run argv
+    tell application "Notes"
+        set n to make new note with properties {name:(item 1 of argv), body:(item 2 of argv)}
+        return id of n
+    end tell
+end run
+"""
+
+NOTE_DELETE = """
+on run argv
+    tell application "Notes" to delete (note id (item 1 of argv))
+end run
+"""

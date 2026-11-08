@@ -1,0 +1,28 @@
+{"set": "apps", "id": "app-0", "prompt": "Sylvie, pon Bridgerton en Netflix", "check": {"type": "everyday", "lang": "es", "tool": "watch", "arg": ["title", "bridgerton"]}}
+{"set": "apps", "id": "app-1", "prompt": "Put Stranger Things on Netflix", "check": {"type": "everyday", "lang": "en", "tool": "watch", "arg": ["title", "stranger things"]}}
+{"set": "apps", "id": "app-2", "prompt": "Mets-moi Lupin sur Netflix", "check": {"type": "everyday", "lang": "fr", "tool": "watch", "arg": ["title", "lupin"]}}
+{"set": "apps", "id": "app-3", "prompt": "Ponme un vídeo de recetas de pasta en YouTube", "check": {"type": "everyday", "lang": "es", "tool": "watch", "arg": ["service", "youtube"]}}
+{"set": "apps", "id": "app-4", "prompt": "Quiero ver The Mandalorian en Disney", "check": {"type": "everyday", "lang": "es", "tool": "watch", "arg": ["service", "disney"]}}
+{"set": "apps", "id": "app-5", "prompt": "Sylvie, enséñame las fotos con mamá", "check": {"type": "everyday", "lang": "es", "tool": "find_photos", "arg": ["person", "mam"]}}
+{"set": "apps", "id": "app-6", "prompt": "Show me my photos from the beach", "check": {"type": "everyday", "lang": "en", "tool": "find_photos", "arg": ["query", "beach"]}}
+{"set": "apps", "id": "app-7", "prompt": "¿Tengo fotos de algún cumpleaños con Ana?", "check": {"type": "everyday", "lang": "es", "tool": "find_photos", "arg": ["person", "ana"]}}
+{"set": "apps", "id": "app-8", "prompt": "¿Qué me ha dicho mamá por WhatsApp?", "check": {"type": "everyday", "lang": "es", "tool": "whatsapp", "arg": ["contact", "mam"]}}
+{"set": "apps", "id": "app-9", "prompt": "What did Ana say about the exam on WhatsApp?", "check": {"type": "everyday", "lang": "en", "tool": "whatsapp", "arg": ["contact", "ana"]}}
+{"set": "apps", "id": "app-10", "prompt": "Mándale un mensaje a mamá diciendo que llego tarde", "check": {"type": "everyday", "lang": "es", "tool": "send_message", "arg": ["text", "tarde"]}}
+{"set": "apps", "id": "app-11", "prompt": "Text Ana that I'll be there in 10 minutes", "check": {"type": "everyday", "lang": "en", "tool": "send_message", "arg": ["to", "ana"]}}
+{"set": "apps", "id": "app-12", "prompt": "Envoie un message à Inés : je t'appelle ce soir", "check": {"type": "everyday", "lang": "fr", "tool": "send_message", "arg": ["to", "in"]}}
+{"set": "apps", "id": "app-13", "prompt": "Escríbele a mamá por WhatsApp que ya he llegado", "check": {"type": "everyday", "lang": "es", "tool": "send_message", "arg": ["app", "whatsapp"]}}
+{"set": "apps", "id": "app-14", "prompt": "Llama a mamá", "check": {"type": "everyday", "lang": "es", "tool": "call", "arg": ["to", "mam"]}}
+{"set": "apps", "id": "app-15", "prompt": "Call Ana on FaceTime video", "check": {"type": "everyday", "lang": "en", "tool": "call", "arg": ["to", "ana"]}}
+{"set": "apps", "id": "app-16", "prompt": "¿Cómo llego a la Puerta del Sol andando?", "check": {"type": "everyday", "lang": "es", "tool": "directions", "arg": ["destination", "sol"]}}
+{"set": "apps", "id": "app-17", "prompt": "How do I get to Madrid-Barajas airport?", "check": {"type": "everyday", "lang": "en", "tool": "directions", "arg": ["destination", "barajas"]}}
+{"set": "apps", "id": "app-18", "prompt": "Apunta en una nota: comprar leche, huevos y pan", "check": {"type": "everyday", "lang": "es", "tool": "create_note", "arg": ["body", "leche"]}}
+{"set": "apps", "id": "app-19", "prompt": "Abre Spotify", "check": {"type": "everyday", "lang": "es", "tool": "open_app", "arg": ["name", "spotify"]}}
+{"set": "apps", "id": "app-20", "prompt": "Open the Notes app", "check": {"type": "everyday", "lang": "en", "tool": "open_app", "arg": ["name", "notes"]}}
+{"set": "apps", "id": "app-21", "prompt": "Pon música para estudiar", "check": {"type": "everyday", "lang": "es", "tool": "play_music"}}
+{"set": "apps", "id": "app-22", "prompt": "Sube el volumen", "check": {"type": "everyday", "lang": "es", "tool": "music", "arg": ["command", "volume_up"]}}
+{"set": "apps", "id": "app-23", "prompt": "Next song please", "check": {"type": "everyday", "lang": "en", "tool": "music", "arg": ["command", "next"]}}
+{"set": "apps", "id": "app-24", "prompt": "Añade al calendario cena con Ana el viernes a las 9 de la noche", "check": {"type": "everyday", "lang": "es", "tool": "create_event", "arg": ["title", "ana"]}}
+{"set": "apps", "id": "app-25", "prompt": "Recuérdame comprar el regalo de mamá mañana a las 6", "check": {"type": "everyday", "lang": "es", "tool": "create_reminder", "arg": ["title", "regalo"]}}
+{"set": "apps", "id": "app-26", "prompt": "Pon un temporizador de 20 minutos para la pasta", "check": {"type": "everyday", "lang": "es", "tool": "set_timer", "arg": ["minutes", "20"]}}
+{"set": "apps", "id": "app-27", "prompt": "Lee mis últimos correos", "check": {"type": "everyday", "lang": "es", "tool": "read_emails"}}

@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval everyday finetune ui-test general-pack import-general learn-now mmlu wikipedia
+.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval everyday apps finetune ui-test general-pack import-general learn-now mmlu wikipedia
 
 setup:
 	uv sync
@@ -70,6 +70,9 @@ eval:
 
 everyday:   # ~32 everyday questions (weather, TV, songs, language switching); fake apps, throwaway memory
 	$(UV) python evals/run.py --label everyday --sets everyday
+
+apps:   # 28 app requests (Netflix, photos, messages, calls, maps, notes…); fake apps, made-up photos and chats
+	$(UV) python evals/run.py --label apps --sets apps
 
 learn-now:   # practice + fine-tune now instead of waiting for the night (stops when you talk to Sylvie)
 	$(UV) python scripts/api.py POST /api/schedule/now '{"minutes": $(or $(MINUTES),180)}'

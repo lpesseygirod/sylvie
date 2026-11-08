@@ -239,6 +239,56 @@ EVERYDAY = [
 ]
 
 
+# Lea, 2026-11-08: "make more tests of access to apps… and see that she does it". Each checks the tool
+# she calls and one argument it must carry. Run against fake apps, a made-up photo library and made-up
+# WhatsApp chats (evals/run.py): nothing is sent, played or opened for real.
+APPS = [
+    ("Sylvie, pon Bridgerton en Netflix", "es", "watch", ("title", "bridgerton")),
+    ("Put Stranger Things on Netflix", "en", "watch", ("title", "stranger things")),
+    ("Mets-moi Lupin sur Netflix", "fr", "watch", ("title", "lupin")),
+    ("Ponme un vídeo de recetas de pasta en YouTube", "es", "watch", ("service", "youtube")),
+    ("Quiero ver The Mandalorian en Disney", "es", "watch", ("service", "disney")),
+    ("Sylvie, enséñame las fotos con mamá", "es", "find_photos", ("person", "mam")),
+    ("Show me my photos from the beach", "en", "find_photos", ("query", "beach")),
+    ("¿Tengo fotos de algún cumpleaños con Ana?", "es", "find_photos", ("person", "ana")),
+    ("¿Qué me ha dicho mamá por WhatsApp?", "es", "whatsapp", ("contact", "mam")),
+    ("What did Ana say about the exam on WhatsApp?", "en", "whatsapp", ("contact", "ana")),
+    ("Mándale un mensaje a mamá diciendo que llego tarde", "es", "send_message", ("text", "tarde")),
+    ("Text Ana that I'll be there in 10 minutes", "en", "send_message", ("to", "ana")),
+    ("Envoie un message à Inés : je t'appelle ce soir", "fr", "send_message", ("to", "in")),
+    ("Escríbele a mamá por WhatsApp que ya he llegado", "es", "send_message", ("app", "whatsapp")),
+    ("Llama a mamá", "es", "call", ("to", "mam")),
+    ("Call Ana on FaceTime video", "en", "call", ("to", "ana")),
+    ("¿Cómo llego a la Puerta del Sol andando?", "es", "directions", ("destination", "sol")),
+    ("How do I get to Madrid-Barajas airport?", "en", "directions", ("destination", "barajas")),
+    ("Apunta en una nota: comprar leche, huevos y pan", "es", "create_note", ("body", "leche")),
+    ("Abre Spotify", "es", "open_app", ("name", "spotify")),
+    ("Open the Notes app", "en", "open_app", ("name", "notes")),
+    ("Pon música para estudiar", "es", "play_music", None),
+    ("Sube el volumen", "es", "music", ("command", "volume_up")),
+    ("Next song please", "en", "music", ("command", "next")),
+    (
+        "Añade al calendario cena con Ana el viernes a las 9 de la noche",
+        "es",
+        "create_event",
+        ("title", "ana"),
+    ),
+    ("Recuérdame comprar el regalo de mamá mañana a las 6", "es", "create_reminder", ("title", "regalo")),
+    ("Pon un temporizador de 20 minutos para la pasta", "es", "set_timer", ("minutes", "20")),
+    ("Lee mis últimos correos", "es", "read_emails", None),
+]
+
+
+def apps_items() -> list[dict]:
+    items = []
+    for i, (prompt, lang, tool, arg) in enumerate(APPS):
+        check = {"type": "everyday", "lang": lang, "tool": tool}
+        if arg:
+            check["arg"] = list(arg)
+        items.append({"id": f"app-{i}", "prompt": prompt, "check": check})
+    return items
+
+
 def everyday_items() -> list[dict]:
     items = []
     for i, e in enumerate(EVERYDAY):
@@ -259,6 +309,7 @@ def main() -> None:
         "general": general_items(),
         "style": style_items(),
         "everyday": everyday_items(),
+        "apps": apps_items(),
     }
     for name, items in sets.items():
         with open(SETS / f"{name}.jsonl", "w", encoding="utf-8") as f:

@@ -96,7 +96,8 @@ voice:
 actions:
   # Allowlist: only these can ever be called. Remove one to switch it off; [] turns all actions off.
   enabled: [music, play_music, save_playlist, calendar_events, create_event, create_reminder, set_timer,
-            open_app, open_in_browser, run_shortcut, run_command, read_emails, draft_email, send_email]
+            open_app, open_in_browser, run_shortcut, run_command, read_emails, draft_email, send_email,
+            watch, send_message, call, directions, create_note]   # the last five: Lea, 2026-11-08
   # run_command: Terminal commands (Lea, 2026-11-06). sudo, disk erasing, wiping folders, Keychain
   # passwords and curl|sh never run. Remove it here to switch off.
   confirm: never   # Lea, 2026-11-06: "never ask" (delete_or_send | changes are the other options)

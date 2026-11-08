@@ -148,6 +148,18 @@ class WhatsApp:
             hits.append(m)
         return hits[-limit:]
 
+    def phone_for(self, name: str) -> str | None:
+        """The phone number of the one-to-one chat named like `name` ('Mamá' → +34…)."""
+        want = _fold(name).strip()
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT ZPARTNERNAME, ZCONTACTJID FROM ZWACHATSESSION WHERE ZSESSIONTYPE = 0 AND ZCONTACTJID LIKE '%@s.whatsapp.net'"
+            ).fetchall()
+        exact = [j for n, j in rows if n and _fold(n) == want]
+        words = [j for n, j in rows if n and want in _fold(n).split()]
+        hits = exact or words
+        return "+" + hits[0].split("@")[0] if len(set(hits)) == 1 else None
+
     def top_people(self, days: int = 365, n: int = 10) -> list[tuple[str, int]]:
         """The one-to-one chats with the most messages over the last `days` of the database."""
         last = self.last_date()
