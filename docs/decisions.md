@@ -299,3 +299,15 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   own words only, so rule 4 holds.
 - Each run now records why rewrites were dropped (`dropped`: empty / no_gain / too_long / still_wrong)
   in the night summary, so a run that keeps nothing explains itself.
+
+### T44 — Learning Lea's tastes from her apps (Lea's idea, 2026-11-08)
+- Through each app's own "download your data" (Spotify, Instagram, TikTok, Google Takeout), never by
+  signing in: Sylvie can't enter Lea's passwords, and TikTok/Instagram forbid automated access. The
+  downloads are read on the Mac (`lea_profile/apps.py`), from ~/Downloads or `App exports/`, and left untouched.
+- Spotify: most-played (≥30 s) and liked artists → interests `music: <artist>` + one fact.
+  Instagram: its own topic list for her. TikTok searches/hashtags and YouTube channels/searches/titles
+  and Drive file names → topics picked by the local model, in the background when she's away.
+  Google Docs from Takeout are copied into Sylvie's data folder and added to document search.
+- Every interest starts as a "guess" (About Lea → Interests: confirm / not me / delete); sensitive
+  topics are filtered as everywhere else. Facts from apps are memory only, never training data (rule 4).
+- First run: the chat window opens About Lea → Your apps until she ticks her apps or says "None of these".

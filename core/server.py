@@ -80,6 +80,10 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
 
                     state["sylvie"].claude_history = ClaudeHistory(state["sylvie"])
                     state["sylvie"].claude_history.start()
+                    from lea_profile.apps import AppLearning
+
+                    state["sylvie"].app_learning = AppLearning(state["sylvie"])
+                    state["sylvie"].app_learning.start()  # Spotify/Instagram/TikTok/Google downloads
                     # Index conversations from before episodic memory existed (when Lea is away).
                     s = state["sylvie"]
                     s.bg.submit("episodes-backfill", lambda ev: s.episodes.backfill(stop=ev), backlog=True)
@@ -467,6 +471,27 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
             raise HTTPException(400, str(e)) from e
         except KeyError as e:
             raise HTTPException(404, "no such suggestion") from e
+
+    def _apps():
+        a = getattr(S(), "app_learning", None)
+        if a is None:
+            from lea_profile.apps import AppLearning
+
+            a = S().app_learning = AppLearning(S())
+        return a
+
+    @app.get("/api/apps")
+    def apps_overview():
+        """The apps Sylvie can learn Lea's tastes from, how to get each download, what she learned."""
+        return _apps().overview()
+
+    @app.post("/api/apps/chosen")
+    def apps_chosen(body: dict = Body(...)):
+        return {"chosen": _apps().choose([str(x) for x in body.get("apps", [])])}
+
+    @app.post("/api/apps/scan")
+    def apps_scan():
+        return {"learned": _apps().scan()}
 
     @app.get("/api/profile")
     def profile():

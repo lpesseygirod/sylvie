@@ -188,6 +188,7 @@ class Sylvie:
         self.scheduler = None  # set by the server (learning/scheduler.py)
         self.bg.hold = lambda: self.scheduler is not None and self.scheduler.proc is not None
         self.claude_history = None  # set by the server (memory/claude_history.py)
+        self.app_learning = None  # set by the server (lea_profile/apps.py)
         self._stops: dict[str, threading.Event] = {}
         self._stt = None
         self._tts = None

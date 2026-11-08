@@ -686,6 +686,36 @@
       refreshBadge();
       return;
     }
+    if (memTab === "apps") {
+      const ov = await api("/api/apps");
+      const intro = ov.asked
+        ? "Sylvie learns what you like from the apps you use. You download your own data from each app (Sylvie never logs in to your accounts); when it lands in Downloads she reads it on this Mac and nothing is sent anywhere."
+        : "Which apps do you use most? Sylvie can learn what you like from them: you download your own data from each app (Sylvie never logs in to your accounts), and when it lands in Downloads she reads it on this Mac. Nothing is sent anywhere.";
+      body.appendChild(el("p", "meta", intro));
+      for (const a of ov.apps) {
+        const st = a.status;
+        const learned = st
+          ? `<div class="meta">Learned ${esc(st.learned_at.slice(0, 10))} from ${esc(st.file)}${st.topics && st.topics.length ? ": " + esc(st.topics.slice(0, 12).join(", ")) : ""}${st.documents_indexed ? ` · ${st.documents_indexed} documents now searchable` : ""}</div>`
+          : "";
+        const how = a.chosen && !st ? `<ol class="meta">${a.how.map((h) => `<li>${esc(h)}</li>`).join("")}</ol>` : "";
+        const r = el("div", "item", `<div class="txt"><label><input type="checkbox" ${a.chosen ? "checked" : ""}> <b>${esc(a.name)}</b></label>
+          <div class="meta">${esc(a.what)}</div>${learned}${how}</div>`);
+        $("input", r).onchange = async () => {
+          const picked = [...body.querySelectorAll(".item input:checked")].map((x) => x.closest(".item").dataset.key);
+          await api("/api/apps/chosen", { method: "POST", body: { apps: picked } });
+          renderMemory();
+        };
+        r.dataset.key = a.key;
+        body.appendChild(r);
+      }
+      const row = el("div", "add-row");
+      if (!ov.asked) row.appendChild(btn("None of these", () => api("/api/apps/chosen", { method: "POST", body: { apps: [] } })));
+      const check = btn("Check Downloads now", () => api("/api/apps/scan", { method: "POST" }));
+      check.className = "btn btn-primary";
+      row.appendChild(check);
+      body.appendChild(row);
+      return;
+    }
     const prof = await api("/api/profile");
     if (memTab === "preferences") {
       const add = el("div", "add-row", `<input placeholder="Add a rule, e.g. “Don't use emojis”" aria-label="New preference"><button class="btn btn-primary">Add</button>`);
@@ -830,5 +860,13 @@
   pollHealth();
   refreshBadge();
   setInterval(refreshBadge, 60000);
+  // First run: ask which apps she uses most, so Sylvie can learn what she likes (Lea, 2026-11-08).
+  if (!PANEL) api("/api/apps").then((ov) => {
+    if (ov.asked || $("#memory-dialog").open) return;
+    memTab = "apps";
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("active", x.dataset.tab === "apps"));
+    $("#memory-dialog").showModal();
+    renderMemory();
+  }).catch(() => {});
   loadConvs().then(() => { if (params.get("c")) openConv(params.get("c")); });
 })();

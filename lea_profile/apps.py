@@ -1,0 +1,515 @@
+"""Learning what Lea likes from the apps she uses most (Lea's request, 2026-11-08).
+
+No logins and no scraping: Sylvie never signs in to Lea's accounts (and TikTok/Instagram forbid
+automated access). Every one of these apps lets Lea download her own data ("Download your data",
+Google Takeout). When such a download lands in ~/Downloads (or the App exports folder), Sylvie
+reads it on this Mac and learns from it:
+
+  Spotify    her most-played and liked artists         → interests "music: <artist>", one fact
+  Instagram  the topics Instagram itself lists for her → interests (its own topic names)
+  TikTok     what she searched, hashtags she saved     → topics, picked by the local model
+  Google     YouTube watched/searched, Drive file names → topics; Docs go into her document search
+
+Nothing is uploaded anywhere, the downloads are never changed or deleted, and every interest is a
+"guess" Lea can confirm, reject or delete in About Lea → Interests. Learned facts are memory, never
+training data.
+"""
+
+from __future__ import annotations
+
+import csv
+import io
+import json
+import logging
+import re
+import threading
+import zipfile
+from collections import Counter, deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+
+from core.jsonutil import extract_json
+
+log = logging.getLogger("sylvie.apps")
+
+CHOSEN_KEY = "apps.chosen"  # the apps Lea said she uses most (None = never asked)
+STATUS_KEY = "apps.status"  # per app: what was learned, from which file, when
+FILES_KEY = "apps.files"  # export files already read: name → size:mtime
+MAX_EXPORT_BYTES = 4_000_000_000
+MAX_MEMBER_BYTES = 200_000_000
+DOC_SUFFIXES = (".docx", ".pdf", ".txt", ".md", ".odt", ".rtf")
+
+APPS = {
+    "spotify": {
+        "name": "Spotify",
+        "what": "the artists you play and like",
+        "how": [
+            "Open spotify.com/account/privacy (signed in).",
+            "Under “Download your data”, tick “Account data” and press “Request data”.",
+            "Confirm the email; a day or two later Spotify emails a link to my_spotify_data.zip.",
+            "Download it. Sylvie picks it up from Downloads by herself.",
+        ],
+    },
+    "instagram": {
+        "name": "Instagram",
+        "what": "the topics Instagram thinks you like",
+        "how": [
+            "Instagram → Settings → Accounts Center → Your information and permissions → Download your information.",
+            "Choose “Some of your information”: Your topics, Ads information, Likes. Format: JSON.",
+            "When it's ready (minutes to a day), download the .zip. Sylvie picks it up from Downloads.",
+        ],
+    },
+    "tiktok": {
+        "name": "TikTok",
+        "what": "what you search and the hashtags you save",
+        "how": [
+            "TikTok → Profile → ☰ → Settings and privacy → Account → Download your data.",
+            "Choose JSON and “All data”, then Request data.",
+            "When it's ready (a few days), download it from the same screen. Sylvie picks it up from Downloads.",
+        ],
+    },
+    "google": {
+        "name": "Google (Docs and YouTube)",
+        "what": "your Docs (searchable by Sylvie) and what you watch on YouTube",
+        "how": [
+            "Open takeout.google.com. Press “Deselect all”, then tick Drive and YouTube and YouTube Music.",
+            "For YouTube, keep history and subscriptions; JSON is fine.",
+            "Next step → Export once → .zip. Google emails a link; download the .zip(s) to Downloads.",
+        ],
+    },
+}
+
+
+@dataclass
+class Signals:
+    """What one export says about Lea, before anything is saved."""
+
+    app: str
+    topics: list[tuple[str, float]] = field(default_factory=list)  # ready-made topic names, weight
+    items: list[str] = field(default_factory=list)  # raw signals (searches, titles) for the model
+    facts: list[str] = field(default_factory=list)
+    docs: list[tuple[str, bytes]] = field(default_factory=list)  # (name, content) to index
+    counts: dict = field(default_factory=dict)
+
+
+# ---------- reading exports ----------
+class Export:
+    """A zip, a folder or a single JSON file, read the same way (member name → bytes)."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self._zip = zipfile.ZipFile(path) if path.suffix.lower() == ".zip" else None
+
+    def names(self) -> list[str]:
+        if self._zip is not None:
+            return [
+                i.filename for i in self._zip.infolist() if not i.is_dir() and i.file_size <= MAX_MEMBER_BYTES
+            ]
+        if self.path.is_dir():
+            return [str(p.relative_to(self.path)) for p in self.path.rglob("*") if p.is_file()]
+        return [self.path.name]
+
+    def read(self, name: str) -> bytes:
+        if self._zip is not None:
+            return self._zip.read(name)
+        if self.path.is_dir():
+            return (self.path / name).read_bytes()
+        return self.path.read_bytes()
+
+    def json(self, name: str):
+        try:
+            return json.loads(self.read(name).decode("utf-8", "replace"))
+        except ValueError:
+            return None
+
+    def close(self) -> None:
+        if self._zip is not None:
+            self._zip.close()
+
+
+def identify(path: Path, names: list[str]) -> str | None:
+    """Which app an export comes from, by its file name and what's inside."""
+    low = path.name.lower()
+    inside = " ".join(n.lower() for n in names[:4000])
+    if (
+        "spotify" in low
+        or "streaminghistory" in inside
+        or "streaming_history_audio" in inside
+        or "yourlibrary.json" in inside
+    ):
+        return "spotify"
+    if low.startswith("takeout") or "takeout/" in inside:
+        return "google"
+    if "tiktok" in low or "user_data_tiktok" in inside:
+        return "tiktok"
+    if (
+        low.startswith(("instagram-", "meta-"))
+        or "your_instagram_activity" in inside
+        or "instagram_ads" in inside
+    ):
+        return "instagram"
+    return None
+
+
+def _strings(obj, keys: set[str]) -> list[str]:
+    """Every string value under one of `keys`, anywhere in a JSON tree."""
+    out: list[str] = []
+    stack = deque([obj])  # first in, first out: keeps the export's order
+    while stack:
+        o = stack.popleft()
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k in keys and isinstance(v, str) and v.strip():
+                    out.append(v.strip())
+                elif isinstance(v, (dict, list)):
+                    stack.append(v)
+        elif isinstance(o, list):
+            stack.extend(o)
+    return out
+
+
+def read_spotify(ex: Export) -> Signals:
+    sig = Signals("spotify")
+    played: Counter = Counter()
+    liked: Counter = Counter()
+    for name in ex.names():
+        base = name.rsplit("/", 1)[-1].lower()
+        if not base.endswith(".json"):
+            continue
+        if base.startswith(("streaminghistory", "streaming_history_audio")):
+            for row in ex.json(name) or []:
+                if not isinstance(row, dict):
+                    continue
+                artist = row.get("artistName") or row.get("master_metadata_album_artist_name")
+                ms = row.get("msPlayed") or row.get("ms_played") or 0
+                if artist and ms >= 30_000:  # skips under 30 s don't count
+                    played[artist] += ms / 60_000
+        elif base == "yourlibrary.json":
+            data = ex.json(name) or {}
+            for t in data.get("tracks", []) if isinstance(data, dict) else []:
+                if isinstance(t, dict) and t.get("artist"):
+                    liked[t["artist"]] += 1
+            for a in data.get("artists", []) if isinstance(data, dict) else []:
+                if isinstance(a, dict) and a.get("name"):
+                    liked[a["name"]] += 3
+    total: Counter = Counter()
+    for a, minutes in played.items():
+        total[a] += minutes / 10
+    for a, n in liked.items():
+        total[a] += n * 2
+    top = [a for a, _ in total.most_common(25)]
+    if top:
+        best = total[top[0]] or 1
+        sig.topics = [(f"music: {a}", round(1 + 2 * total[a] / best, 1)) for a in top]
+        sig.facts = [f"Lea's favourite artists on Spotify (most played and liked): {', '.join(top[:12])}."]
+    sig.counts = {"artists_played": len(played), "liked_artists": len(liked), "top": top[:10]}
+    return sig
+
+
+def read_instagram(ex: Export) -> Signals:
+    sig = Signals("instagram")
+    topics: list[str] = []
+    for name in ex.names():
+        low = name.lower()
+        if not low.endswith(".json"):
+            continue
+        if "topics" in low or "ads_interests" in low or "ads_and_topics" in low:
+            topics += _strings(ex.json(name), {"value", "Name", "name", "title"})
+    clean = [t for t in dict.fromkeys(topics) if 1 < len(t) <= 60 and not t.startswith("http")]
+    sig.topics = [(t, 1.5) for t in clean[:60]]
+    sig.counts = {"topics": len(clean), "top": clean[:10]}
+    return sig
+
+
+def read_tiktok(ex: Export) -> Signals:
+    sig = Signals("tiktok")
+    searches: list[str] = []
+    tags: list[str] = []
+    for name in ex.names():
+        if not name.lower().endswith(".json"):
+            continue
+        data = ex.json(name)
+        searches += _strings(data, {"SearchTerm", "searchTerm"})
+        for link in _strings(data, {"Link", "link", "HashtagName", "Hashtag"}):
+            m = re.search(r"/tag/([^/?#]+)", link)
+            if m:
+                tags.append(m.group(1))
+            elif not link.startswith("http"):
+                tags.append(link.lstrip("#"))
+    counted = Counter(s.lower() for s in searches)
+    sig.items = [s for s, _ in counted.most_common(150)] + [f"#{t}" for t in dict.fromkeys(tags)][:50]
+    sig.counts = {
+        "searches": len(searches),
+        "hashtags": len(set(tags)),
+        "top": [s for s, _ in counted.most_common(10)],
+    }
+    return sig
+
+
+def read_google(ex: Export) -> Signals:
+    sig = Signals("google")
+    watched_channels: Counter = Counter()
+    titles: list[str] = []
+    searches: list[str] = []
+    subs: list[str] = []
+    doc_names: list[str] = []
+    for name in ex.names():
+        low = name.lower()
+        base = name.rsplit("/", 1)[-1]
+        if "youtube" in low and base == "watch-history.json":
+            for row in ex.json(name) or []:
+                if not isinstance(row, dict):
+                    continue
+                t = str(row.get("title", ""))
+                if t.startswith("Watched "):
+                    titles.append(t[len("Watched ") :])
+                for sub in row.get("subtitles") or []:
+                    if isinstance(sub, dict) and sub.get("name"):
+                        watched_channels[sub["name"]] += 1
+        elif "youtube" in low and base == "search-history.json":
+            for row in ex.json(name) or []:
+                t = str(row.get("title", "")) if isinstance(row, dict) else ""
+                if t.startswith("Searched for "):
+                    searches.append(t[len("Searched for ") :])
+        elif "youtube" in low and base.lower() == "subscriptions.csv":
+            reader = csv.DictReader(io.StringIO(ex.read(name).decode("utf-8", "replace")))
+            subs += [r.get("Channel Title") or r.get("Channel title") or "" for r in reader]
+        elif "/drive/" in low and low.endswith(DOC_SUFFIXES):
+            doc_names.append(base.rsplit(".", 1)[0])
+            if len(sig.docs) < 500:
+                sig.docs.append((name, ex.read(name)))
+    channels = [c for c, _ in watched_channels.most_common(40)] + [s for s in subs if s][:40]
+    sig.items = (
+        [f"YouTube channel: {c}" for c in dict.fromkeys(channels)]
+        + [f"YouTube search: {s}" for s, _ in Counter(searches).most_common(80)]
+        + [f"Watched: {t}" for t in titles[:150]]
+        + [f"Document: {d}" for d in doc_names[:120]]
+    )
+    sig.counts = {
+        "videos_watched": len(titles),
+        "youtube_searches": len(searches),
+        "subscriptions": len([s for s in subs if s]),
+        "documents": len(doc_names),
+        "top": channels[:10],
+    }
+    return sig
+
+
+READERS = {"spotify": read_spotify, "instagram": read_instagram, "tiktok": read_tiktok, "google": read_google}
+
+TOPICS_PROMPT = """Below is what Lea did on {app}: {kind}. Name the topics and interests it shows she
+cares about (hobbies, music, subjects, sports, places, creators, styles). Ignore one-off noise.
+Use short topic names (1-4 words) in English. Never include anything about health, religion,
+politics, sexuality or other sensitive matters.
+
+<data>
+{data}
+</data>
+
+Return JSON only: {{"topics": [{{"topic": "<name>", "strength": <1-3>}}]}} with at most 25 topics."""
+
+
+def topics_from_items(llm, app: str, items: list[str]) -> list[tuple[str, float]]:
+    """The local model turns raw signals (searches, titles) into topic names."""
+    if not items:
+        return []
+    kind = {"tiktok": "searches and saved hashtags", "google": "YouTube and Google Drive activity"}.get(
+        app, "activity"
+    )
+    data = "\n".join(i[:120] for i in items[:300])
+    raw = llm.complete(
+        [{"role": "user", "content": TOPICS_PROMPT.format(app=APPS[app]["name"], kind=kind, data=data)}],
+        max_tokens=700,
+    )
+    out = []
+    for t in (extract_json(raw) or {}).get("topics", []) or []:
+        if isinstance(t, dict) and isinstance(t.get("topic"), str) and 1 < len(t["topic"].strip()) <= 50:
+            try:
+                strength = min(3.0, max(1.0, float(t.get("strength", 1))))
+            except (TypeError, ValueError):
+                strength = 1.0
+            out.append((t["topic"].strip(), strength))
+    return out[:25]
+
+
+# ---------- the background watcher ----------
+class AppLearning:
+    """Checks Downloads (and the App exports folder) for app downloads every few minutes."""
+
+    def __init__(self, sylvie, every_seconds: float = 300.0):
+        self.s = sylvie
+        cfg = sylvie.cfg
+        self.enabled = bool(cfg.get_path("apps.enabled", True))
+        self.folders = [
+            Path(str(f)).expanduser()
+            for f in cfg.get_path(
+                "apps.folders", ["~/Downloads", "~/Documents/Projects/Apps/Sylvie/App exports"]
+            )
+        ]
+        self.docs_dir = Path(cfg.data_dir) / "app-data" / "google-drive"
+        self.every = every_seconds
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
+
+    # meta helpers
+    def _get(self, key: str, default):
+        rows = self.s.db.query("SELECT value FROM meta WHERE key = ?", (key,))
+        try:
+            return json.loads(rows[0]["value"]) if rows else default
+        except ValueError:
+            return default
+
+    def _set(self, key: str, value) -> None:
+        self.s.db.execute(
+            "INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, json.dumps(value)),
+        )
+
+    def chosen(self) -> list[str] | None:
+        return self._get(CHOSEN_KEY, None)
+
+    def choose(self, apps: list[str]) -> list[str]:
+        picked = [a for a in apps if a in APPS]
+        self._set(CHOSEN_KEY, picked)
+        return picked
+
+    def overview(self) -> dict:
+        status = self._get(STATUS_KEY, {})
+        chosen = self.chosen()
+        return {
+            "asked": chosen is not None,
+            "folders": [str(f) for f in self.folders],
+            "apps": [
+                {
+                    "key": k,
+                    "name": a["name"],
+                    "what": a["what"],
+                    "how": a["how"],
+                    "chosen": bool(chosen and k in chosen),
+                    "status": status.get(k),
+                }
+                for k, a in APPS.items()
+            ],  # fmt: skip
+        }
+
+    def _candidates(self) -> list[Path]:
+        out = []
+        for folder in self.folders:
+            if not folder.is_dir():
+                continue
+            for p in folder.iterdir():
+                if p.name.startswith("."):
+                    continue
+                low = p.name.lower()
+                if p.suffix.lower() in (".zip", ".json") or (
+                    p.is_dir() and low.startswith(("takeout", "tiktok", "instagram", "my_spotify"))
+                ):
+                    out.append(p)
+        return out
+
+    def scan(self) -> list[str]:
+        """Read every new app download. Returns the apps learned from."""
+        if not self.enabled:
+            return []
+        files = self._get(FILES_KEY, {})
+        learned = []
+        for path in sorted(self._candidates()):
+            try:
+                st = path.stat()
+                if st.st_size > MAX_EXPORT_BYTES:
+                    continue
+                sig_key = f"{st.st_size}:{int(st.st_mtime)}"
+                if files.get(str(path)) == sig_key:
+                    continue
+                files[str(path)] = sig_key  # an unrelated zip is looked at once, then left alone
+                ex = Export(path)
+                try:
+                    app = identify(path, ex.names())
+                    if app is None:
+                        continue
+                    sig = READERS[app](ex)
+                finally:
+                    ex.close()
+            except (OSError, zipfile.BadZipFile, ValueError) as e:
+                log.warning("couldn't read %s: %s", path.name, e)
+                continue
+            self.apply(sig, path)
+            learned.append(sig.app)
+        self._set(FILES_KEY, files)
+        return learned
+
+    def apply(self, sig: Signals, path: Path) -> None:
+        source = f"app:{sig.app}"
+        bumped = []
+        for topic, weight in sig.topics:
+            if self.s.interests.bump(topic, weight) is not None:
+                bumped.append(topic)
+        for text in sig.facts:
+            self.s.memory.add(text, key=f"lea.{sig.app}.taste", category="preferences", source=source)
+        indexed = self._index_docs(sig.docs)
+        self._record(sig.app, path, sig.counts, bumped, indexed)
+        if sig.items:
+            items, app = sig.items, sig.app
+
+            def job(ev):
+                from core.orchestrator import _Stoppable
+
+                topics = topics_from_items(_Stoppable(self.s.llm, ev), app, items)
+                if ev.is_set():
+                    return
+                names = [t for t, w in topics if self.s.interests.bump(t, w) is not None]
+                self._record(app, path, None, names, None)
+
+            self.s.bg.submit(f"learn-{sig.app}", job, backlog=True)  # uses the model: only when Lea is away
+        log.info("learned from %s download %s", sig.app, path.name)
+
+    def _index_docs(self, docs: list[tuple[str, bytes]]) -> int:
+        if not docs:
+            return 0
+        from knowledge.docs_index import DocsIndex
+
+        idx = DocsIndex(self.s.db, self.s.embedder)
+        n = 0
+        for name, content in docs:
+            safe = re.sub(r"[^\w .\-()]+", "_", name.split("/Drive/", 1)[-1]).strip() or "document"
+            out = self.docs_dir / safe
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(content)
+            try:
+                if idx.index_file(out):
+                    n += 1
+            except Exception:
+                log.exception("couldn't index %s", safe)
+        return n
+
+    def _record(self, app, path, counts, topics, indexed) -> None:
+        with self._lock:
+            status = self._get(STATUS_KEY, {})
+            st = status.get(app) or {"topics": []}
+            st["file"] = path.name
+            st["learned_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+            if counts is not None:
+                st["counts"] = counts
+            if indexed is not None:
+                st["documents_indexed"] = indexed
+            st["topics"] = list(dict.fromkeys(st.get("topics", []) + list(topics)))[:80]
+            status[app] = st
+            self._set(STATUS_KEY, status)
+
+    def start(self) -> None:
+        if not self.enabled:
+            return
+
+        def loop():
+            while not self._stop.is_set():
+                try:
+                    self.scan()
+                except Exception:
+                    log.exception("reading app downloads failed")
+                self._stop.wait(self.every)
+
+        threading.Thread(target=loop, name="app-learning", daemon=True).start()
+
+    def stop(self) -> None:
+        self._stop.set()
