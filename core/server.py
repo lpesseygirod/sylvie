@@ -58,6 +58,9 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
         def _boot():
             try:
                 if state["sylvie"] is None:
+                    from core.llm import limit_gpu_cache
+
+                    limit_gpu_cache()
                     state["sylvie"] = Sylvie.build(cfg)
                 from learning.promote import load_state
 

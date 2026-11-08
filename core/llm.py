@@ -20,6 +20,21 @@ from core.config import Config, load_config
 
 log = logging.getLogger("sylvie.llm")
 
+GPU_CACHE_LIMIT = 1 << 30  # 1 GB
+
+
+def limit_gpu_cache(limit: int = GPU_CACHE_LIMIT) -> None:
+    """Caps MLX's cache of freed GPU buffers. Measured 2026-11-08: without a cap the server held
+    26.7 GB of GPU memory (the 9B, Whisper, Kokoro and embeddings need ~9 GB): freed buffers from
+    long prompts and document indexing were kept, the Mac swapped 27 GB, and a 5 s voice question
+    took 16 s just to transcribe."""
+    try:
+        import mlx.core as mx
+
+        mx.set_cache_limit(limit)
+    except Exception as e:  # no MLX (tests on another machine)
+        log.warning("couldn't cap the GPU cache: %s", e)
+
 
 @dataclass
 class GenStats:
