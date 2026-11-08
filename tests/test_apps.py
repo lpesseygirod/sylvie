@@ -3,7 +3,15 @@
 import json
 import zipfile
 
-from lea_profile.apps import Export, identify, read_google, read_instagram, read_spotify, read_tiktok
+from lea_profile.apps import (
+    Export,
+    identify,
+    read_google,
+    read_instagram,
+    read_netflix,
+    read_spotify,
+    read_tiktok,
+)
 from tests.test_orchestrator import make
 
 
@@ -103,3 +111,18 @@ def test_a_download_in_the_folder_becomes_interests(tmp_path):
     assert spot["status"]["file"] == "my_spotify_data.zip" and "music: Ren" in spot["status"]["topics"]
     assert "Maluma" in s.memory.by_source("app:spotify")[0].text
     assert a.choose(["spotify", "nonsense"]) == ["spotify"] and a.overview()["asked"] is True
+
+
+def test_netflix_viewing_history(tmp_path):
+    csv_file = tmp_path / "NetflixViewingHistory.csv"
+    csv_file.write_text(
+        "Title,Date\n"
+        '"Wednesday: Season 2: Episode 1",11/1/26\n'
+        '"Wednesday: Season 2: Episode 2",11/2/26\n'
+        '"La casa de papel: Parte 1: Episodio 1",10/1/26\n'
+        '"Bird Box",9/1/26\n'
+    )
+    assert identify(csv_file, Export(csv_file).names()) == "netflix"
+    sig = read_netflix(Export(csv_file))
+    assert sig.topics[0] == ("watching: Wednesday", 3.0)
+    assert "La casa de papel" in sig.facts[0] and sig.counts["shows"] == 3

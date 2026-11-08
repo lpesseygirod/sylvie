@@ -7,6 +7,7 @@ is wrapped in <untrusted> so the model treats it as data.
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import dataclass, field
 
 from tools.calc import calculate
@@ -148,6 +149,21 @@ OPEN_URL = _fn(
 )
 
 
+WHATSAPP = _fn(
+    "whatsapp",
+    "Read Lea's WhatsApp messages, on this Mac and read-only (you can't send anything). Use when she asks "
+    "what someone said or wrote, to find a message, or to summarise a chat. Give a contact or group name "
+    "and/or a few words to look for; days limits it to the last N days. With no arguments: her most recent "
+    "chats. Messages are private: never put their content in a web search.",
+    {"contact": {"type": "string", "description": "person or group name, as in her chats (optional)"},
+     "text": {"type": "string", "description": "words to look for (optional)"},
+     "days": {"type": "integer", "description": "only the last N days (optional)"}},
+    [],
+)  # fmt: skip
+# After reading private messages, nothing may leave the Mac this turn (a query could carry them).
+LEAVES_THE_MAC = {"web_search", "open_url", "research", "ask_claude", "find_papers", "check_reference"}
+
+
 @dataclass
 class ToolContext:
     cfg: object
@@ -159,6 +175,7 @@ class ToolContext:
     actions: object | None = None  # actions.runner.ActionRunner
     conversation_id: str | None = None
     read_untrusted: bool = False  # set once outside content (web, files, email) entered this turn
+    read_private: bool = False  # set once Lea's private messages (WhatsApp) entered this turn
     llm: object | None = None  # for tools that think (research); the turn's model, idle while tools run
     settings: object | None = None  # the Sylvie whose settings Lea can change by asking (core/settings.py)
     refs: list = field(
@@ -186,6 +203,12 @@ def _zotero(ctx: ToolContext):
     return get(ctx.cfg)
 
 
+def _whatsapp(ctx: ToolContext):
+    from lea_profile.whatsapp import get
+
+    return get(ctx.cfg)
+
+
 def _scholar_on(ctx: ToolContext) -> bool:
     return bool(ctx.cfg.get_path("search.enabled", True) and ctx.cfg.get_path("scholar.enabled", True))
 
@@ -208,6 +231,8 @@ def available_tools(ctx: ToolContext) -> list[dict]:
         tools.append(ZOTERO)
     if ctx.docs is not None and ctx.docs.stats()["chunks"] > 0:
         tools.append(SEARCH_DOCS)
+    if _whatsapp(ctx) is not None:
+        tools.append(WHATSAPP)
     if ctx.actions is not None:
         tools += ctx.actions.tool_defs()
     if ctx.settings is not None:
@@ -256,6 +281,7 @@ UNTRUSTED_TOOLS = {
     "zotero_library",
     "find_papers",
     "check_reference",
+    "whatsapp",
 }
 
 
@@ -268,6 +294,29 @@ def execute(call, ctx: ToolContext) -> ToolResult:
 
 def _execute(call, ctx: ToolContext) -> ToolResult:
     args = call.arguments
+    if ctx.read_private and call.name in LEAVES_THE_MAC:
+        return ToolResult(
+            "Not allowed in this turn: you read Lea's private messages, and nothing from them may leave the "
+            "Mac. Answer from what you have.",
+            ok=False,
+        )
+    if call.name == "whatsapp":
+        from lea_profile.whatsapp import answer_lines
+
+        wa = _whatsapp(ctx)
+        if wa is None:
+            return ToolResult("WhatsApp isn't on this Mac (or Lea turned it off).", ok=False)
+        ctx.read_private = True
+        days = args.get("days")
+        try:
+            days = int(days) if days not in (None, "") else None
+        except (TypeError, ValueError):
+            days = None
+        try:
+            text = answer_lines(wa, str(args.get("text") or ""), str(args.get("contact") or ""), days)
+        except (sqlite3.DatabaseError, OSError) as e:
+            return ToolResult(f"Couldn't read WhatsApp right now ({type(e).__name__}).", ok=False)
+        return ToolResult(text)
     if ctx.actions is not None and ctx.actions.handles(call.name):
         out = ctx.actions.call(call.name, args, ctx.conversation_id, after_untrusted=ctx.read_untrusted)
         pending = None

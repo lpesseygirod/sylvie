@@ -22,6 +22,7 @@ import io
 import json
 import logging
 import re
+import sqlite3
 import threading
 import zipfile
 from collections import Counter, deque
@@ -76,6 +77,24 @@ APPS = {
             "Open takeout.google.com. Press “Deselect all”, then tick Drive and YouTube and YouTube Music.",
             "For YouTube, keep history and subscriptions; JSON is fine.",
             "Next step → Export once → .zip. Google emails a link; download the .zip(s) to Downloads.",
+        ],
+    },
+    "netflix": {
+        "name": "Netflix",
+        "what": "the series and films you watch",
+        "how": [
+            "Open netflix.com/viewingactivity (signed in, on your own profile).",
+            "Scroll to the bottom and press “Download all”: you get NetflixViewingHistory.csv straight away.",
+            "Leave it in Downloads. Sylvie picks it up by herself.",
+        ],
+    },
+    "whatsapp": {
+        "name": "WhatsApp",
+        "what": "who you talk to, and your chats when you ask about them (read on this Mac, never sent)",
+        "how": [
+            "Install WhatsApp from the Mac App Store and open it.",
+            "On your phone: WhatsApp → Settings → Linked devices → Link a device, and scan the code on the Mac.",
+            "Keep WhatsApp open on the Mac now and then so it stays up to date. Sylvie reads it by herself.",
         ],
     },
 }
@@ -139,6 +158,8 @@ def identify(path: Path, names: list[str]) -> str | None:
         or "yourlibrary.json" in inside
     ):
         return "spotify"
+    if "netflix" in low or "viewingactivity.csv" in inside:
+        return "netflix"
     if low.startswith("takeout") or "takeout/" in inside:
         return "google"
     if "tiktok" in low or "user_data_tiktok" in inside:
@@ -296,7 +317,36 @@ def read_google(ex: Export) -> Signals:
     return sig
 
 
-READERS = {"spotify": read_spotify, "instagram": read_instagram, "tiktok": read_tiktok, "google": read_google}
+def read_netflix(ex: Export) -> Signals:
+    """NetflixViewingHistory.csv (Title, Date) or the full "Get my info" ViewingActivity.csv."""
+    sig = Signals("netflix")
+    shows: Counter = Counter()
+    for name in ex.names():
+        base = name.rsplit("/", 1)[-1].lower()
+        if not (base.startswith("netflixviewinghistory") or base == "viewingactivity.csv"):
+            continue
+        for row in csv.DictReader(io.StringIO(ex.read(name).decode("utf-8-sig", "replace"))):
+            if (row.get("Supplemental Video Type") or "").strip():  # trailers, teasers
+                continue
+            title = (row.get("Title") or "").strip()
+            if title:
+                shows[title.split(":")[0].strip()] += 1  # "Show: Season 1: Episode" → "Show"
+    top = [t for t, _ in shows.most_common(25)]
+    sig.topics = [(f"watching: {t}", 3.0 if i < 5 else 2.0 if i < 12 else 1.0) for i, t in enumerate(top)]
+    sig.items = [f"Watched on Netflix: {t}" for t, _ in shows.most_common(120)]
+    if top:
+        sig.facts.append(f"On Netflix, Lea watches most: {', '.join(top[:8])}.")
+    sig.counts = {"titles": sum(shows.values()), "shows": len(shows), "top": top[:10]}
+    return sig
+
+
+READERS = {
+    "spotify": read_spotify,
+    "instagram": read_instagram,
+    "tiktok": read_tiktok,
+    "google": read_google,
+    "netflix": read_netflix,
+}
 
 TOPICS_PROMPT = """Below is what Lea did on {app}: {kind}. Name the topics and interests it shows she
 cares about (hobbies, music, subjects, sports, places, creators, styles). Ignore one-off noise.
@@ -402,8 +452,13 @@ class AppLearning:
                 if p.name.startswith("."):
                     continue
                 low = p.name.lower()
-                if p.suffix.lower() in (".zip", ".json") or (
-                    p.is_dir() and low.startswith(("takeout", "tiktok", "instagram", "my_spotify"))
+                if (
+                    p.suffix.lower() in (".zip", ".json")
+                    or (p.suffix.lower() == ".csv" and low.startswith("netflix"))
+                    or (
+                        p.is_dir()
+                        and low.startswith(("takeout", "tiktok", "instagram", "my_spotify", "netflix"))
+                    )
                 ):
                     out.append(p)
         return out
@@ -436,8 +491,39 @@ class AppLearning:
                 continue
             self.apply(sig, path)
             learned.append(sig.app)
+        if self._learn_whatsapp(files):
+            learned.append("whatsapp")
         self._set(FILES_KEY, files)
         return learned
+
+    def _learn_whatsapp(self, files: dict) -> bool:
+        """Who Lea writes to most, once per WhatsApp update. Only that goes to memory: the messages
+        themselves stay in WhatsApp and are read when she asks (lea_profile/whatsapp.py)."""
+        from lea_profile.whatsapp import get
+
+        try:
+            wa = get(self.s.cfg)
+            if wa is None:
+                return False
+            last = wa.last_date()
+            key = f"whatsapp:v2:{last}"  # v2: phone numbers left out
+            if files.get("whatsapp") == key:
+                return False
+            files["whatsapp"] = key
+            # Unsaved contacts are just phone numbers: not worth remembering as "people".
+            people = [n for n, _ in wa.top_people(n=12) if not re.fullmatch(r"[+\d\s()-]+", n)][:8]
+            chats = len(wa.chats(limit=1000))
+        except (OSError, sqlite3.DatabaseError) as e:
+            log.warning("couldn't read WhatsApp: %s", e)
+            return False
+        if people:
+            self.s.memory.add(
+                f"On WhatsApp, the people Lea writes to most are: {', '.join(people)}.",
+                key="lea.whatsapp.people", category="people", source="app:whatsapp",
+            )  # fmt: skip
+        self._record("whatsapp", wa.source, {"chats": chats, "top": people,
+                     "last_message": f"{last:%Y-%m-%d}" if last else None}, [], None)  # fmt: skip
+        return True
 
     def apply(self, sig: Signals, path: Path) -> None:
         source = f"app:{sig.app}"

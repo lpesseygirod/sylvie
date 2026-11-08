@@ -154,7 +154,10 @@ def build_sylvie(adapter: str | None, model: str | None):
     if model:
         cfg["llm"]["model"] = model
     cfg["llm"]["adapter"] = adapter
-    cfg["voice"]["enabled"] = False  # text-only evals: don't load Whisper/Kokoro next to the model
+    cfg["voice"]["enabled"] = False
+    cfg["whatsapp"] = {
+        "enabled": False
+    }  # evals never read Lea's private chats  # text-only evals: don't load Whisper/Kokoro next to the model
     tmp = Path(tempfile.mkdtemp(prefix="sylvie-eval-"))
     dim = cfg.get_path("embeddings.dim", 1024)
     db = Database(tmp / "eval.db", dim=dim)

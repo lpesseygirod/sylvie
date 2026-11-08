@@ -335,3 +335,16 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   escuchar" / "arrête d'écouter" stops talking and turns the mic off until ⌥Space or the menu. Caught by
   the on-device recognizer while she talks, and by the server (voice/loop.stop_command, no model) when it
   arrives in a recording.
+
+### T46 — Netflix, WhatsApp (Lea, 2026-11-08: "connect to my Netflix, photos, WhatsApp… learn and help me")
+- Netflix: the viewing-activity CSV (netflix.com/viewingactivity → Download all) or the full "Get my
+  info" ViewingActivity.csv, picked up from Downloads like the other app downloads. Most-watched shows
+  → interests `watching: <show>` + one fact; titles → topics by the local model.
+- WhatsApp: read from WhatsApp Desktop's own database on the Mac (a snapshot copy in Sylvie's data
+  folder; WhatsApp's file is never touched). A `whatsapp` tool finds messages by person/words/days or
+  lists recent chats; it can't send anything. Messages are untrusted, and a turn that read them can't
+  use any tool that leaves the Mac (web search, open_url, research, Claude, paper search), so nothing
+  private ends up in a query. Memory gets only "who she writes to most" (saved contacts, not numbers);
+  message contents are never stored, never training data. The copy on this Mac stops at 21 Nov 2025
+  (WhatsApp Desktop isn't installed any more): reinstalling and linking it makes it current.
+- Instagram/TikTok stay download-only: no way to act in them for her (no API; automated use forbidden).

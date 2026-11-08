@@ -129,6 +129,10 @@ zotero:
   enabled: true
   data_dir: ~/Zotero            # read only; Sylvie indexes a copy (knowledge/zotero.py)
 
+whatsapp:                       # Lea, 2026-11-08: read her chats on this Mac (read-only, never sent anywhere)
+  enabled: true
+  folder: ~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared
+
 scholar:
   enabled: true                 # find_papers (OpenAlex) and check_reference (Crossref); only search words leave the Mac
 
