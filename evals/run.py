@@ -162,10 +162,12 @@ def build_sylvie(adapter: str | None, model: str | None):
     if model:
         cfg["llm"]["model"] = model
     cfg["llm"]["adapter"] = adapter
-    cfg["voice"]["enabled"] = False
-    cfg["whatsapp"] = {
-        "enabled": False
-    }  # evals never read Lea's private chats  # text-only evals: don't load Whisper/Kokoro next to the model
+    cfg["voice"]["enabled"] = False  # text-only evals: don't load Whisper/Kokoro next to the model
+    # Evals never read Lea's own chats, photos, Zotero library or documents (measured 2026-11-08: Zotero was).
+    cfg["whatsapp"] = {"enabled": False}
+    cfg["photos"] = {"enabled": False}
+    cfg["zotero"] = {"enabled": False}
+    cfg["knowledge"] = {**cfg.get("knowledge", {}), "folders": []}
     tmp = Path(tempfile.mkdtemp(prefix="sylvie-eval-"))
     dim = cfg.get_path("embeddings.dim", 1024)
     db = Database(tmp / "eval.db", dim=dim)
@@ -196,11 +198,19 @@ def run(
         fake = Path(tempfile.mkdtemp(prefix="sylvie-eval-apps-"))
         s.cfg["photos"] = {"enabled": True, "folder": str(fake_library(fake / "photos"))}
         s.cfg["whatsapp"] = {"enabled": True, "folder": str(fake_whatsapp(fake / "wa"))}
-        from actions.scripts import CONTACTS_ALL, MESSAGES_SEND, NOTE_CREATE
         from tests.test_app_actions import CONTACTS
 
-        s.actions.osa.outputs.update({CONTACTS_ALL.strip()[:40]: CONTACTS + "Ana García\t+34 600 777 888,\t\n",
-                                      MESSAGES_SEND.strip()[:40]: "sent", NOTE_CREATE.strip()[:40]: "note-1"})  # fmt: skip
+        s.actions.osa.outputs.update({'application "Contacts"': CONTACTS + "Ana García\t+34 600 777 888,\t\n",
+                                      'application "Messages"': "sent", "make new note": "note-1"})  # fmt: skip
+        s.actions.osa.outputs.update({
+            "every event of c": "2026-11-10T09:00:00\tClase de Derecho\tMy IE Agenda\n"
+                                "2026-11-12T23:59:00\tEntrega ensayo criminología\tBlackboard\n",
+            "completed is false": "2026-11-09T18:00:00\tComprar regalo\tPersonal\n",
+        })  # fmt: skip
+        from tests.test_documents import docx
+
+        essay = docx(fake / "Ensayo criminología.docx", "La teoría de la anomia de Merton explica el delito.")
+        s.docs.index_file(essay)
     s.warm()
     results = []
     for item in load_items(sets, limit):

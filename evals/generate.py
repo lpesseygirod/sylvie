@@ -276,6 +276,13 @@ APPS = [
     ("Recuérdame comprar el regalo de mamá mañana a las 6", "es", "create_reminder", ("title", "regalo")),
     ("Pon un temporizador de 20 minutos para la pasta", "es", "set_timer", ("minutes", "20")),
     ("Lee mis últimos correos", "es", "read_emails", None),
+    # calendar, Blackboard deadlines, reminders, contacts, documents (Lea, 2026-11-08)
+    ("¿Qué tengo esta semana?", "es", "calendar_events", None),
+    ("When is my criminology essay due?", "en", "calendar_events", ("search", "")),
+    ("What are my reminders?", "en", "list_reminders", None),
+    ("¿Cuál es el número de Inés Pérez?", "es", "contact_info", ("name", "in")),
+    ("Resume mi ensayo de criminología", "es", ["read_document", "search_documents"], None),
+    ("What does my criminology essay say about Merton?", "en", ["search_documents", "read_document"], None),
 ]
 
 

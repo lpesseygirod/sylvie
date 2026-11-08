@@ -9,7 +9,8 @@ _WORDS = {
     "es": set(
         "el la los las que qué de y es por para con una un cómo como dónde cuándo hola puedes está esta "
         "mi me lo hay pero muy sí gracias del al pon ponme dime hace hará tengo tienes quiero fue son su sus "
-        "yo eres estoy también ahora mañana hoy hecho listo música llama llámale abre pon".split()
+        "yo eres estoy también ahora mañana hoy hecho listo música llama llámale abre pon dijo dice quiere tiene "
+        "mamá".split()
     ),
     "fr": set(
         "le la les des est et que qui une un pour avec pas je tu vous comment où quand bonjour merci c'est "

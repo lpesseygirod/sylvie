@@ -105,7 +105,7 @@ def test_docs_index_and_search_documents_tool(tmp_path):
     (folder / "image.png").write_bytes(b"\x89PNG")
     db = Database(tmp_path / "d.db", dim=256)
     idx = DocsIndex(db, HashEmbedder(256))
-    assert idx.index_folders([str(folder)]) == {"files": 2, "chunks": 2, "errors": 0}
+    assert idx.index_folders([str(folder)]) == {"files": 2, "chunks": 2, "errors": 0, "stopped": False}
     assert idx.index_folders([str(folder)])["chunks"] == 0  # unchanged files are skipped
     ctx = ToolContext(cfg=CFG, docs=idx)
     r = execute(ToolCall("search_documents", {"query": "what is the WACC"}), ctx)

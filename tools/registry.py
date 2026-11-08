@@ -7,6 +7,7 @@ is wrapped in <untrusted> so the model treats it as data.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import dataclass, field
 
@@ -84,6 +85,14 @@ SEARCH_DOCS = _fn(
     "Search Lea's own indexed files (course PDFs, slides, notes). Use for questions about her courses or documents.",
     {"query": {"type": "string", "description": "what to look for"}},
     ["query"],
+)
+READ_DOCUMENT = _fn(
+    "read_document",
+    "Open one of Lea's own documents by its name (or words of it) and read it: Word, PowerPoint, Excel, "
+    "PDF or notes from her Documents, Desktop, OneDrive or iCloud Drive. Use to summarise a document, answer "
+    "from it, or check what it says. If several match, you get the list: pick or ask her.",
+    {"name": {"type": "string", "description": "words of the file name, e.g. 'criminology essay'"}},
+    ["name"],
 )
 CALCULATOR = _fn(
     "calculator",
@@ -252,7 +261,7 @@ def available_tools(ctx: ToolContext) -> list[dict]:
     if _zotero(ctx) is not None:
         tools.append(ZOTERO)
     if ctx.docs is not None and ctx.docs.stats()["chunks"] > 0:
-        tools.append(SEARCH_DOCS)
+        tools += [SEARCH_DOCS, READ_DOCUMENT]
     if _whatsapp(ctx) is not None:
         tools.append(WHATSAPP)
     if _photos(ctx) is not None:
@@ -323,6 +332,30 @@ def _execute(call, ctx: ToolContext) -> ToolResult:
             "Not allowed in this turn: you read Lea's private messages, and nothing from them may leave the "
             "Mac. Answer from what you have.",
             ok=False,
+        )
+    if call.name == "read_document":
+        from pathlib import Path
+
+        wanted = re.sub(r"\.\w{2,4}$", "", str(args.get("name", "")).strip())
+        paths = ctx.docs.find(wanted) if ctx.docs is not None else []
+        if not paths:
+            return ToolResult(
+                f"No document of Lea's is called anything like '{args.get('name', '')}'. Try other words of "
+                "its name, or search_documents for what it's about.",
+                ok=False,
+            )
+        if len(paths) > 1 and not any(
+            Path(p).stem.lower() == str(args.get("name", "")).lower() for p in paths
+        ):
+            listed = "\n".join(f"- {Path(p).name} (in {Path(p).parent.name})" for p in paths)
+            return ToolResult(
+                f"Several documents match:\n{listed}\nRead the right one by its full name, or ask Lea."
+            )
+        path = next((p for p in paths if Path(p).stem.lower() == wanted.lower()), paths[0])
+        ctx.sources.append({"n": len(ctx.sources) + 1, "title": Path(path).name, "path": path})
+        return ToolResult(
+            f'<untrusted source="document {Path(path).name}">\n{ctx.docs.text_of(path)}\n</untrusted>',
+            sources=ctx.sources[-1:],
         )
     if call.name == "find_photos":
         from lea_profile.photos import answer

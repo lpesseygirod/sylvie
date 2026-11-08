@@ -106,7 +106,21 @@ WRITING_NOTE = (
 )
 
 
+# Her OWN existing essay ("resume mi ensayo", "what does my essay say") is reading, not writing: measured
+# 2026-11-08 (make apps), the writing note sent her to Zotero instead of opening the document.
+OWN_DOC_RE = re.compile(
+    r"\b(my|mi|mis|mon|ma|mes)\s+(\w+\s+){0,2}(essays?|ensayos?|tesis|thesis|trabajo|m[ée]moire|dissertation)\b",
+    re.I,
+)
+READ_VERB_RE = re.compile(
+    r"\b(resume|res[uú]meme|summari[sz]e|what does|qu[eé] dice|lee|read|r[ée]sume|que dit)\b",
+    re.I,
+)
+
+
 def looks_like_writing(text: str) -> bool:
+    if OWN_DOC_RE.search(text) and READ_VERB_RE.search(text):
+        return False
     return bool(WRITING_RE.search(text))
 
 

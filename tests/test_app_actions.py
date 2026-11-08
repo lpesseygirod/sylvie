@@ -6,7 +6,7 @@ import subprocess
 from actions.log import ActionLog
 from actions.osa import FakeOSA
 from actions.runner import ActionRunner, match_contacts
-from actions.scripts import CONTACTS_ALL, MESSAGES_SEND, NOTE_CREATE, NOTE_DELETE
+from actions.scripts import MESSAGES_SEND, NOTE_CREATE, NOTE_DELETE
 from core.db import Database
 from tests.test_orchestrator import make
 
@@ -24,11 +24,7 @@ def runner(tmp_path, confirm="never", found=None):
         return subprocess.CompletedProcess(args, 0, "", "")
 
     osa = FakeOSA(
-        {
-            CONTACTS_ALL.strip()[:40]: CONTACTS,
-            MESSAGES_SEND.strip()[:40]: "sent",
-            NOTE_CREATE.strip()[:40]: "note-1",
-        }
+        {'application "Contacts"': CONTACTS, 'application "Messages"': "sent", "make new note": "note-1"}
     )
     r = ActionRunner(s.cfg, ActionLog(Database(tmp_path / "a.db", dim=16)), osa=osa, run_cmd=run_cmd,
                      is_locked=lambda: False, find_title=lambda service, title: found)  # fmt: skip
@@ -116,3 +112,23 @@ def test_saying_sent_when_it_was_not_is_corrected(tmp_path):
     said = [m["content"] for m in s.llm.calls[2]["messages"] if m["role"] == "user"]
     assert said[-1].startswith("(Check: nothing was sent.")
     assert "couldn't send it" in "".join(e["text"] for e in ev if e["type"] == "text")
+
+
+def test_calendar_week_search_reminders_and_contact_info(tmp_path):
+    from actions.scripts import CALENDAR_EVENTS
+
+    r, osa, _ = runner(tmp_path)
+    osa.outputs["every event of c"] = (
+        "2026-11-10T09:00:00\tClase de Derecho\tMy IE Agenda\n2026-11-12T23:59:00\tEntrega ensayo criminología\tBlackboard\n"
+    )
+    osa.outputs["completed is false"] = (
+        "2026-11-09T18:00:00\tComprar regalo\tPersonal\n\tLlamar al banco\tPersonal\n"
+    )
+    week = r.call("calendar_events", {"day_offset": 0, "days": 7}, None).content
+    assert "Tue 10 Nov 09:00 Clase de Derecho" in week and "Entrega" in week
+    assert [c[1] for c in osa.calls if c[0] == CALENDAR_EVENTS][-1] == ("0", "7")
+    due = r.call("calendar_events", {"day_offset": 0, "days": 14, "search": "entrega"}, None).content
+    assert "Entrega ensayo" in due and "Derecho" not in due
+    rem = r.call("list_reminders", {}, None).content
+    assert "- Llamar al banco [Personal]" in rem and "Comprar regalo (due 2026-11-09 18:00)" in rem
+    assert "+34 600 111 222" in r.call("contact_info", {"name": "mamá"}, None).content

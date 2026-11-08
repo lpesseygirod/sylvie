@@ -87,8 +87,11 @@ TOOLS = {
     ),
     "calendar_events": _fn(
         "calendar_events",
-        "List Lea's calendar events for a day. day_offset: 0 = today, 1 = tomorrow, -1 = yesterday.",
-        {"day_offset": INT},
+        "List Lea's calendar events (all her calendars, including university ones like Blackboard deadlines "
+        "if she subscribed them). day_offset: first day, 0 = today, 1 = tomorrow, -1 = yesterday. days: how "
+        "many days from there (1 = that day, 7 = a week, up to 62). search: only events whose title has these "
+        "words ('exam', 'entrega', 'due'). Use it to find free time too.",
+        {"day_offset": INT, "days": INT, "search": STR},
         ["day_offset"],
     ),
     "create_event": _fn(
@@ -177,9 +180,23 @@ TOOLS = {
     ),
     "directions": _fn(
         "directions",
-        "Open Apple Maps with directions to a place. mode: driving (default), walking or transit.",
+        "Open Apple Maps with directions to a place. Use it whenever Lea asks how to get somewhere ('how do I "
+        "get to…', '¿cómo llego a…?'), and also say the usual route in a sentence. mode: driving (default), "
+        "walking or transit.",
         {"destination": STR, "mode": {**STR, "enum": ["driving", "walking", "transit"]}},
         ["destination"],
+    ),
+    "list_reminders": _fn(
+        "list_reminders",
+        "List Lea's open (not completed) reminders from the Reminders app, with due dates.",
+        {},
+        [],
+    ),
+    "contact_info": _fn(
+        "contact_info",
+        "Look up someone in Lea's Contacts: their phone numbers and emails. name: as Lea calls them.",
+        {"name": STR},
+        ["name"],
     ),
     "create_note": _fn(
         "create_note",
@@ -659,14 +676,38 @@ class ActionRunner:
                     f"Nothing on Spotify matched '{q}'. Opened the search; suggest another name."
                 )
             if name == "calendar_events":
-                raw = self.osa.run(scripts.CALENDAR_EVENTS, str(int(a.get("day_offset", 0))), timeout=40)
+                ndays = max(1, min(int(a.get("days") or 1), 62))
+                raw = self.osa.run(
+                    scripts.CALENDAR_EVENTS,
+                    str(int(a.get("day_offset", 0))),
+                    str(ndays),
+                    timeout=40 + 4 * ndays,
+                )
                 lines = sorted(x for x in raw.splitlines() if x.strip())
+                words = [_fold(w) for w in str(a.get("search") or "").split() if len(w) > 1]
+                if words:
+                    lines = [
+                        ln
+                        for ln in lines
+                        if any(w in _fold(ln.split("\t")[1] if "\t" in ln else ln) for w in words)
+                    ]
                 if not lines:
-                    return ActionOutcome("No events that day.")
+                    return ActionOutcome(
+                        "No events"
+                        + (" matching that" if words else "")
+                        + (" that day." if ndays == 1 else " in those days.")
+                    )
                 events = []
                 for ln in lines:
                     start, title, cal = (ln.split("\t") + ["", "", ""])[:3]
-                    events.append(f"- {start[11:16]} {title} ({cal})")
+                    when = (
+                        start[11:16]
+                        if ndays == 1
+                        else f"{datetime.fromisoformat(start[:19]):%a %d %b %H:%M}"
+                        if start
+                        else ""
+                    )
+                    events.append(f"- {when} {title} ({cal})")
                 return ActionOutcome(
                     'Events:\n<untrusted source="calendar">\n' + "\n".join(events) + "\n</untrusted>"
                 )
@@ -793,6 +834,25 @@ class ActionRunner:
                     else "Couldn't open Maps.",
                     ok=p.returncode == 0,
                 )
+            if name == "list_reminders":
+                raw = self.osa.run(scripts.REMINDERS_LIST, timeout=60)
+                rows = sorted((x.split("\t") + ["", "", ""])[:3] for x in raw.splitlines() if x.strip())
+                if not rows:
+                    return ActionOutcome("No open reminders.")
+                lines = [
+                    f"- {t}" + (f" (due {d[:16].replace('T', ' ')})" if d else "") + f" [{lst}]"
+                    for d, t, lst in rows[:60]
+                ]
+                return ActionOutcome(
+                    'Open reminders:\n<untrusted source="reminders">\n' + "\n".join(lines) + "\n</untrusted>"
+                )
+            if name == "contact_info":
+                hits = match_contacts(self.contacts(), str(a["name"]))
+                if not hits:
+                    return ActionOutcome(f"No contact called {a['name']}.", ok=False)
+                return ActionOutcome("\n".join(
+                    f"- {n}: phone {', '.join(ph) or 'none'}; email {', '.join(em) or 'none'}" for n, ph, em in hits[:5]
+                ))  # fmt: skip
             if name == "create_note":
                 import html
 

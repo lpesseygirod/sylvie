@@ -24,6 +24,7 @@ import logging
 import re
 import sqlite3
 import threading
+import time
 import zipfile
 from collections import Counter, deque
 from dataclasses import dataclass, field
@@ -86,6 +87,25 @@ APPS = {
             "Open netflix.com/viewingactivity (signed in, on your own profile).",
             "Scroll to the bottom and press “Download all”: you get NetflixViewingHistory.csv straight away.",
             "Leave it in Downloads. Sylvie picks it up by herself.",
+        ],
+    },
+    "documents": {
+        "name": "Your documents",
+        "what": "Word, PowerPoint, Excel and PDF files in Documents, Desktop, OneDrive and iCloud Drive",
+        "how": [
+            "Nothing to do: Sylvie reads them on this Mac and keeps them up to date every few hours.",
+            "Files that are only in the cloud are skipped (nothing is downloaded); open one once to include it.",
+            "Ask “what does my criminology essay say about…?” or “summarise my notes on…”.",
+        ],
+    },
+    "blackboard": {
+        "name": "Blackboard",
+        "what": "your assignments and deadlines (through your Mac's Calendar)",
+        "how": [
+            "In Blackboard, open Calendar → the ⚙ or “Share” button → copy the calendar link (it ends in .ics).",
+            "On the Mac: Calendar app → File → New Calendar Subscription… → paste the link → Subscribe.",
+            "Set Auto-refresh to “Every hour”. Sylvie then sees every deadline: “what's due this week?”.",
+            "Course announcements arrive by email; Sylvie can read those with your Mail.",
         ],
     },
     "photos": {
@@ -411,6 +431,7 @@ class AppLearning:
         self.every = every_seconds
         self._stop = threading.Event()
         self._lock = threading.Lock()
+        self._docs_queued = False
 
     # meta helpers
     def _get(self, key: str, default):
@@ -505,8 +526,39 @@ class AppLearning:
             learned.append("whatsapp")
         if self._learn_photos(files):
             learned.append("photos")
+        self._index_documents()
         self._set(FILES_KEY, files)
         return learned
+
+    def _index_documents(self) -> None:
+        """Lea's document folders (knowledge.folders), every few hours, when she's away (it uses the
+        embedding model): searchable with search_documents, readable with read_document."""
+        folders = list(self.s.cfg.get_path("knowledge.folders", []) or [])
+        if not folders or self.s.docs is None:
+            return
+        every = float(self.s.cfg.get_path("knowledge.reindex_hours", 6)) * 3600
+        last = self._get("docs.indexed_at", 0)
+        if time.time() - last < every or self._docs_queued:
+            return
+        self._docs_queued = True
+        folders.append(str(self.docs_dir))  # the Google Docs from Takeout stay indexed too
+
+        def job(ev):
+            try:
+                counts = self.s.docs.index_folders(folders, stop=ev)
+            except Exception:
+                log.exception("indexing Lea's documents failed")
+                self._docs_queued = False
+                return
+            if counts.get("stopped"):
+                return  # Lea needed the model: the job is re-queued and carries on later
+            self._set("docs.indexed_at", time.time())
+            self._record(
+                "documents", Path(folders[0]), {**self.s.docs.stats(), "errors": counts["errors"]}, [], None
+            )
+            self._docs_queued = False
+
+        self.s.bg.submit("index-documents", job, backlog=True)
 
     def _learn_photos(self, files: dict) -> bool:
         """Who's in Lea's photos most, once per library copy (lea_profile/photos.py). Only names and

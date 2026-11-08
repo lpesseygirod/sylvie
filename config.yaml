@@ -76,7 +76,9 @@ proactivity:
   max_asides_per_conversation: 2   # Lea wants more initiative (2026-11-06)
 
 knowledge:
-  folders: []                      # Lea chooses (decision 4); nothing indexed until she does
+  # Lea, 2026-11-08: "access to … docs". Code projects (.git), app libraries and cloud-only files are skipped.
+  folders: [~/Documents, ~/Desktop, ~/Library/CloudStorage/OneDrive-Personal, "~/Library/Mobile Documents/com~apple~CloudDocs"]
+  reindex_hours: 6
 
 voice:
   enabled: true
@@ -97,7 +99,7 @@ actions:
   # Allowlist: only these can ever be called. Remove one to switch it off; [] turns all actions off.
   enabled: [music, play_music, save_playlist, calendar_events, create_event, create_reminder, set_timer,
             open_app, open_in_browser, run_shortcut, run_command, read_emails, draft_email, send_email,
-            watch, send_message, call, directions, create_note]   # the last five: Lea, 2026-11-08
+            watch, send_message, call, directions, create_note, list_reminders, contact_info]   # the last seven: Lea, 2026-11-08
   # run_command: Terminal commands (Lea, 2026-11-06). sudo, disk erasing, wiping folders, Keychain
   # passwords and curl|sh never run. Remove it here to switch off.
   confirm: never   # Lea, 2026-11-06: "never ask" (delete_or_send | changes are the other options)

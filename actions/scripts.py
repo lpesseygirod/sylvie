@@ -75,7 +75,9 @@ CALENDAR_EVENTS = """
 on run argv
     set startD to (current date) + ((item 1 of argv) as integer) * days
     set time of startD to 0
-    set endD to startD + 1 * days
+    set n to 1
+    if (count of argv) > 1 then set n to (item 2 of argv) as integer
+    set endD to startD + n * days
     set out to ""
     tell application "Calendar"
         repeat with c in calendars
@@ -245,5 +247,24 @@ end run
 NOTE_DELETE = """
 on run argv
     tell application "Notes" to delete (note id (item 1 of argv))
+end run
+"""
+
+# Lea's open reminders: "due<TAB>title<TAB>list" per line (due empty when there's none).
+REMINDERS_LIST = """
+on run argv
+    set out to ""
+    tell application "Reminders"
+        repeat with l in lists
+            repeat with r in (reminders of l whose completed is false)
+                set d to ""
+                try
+                    set d to (due date of r) as «class isot» as string
+                end try
+                set out to out & d & tab & (name of r) & tab & (name of l) & linefeed
+            end repeat
+        end repeat
+    end tell
+    return out
 end run
 """

@@ -382,3 +382,20 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   are held back and checked (core/lang.LanguageGuard): a start in the wrong language is dropped and redone
   once with "Answer ONLY in English…" before anything is shown or spoken. With Whisper's language known,
   only a clear majority of words overrules it ("make me a plan" had been taken for Spanish).
+
+### T48 — Calendar, Blackboard, documents, reminders, contacts (Lea, 2026-11-08: "think of all options")
+- Calendar: `calendar_events` takes a range (days, up to 62) and a title search ("entrega", "exam").
+  Blackboard needs no login: its calendar link (.ics) subscribed in the Mac's Calendar app puts every
+  deadline where Sylvie already reads (steps in About Lea → Your apps). Announcements come by email.
+- Documents: `knowledge.folders` = Documents, Desktop, OneDrive, iCloud Drive (Lea asked for access).
+  Word/PowerPoint/Excel/OpenDocument/RTF are now read (stdlib XML, no new packages). Code projects (.git),
+  app libraries and cloud-only files (SF_DATALESS: reading would download them) are skipped. Indexed in
+  the background every 6 h when Lea is away. New `read_document` opens one by name (untrusted content).
+  "Resume mi ensayo" is reading her own document, not academic writing (it had sent her to Zotero).
+- `list_reminders`, `contact_info`. Sylvie's data folder is now 700 (only Lea's user).
+- Evals never read Lea's Zotero, documents, photos or chats (Zotero had been read). apps 33/34
+  (directions for "how do I get to…" sometimes answered in words), everyday 35/35.
+- Passwords (Lea asked to give Sylvie some "to just access"): not done. Each connection uses macOS
+  permissions, Apple's own accounts (Mail, Calendar) or Lea's own downloads instead; a model that reads
+  web pages and emails must not hold passwords (a planted instruction could leak them), and Instagram/
+  TikTok forbid automated logins.

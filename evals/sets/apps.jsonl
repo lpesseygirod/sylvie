@@ -26,3 +26,9 @@
 {"set": "apps", "id": "app-25", "prompt": "Recuérdame comprar el regalo de mamá mañana a las 6", "check": {"type": "everyday", "lang": "es", "tool": "create_reminder", "arg": ["title", "regalo"]}}
 {"set": "apps", "id": "app-26", "prompt": "Pon un temporizador de 20 minutos para la pasta", "check": {"type": "everyday", "lang": "es", "tool": "set_timer", "arg": ["minutes", "20"]}}
 {"set": "apps", "id": "app-27", "prompt": "Lee mis últimos correos", "check": {"type": "everyday", "lang": "es", "tool": "read_emails"}}
+{"set": "apps", "id": "app-28", "prompt": "¿Qué tengo esta semana?", "check": {"type": "everyday", "lang": "es", "tool": "calendar_events"}}
+{"set": "apps", "id": "app-29", "prompt": "When is my criminology essay due?", "check": {"type": "everyday", "lang": "en", "tool": "calendar_events", "arg": ["search", ""]}}
+{"set": "apps", "id": "app-30", "prompt": "What are my reminders?", "check": {"type": "everyday", "lang": "en", "tool": "list_reminders"}}
+{"set": "apps", "id": "app-31", "prompt": "¿Cuál es el número de Inés Pérez?", "check": {"type": "everyday", "lang": "es", "tool": "contact_info", "arg": ["name", "in"]}}
+{"set": "apps", "id": "app-32", "prompt": "Resume mi ensayo de criminología", "check": {"type": "everyday", "lang": "es", "tool": ["read_document", "search_documents"]}}
+{"set": "apps", "id": "app-33", "prompt": "What does my criminology essay say about Merton?", "check": {"type": "everyday", "lang": "en", "tool": ["search_documents", "read_document"]}}
