@@ -399,3 +399,10 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   permissions, Apple's own accounts (Mail, Calendar) or Lea's own downloads instead; a model that reads
   web pages and emails must not hold passwords (a planted instruction could leak them), and Instagram/
   TikTok forbid automated logins.
+
+### T49 — Efficiency plan A1: measure memory before changing anything (2026-11-08)
+- **What:** a memory recorder inside the server (`core/memwatch.py`, one JSON line a minute, every 10 s under pressure, kept 14 days) and a day summary (`scripts/memreport.py`). Findings: `docs/reports/a1-memory-2026-11-08.md`.
+- **Why:** Lea's Mac froze three times today (answers took 61–214 s instead of ~1.5 s). The plan says measure first. Main causes found: MLX's uncapped GPU cache (26.7 GB; capped in 038d988), document indexing holding the embedding model for whole e-books, ~20 GB of other apps (Docker VM 7.8 GB), test runs loading a second 9B, a night job running into the morning, and a WhatsApp permission prompt that blocks server startup.
+- **How:** kernel counters through ctypes (`proc_pid_rusage`, `sysctlbyname`), no extra process except `ioreg` for keyboard idle time. ~50 ms per sample. Nothing leaves the Mac.
+- **Alternatives:** Activity Monitor or `powermetrics` (needs sudo); a separate launchd recorder (would not know what Sylvie was doing).
+- **Change it:** `config.yaml → memwatch.enabled: false`.

@@ -87,6 +87,11 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
 
                     state["sylvie"].app_learning = AppLearning(state["sylvie"])
                     state["sylvie"].app_learning.start()  # Spotify/Instagram/TikTok/Google downloads
+                    if cfg.get_path("memwatch.enabled", True):  # memory timeline (efficiency plan A1)
+                        from core.memwatch import MemWatch
+
+                        state["memwatch"] = MemWatch(state["sylvie"], cfg.data_dir / "logs")
+                        state["memwatch"].start()
                     # Index conversations from before episodic memory existed (when Lea is away).
                     s = state["sylvie"]
                     s.bg.submit("episodes-backfill", lambda ev: s.episodes.backfill(stop=ev), backlog=True)

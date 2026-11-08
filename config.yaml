@@ -146,6 +146,9 @@ writing:
   citation_style: apa           # apa | mla | chicago | harvard (Lea can ask for another in any request)
   practice_per_night: 6         # writing practice on open-access CC BY papers (learning/writing.py); 0 = off
 
+memwatch:
+  enabled: true                 # memory timeline, one line a minute in logs/memory-DAY.jsonl (efficiency plan A1)
+
 privacy:
   log_conversations: true
   delete_audio_after_transcription: true
