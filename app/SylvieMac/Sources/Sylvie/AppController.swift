@@ -281,13 +281,15 @@ final class AppController: ObservableObject {
         }
         // Without echo cancellation the mic hears Sylvie herself (her "Hello Lea", the chime): measured
         // 2026-11-06, her greeting ended up in Lea's question ("Sylvie. Hello Lea."). Leave those out.
-        if !pipeline.echoCancelled && (speaker.isSpeaking || Date() < ignoreMicUntil) { return }
+        if !pipeline.echoCancelled && (speaker.isPlaying || Date() < ignoreMicUntil) { return }
         recording.append(contentsOf: samples)
         sendLevel(samples)
         for event in vad.process(samples) {
             switch event {
             case .speechStarted:
                 heardSpeech = true
+                // Lea is already talking: drop a greeting that hasn't started playing yet.
+                if speaker.isSpeaking && !speaker.isPlaying { speaker.stop() }
             case .speechEnded, .maxLengthReached:
                 finishRecording()
                 return  // later events in this batch (e.g. a "no speech" timeout) belong to the old recording

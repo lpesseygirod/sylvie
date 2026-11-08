@@ -10,6 +10,10 @@ final class Speaker {
     var onFinished: (() -> Void)?
     var api: APIClient?
     private(set) var isSpeaking = false
+    /// Sound is actually coming out (not just waiting for Kokoro's audio). Measured 2026-11-08: the
+    /// greeting took 1.4-2.3 s to arrive, and the mic was ignored all that time, so Lea's question
+    /// (started right after "Sylvie") was thrown away and she only heard "Hola Lea".
+    private(set) var isPlaying = false
 
     private struct Item {
         let text: String
@@ -41,6 +45,7 @@ final class Speaker {
         synth.stopSpeaking(at: .immediate)
         pipeline.player.stop()
         isSpeaking = false
+        isPlaying = false
     }
 
     private func voice(for language: String) -> AVSpeechSynthesisVoice? {
@@ -59,6 +64,7 @@ final class Speaker {
     private func next() {
         guard !queue.isEmpty else {
             isSpeaking = false
+            isPlaying = false
             onFinished?()
             return
         }
@@ -86,6 +92,7 @@ final class Speaker {
         samples.withUnsafeBufferPointer { channel.update(from: $0.baseAddress!, count: samples.count) }
         guard let converted = pipeline.toPlayerFormat(buffer) else { return false }
         if !pipeline.player.isPlaying { pipeline.player.play() }
+        isPlaying = true
         pipeline.player.scheduleBuffer(converted, completionCallbackType: .dataPlayedBack) { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self, gen == self.generation else { return }
@@ -100,6 +107,7 @@ final class Speaker {
         utterance.voice = voice(for: item.language)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.05
         if !pipeline.player.isPlaying { pipeline.player.play() }
+        isPlaying = true
         synth.write(utterance) { [weak self] buffer in
             guard let self, gen == self.generation, let pcm = buffer as? AVAudioPCMBuffer else { return }
             if pcm.frameLength == 0 {
