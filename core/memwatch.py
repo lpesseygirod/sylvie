@@ -105,6 +105,31 @@ def all_pids() -> list[int]:
     return [arr[i] for i in range(max(n, 0)) if arr[i] > 0]
 
 
+def descendants(pid: int) -> list[int]:
+    """pid and every process it started (the night job runs `mlx_lm lora` as a child)."""
+    try:
+        out = subprocess.run(["/bin/ps", "-A", "-o", "pid=,ppid="], capture_output=True, text=True,
+                             timeout=3).stdout  # fmt: skip
+    except (OSError, subprocess.SubprocessError):
+        return [pid]
+    kids: dict[int, list[int]] = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            kids.setdefault(int(parts[1]), []).append(int(parts[0]))
+    tree, todo = [], [pid]
+    while todo:
+        p = todo.pop()
+        tree.append(p)
+        todo += kids.get(p, [])
+    return tree
+
+
+def tree_footprint(pid: int) -> int:
+    """Memory footprint of a process and all its children, in bytes."""
+    return sum((proc_usage(p) or {}).get("footprint", 0) for p in descendants(pid))
+
+
 def top_processes(n: int = 6, skip: set[int] | None = None) -> list[list]:
     """The n biggest processes by footprint, helpers of one app added together
     ("Google Chrome Helper (Renderer)" counts as "Google Chrome"): [[name, GB], …]."""
@@ -125,23 +150,55 @@ def top_processes(n: int = 6, skip: set[int] | None = None) -> list[list]:
 def idle_seconds() -> float | None:
     """Seconds since Lea last used the keyboard, mouse or trackpad."""
     try:
-        out = subprocess.run(["ioreg", "-c", "IOHIDSystem", "-d", "4"], capture_output=True, text=True,
-                             timeout=3).stdout  # fmt: skip
+        # Full path: the server's launchd PATH has no /usr/sbin (the A1 timeline had no idle times).
+        out = subprocess.run(["/usr/sbin/ioreg", "-r", "-k", "HIDIdleTime", "-d", "1"], capture_output=True,
+                             text=True, timeout=3).stdout  # fmt: skip
     except (OSError, subprocess.SubprocessError):
         return None
     m = re.search(r'"HIDIdleTime" = (\d+)', out)
     return round(int(m.group(1)) / 1e9, 1) if m else None
 
 
+def page_counts() -> dict[str, int]:
+    """`vm_stat` in bytes: {"free", "speculative", "purgeable", "file_backed", "occupied_by_compressor", …}."""
+    try:
+        out = subprocess.run(["/usr/bin/vm_stat"], capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    m = re.search(r"page size of (\d+) bytes", out)
+    page = int(m.group(1)) if m else 16384
+    counts = {}
+    for name, n in re.findall(r'^"?([A-Za-z][^:"]+)"?:\s+(\d+)\.', out, re.M):
+        key = re.sub(r"\bpages\b", "", name.lower()).strip().replace(" ", "_").replace("-", "_")
+        counts[key] = int(n) * page
+    return counts
+
+
+def available_bytes(pages: dict[str, int] | None = None) -> int | None:
+    """Memory a new program can take without macOS compressing or swapping others: free pages plus
+    cached files (what Activity Monitor shows as free + "Cached Files"). Measured 2026-11-08 23:55:
+    macOS's own "free %" said 38% (13.7 GB) while 18 GB of RAM held compressed pages and only
+    ~4.7 GB was really free, so the percentage alone would let a 20 GB job start into a full Mac."""
+    p = page_counts() if pages is None else pages
+    if not p:
+        return None
+    return sum(p.get(k, 0) for k in ("free", "speculative", "purgeable", "file_backed"))
+
+
 def mac_memory() -> dict:
     level = _sysctl_int("kern.memorystatus_vm_pressure_level")
     swap = swap_used()
     comp = _sysctl_int("vm.compressor_bytes_used")
+    pages = page_counts()
+    avail = available_bytes(pages)
+    held = pages.get("occupied_by_compressor")
     return {
         "pressure": PRESSURE.get(level or 0, str(level)),
         "free_pct": _sysctl_int("kern.memorystatus_level"),
+        "available_gb": round(avail / GB, 2) if avail is not None else None,
         "swap_gb": round(swap / GB, 2) if swap is not None else None,
         "compressed_gb": round(comp / GB, 2) if comp is not None else None,
+        "compressor_ram_gb": round(held / GB, 2) if held is not None else None,
     }
 
 
@@ -181,9 +238,8 @@ def sylvie_state(s) -> dict:
     }
     sch = s.scheduler
     if sch is not None and sch.proc is not None and sch.proc.poll() is None:
-        u = proc_usage(sch.proc.pid) or {}
         out["night_job"] = getattr(sch.current, "name", "?")
-        out["night_job_gb"] = round(u.get("footprint", 0) / GB, 2)
+        out["night_job_gb"] = round(tree_footprint(sch.proc.pid) / GB, 2)  # training runs as its child
     return out
 
 
@@ -192,7 +248,7 @@ def sample(sylvie=None) -> dict:
     skip = {os.getpid()}
     sch = getattr(sylvie, "scheduler", None)
     if sch is not None and sch.proc is not None:
-        skip.add(sch.proc.pid)
+        skip.update(descendants(sch.proc.pid))
     return {
         "t": datetime.now().isoformat(timespec="seconds"),
         "mac": mac_memory(),

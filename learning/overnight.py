@@ -349,11 +349,13 @@ def main() -> None:
     a = ap.parse_args()
 
     from core.db import Database
+    from core.llm import limit_gpu_cache
     from core.orchestrator import Sylvie
     from core.toolcall import ToolCall
     from learning.store import LearningStore
     from tools.registry import available_tools, execute
 
+    limit_gpu_cache()  # like the server: freed GPU buffers are given back (A1: uncapped, they piled up)
     cfg = load_config()
     sylvie = Sylvie.build(cfg)  # for prompts/stores only; its LLM stays unloaded (the pool loads models)
     db = Database(cfg.db_path, dim=cfg.get_path("embeddings.dim", 1024))

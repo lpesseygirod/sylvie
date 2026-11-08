@@ -10,6 +10,7 @@ import json
 import re
 import sqlite3
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from tools.calc import calculate
 from tools.fetch import BlockedURL, fetch_page
@@ -234,6 +235,21 @@ def _whatsapp(ctx: ToolContext):
     return get(ctx.cfg)
 
 
+def _whatsapp_listed(ctx: ToolContext) -> bool:
+    """Whether to offer the whatsapp tool, without opening WhatsApp's folder. It sits in another app's
+    container, so every open can bring up macOS's "access data from other apps" prompt. Building the
+    tool list at startup waited on that prompt (A1, 2026-11-08: not ready 14 minutes after a restart).
+    Sylvie's own copy of the chats (made when they were last read) says the folder was readable."""
+    if not ctx.cfg.get_path("whatsapp.enabled", True):
+        return False
+    from lea_profile.whatsapp import DEFAULT_DIR
+
+    folder = Path(ctx.cfg.get_path("whatsapp.folder", str(DEFAULT_DIR))).expanduser()
+    if "Group Containers" in folder.parts:
+        return (ctx.cfg.data_dir / "app-data" / "whatsapp" / "ChatStorage.sqlite").exists()
+    return _whatsapp(ctx) is not None  # a folder outside app containers (the evals' made-up chats)
+
+
 def _photos(ctx: ToolContext):
     from lea_profile.photos import get
 
@@ -262,7 +278,7 @@ def available_tools(ctx: ToolContext) -> list[dict]:
         tools.append(ZOTERO)
     if ctx.docs is not None and ctx.docs.stats()["chunks"] > 0:
         tools += [SEARCH_DOCS, READ_DOCUMENT]
-    if _whatsapp(ctx) is not None:
+    if _whatsapp_listed(ctx):
         tools.append(WHATSAPP)
     if _photos(ctx) is not None:
         tools.append(FIND_PHOTOS)

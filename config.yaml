@@ -87,6 +87,8 @@ voice:
   # The Mac app falls back to the system voice if Kokoro isn't available. The iPhone Shortcut uses Siri's voice.
   speak_full_answer: true   # Lea's rule (2026-11-06): read the whole answer aloud; she says "stop" to interrupt
   tts: kokoro
+  load_on_demand: true          # efficiency plan A2: Whisper/Kokoro (~1.9 GB) load when voice is used, not at startup
+  unload_after_minutes: 10      # …and unload after this long without voice (2 min while memory is tight)
   tts_model: mlx-community/Kokoro-82M-bf16
   kokoro_voices: {en: af_heart, es: ef_dora, fr: ff_siwis}   # Lea tried Isabella, went back to Heart (2026-11-06)
   speed: 1.0
@@ -120,6 +122,8 @@ schedule:
   always: false                 # Lea, 2026-11-08: back to nights only (was: any hour Sylvie is unused, from 2026-11-07)
   always_idle_minutes: 5        # …after this many quiet minutes (plugged in only; never on battery)
   always_job_minutes: 240       # one practice run, then the next starts while she's still unused
+  job_memory_gb: 20             # A2: a night job starts only if this much is free once Sylvie unloads (judge ~18 GB)
+  max_job_gb: 24                # A2: hard cap; the job (and its training child) is stopped above it, or after 3 min of pressure
   interest_research: daily
 learning:
   # Lea chose autonomy (2026-11-07): night pairs on GENERAL questions that code verified, or that the
@@ -148,6 +152,11 @@ writing:
 
 memwatch:
   enabled: true                 # memory timeline, one line a minute in logs/memory-DAY.jsonl (efficiency plan A1)
+
+memguard:                       # efficiency plan A2 (core/memguard.py): heavy work only when the Mac has room
+  enabled: true
+  lea_away_minutes: 5           # backlog jobs (indexing, old chats, downloads) wait until Lea is away from the Mac this long
+  backlog_min_free_gb: 6        # …and this much memory is really free (free + cached files, not macOS's "free %")
 
 privacy:
   log_conversations: true

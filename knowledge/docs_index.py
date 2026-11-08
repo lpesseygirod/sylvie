@@ -42,6 +42,11 @@ PDF_EXT = {".pdf"}
 # Office and other document formats, read from their XML with the standard library (no new packages).
 OFFICE_EXT = {".docx", ".pptx", ".xlsx", ".odt", ".odp", ".rtf"}
 SF_DATALESS = 0x40000000  # macOS: a OneDrive/iCloud file that's only in the cloud (reading it downloads it)
+# Pieces embedded at once; Lea's lookups and "stop" get in between. Measured 2026-11-09 on a 240-piece
+# file: one call for the file made a lookup wait up to 16.9 s; batches of 16, 1.4 s (worst 2.4 s);
+# batches of 8, 0.41 s (worst 0.57 s) at the same indexing speed (~11 pieces/s). Alone: 0.01 s.
+EMBED_BATCH = 8
+FAILED_KEY = "docs.failed"  # meta: {path: mtime} of files that couldn't be read (retried once changed)
 CHUNK_CHARS = 1200
 OVERLAP = 200
 MAX_FILE_BYTES = 50_000_000
@@ -142,7 +147,9 @@ class DocsIndex:
         self.db = db
         self.embedder = embedder
 
-    def index_file(self, path: Path) -> int:
+    def index_file(self, path: Path, stop=None) -> int | None:
+        """Pieces indexed (0: unchanged). None when `stop` was set midway: nothing is saved for the
+        file, so the next run does it again."""
         path = path.resolve()
         mtime = path.stat().st_mtime
         row = self.db.one("SELECT id, mtime FROM documents WHERE path = ?", (str(path),))
@@ -152,7 +159,15 @@ class DocsIndex:
         for loc, text in read_file(path):
             for i, ch in enumerate(chunk_text(text)):
                 pieces.append((loc or f"part {i + 1}", ch))
-        vecs = self.embedder.embed([f"{path.name}: {t}" for _, t in pieces]) if pieces else []
+        vecs = []
+        for i in range(0, len(pieces), EMBED_BATCH):
+            if stop is not None and stop.is_set():
+                return None
+            vecs.extend(
+                self.embedder.embed(
+                    [f"{path.name}: {t}" for _, t in pieces[i : i + EMBED_BATCH]], batch_size=EMBED_BATCH
+                )
+            )
         with self.db.transaction() as c:
             if row:
                 self._remove_doc(c, row["id"])
@@ -178,7 +193,9 @@ class DocsIndex:
     def index_folders(self, folders: list[str], stop=None) -> dict:
         """Index every document under `folders`. Code repositories (folders with .git), app libraries and
         files that are only in the cloud are skipped. `stop` (a threading.Event) pauses it for Lea."""
-        seen, counts = set(), {"files": 0, "chunks": 0, "errors": 0, "stopped": False}
+        seen = set()
+        counts = {"files": 0, "chunks": 0, "errors": 0, "skipped_broken": 0, "stopped": False}
+        failed = self._failed()
         for folder in folders:
             root = Path(folder).expanduser()
             if not root.is_dir():
@@ -207,23 +224,53 @@ class DocsIndex:
                         continue
                     if st.st_size > MAX_FILE_BYTES or getattr(st, "st_flags", 0) & SF_DATALESS:
                         continue
-                    seen.add(str(p.resolve()))
+                    key = str(p.resolve())
+                    seen.add(key)
                     if stop is not None and stop.is_set():
                         counts["stopped"] = True
+                        self._set_failed(failed)
                         return counts  # nothing forgotten: the next run carries on
+                    if failed.get(key) == st.st_mtime:
+                        counts["skipped_broken"] += 1  # failed before and unchanged since
+                        continue
                     try:
-                        n = self.index_file(p)
-                        counts["files"] += 1
-                        counts["chunks"] += n
+                        n = self.index_file(p, stop=stop)
                     except Exception as e:  # one broken PDF shouldn't stop the whole index
                         log.warning("could not index %s: %s", p, e)
                         counts["errors"] += 1
+                        failed[key] = st.st_mtime
+                        continue
+                    if n is None:
+                        counts["stopped"] = True
+                        self._set_failed(failed)
+                        return counts
+                    failed.pop(key, None)
+                    counts["files"] += 1
+                    counts["chunks"] += n
         # Forget the index entries (not the files!) of files that were removed from the folders.
+        self._set_failed({k: v for k, v in failed.items() if k in seen})
         with self.db.transaction() as c:
             for r in c.execute("SELECT id, path FROM documents").fetchall():
                 if r["path"] not in seen:
                     self._remove_doc(c, r["id"])
         return counts
+
+    def _failed(self) -> dict[str, float]:
+        import json
+
+        row = self.db.one("SELECT value FROM meta WHERE key = ?", (FAILED_KEY,))
+        try:
+            return json.loads(row["value"]) if row else {}
+        except ValueError:
+            return {}
+
+    def _set_failed(self, failed: dict[str, float]) -> None:
+        import json
+
+        self.db.execute(
+            "INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (FAILED_KEY, json.dumps(failed)),
+        )
 
     def search(self, query: str, k: int = 5) -> list[Hit]:
         out = []

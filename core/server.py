@@ -67,7 +67,14 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
                 saved = load_state(cfg).get("settings", {})
                 if "search_enabled" in saved:
                     cfg.setdefault("search", {})["enabled"] = saved["search_enabled"]
+                s = state["sylvie"]
                 if warm:
+                    from core.memguard import GuardLoop, MemoryGuard
+
+                    s.guard = MemoryGuard(cfg)
+                    s.bg.backlog_gate = lambda: s.guard.backlog_ok()[0]
+                    state["guard_loop"] = GuardLoop(s, s.guard)
+                    state["guard_loop"].start()  # pauses backlog jobs, unloads quiet voice models
                     if cfg.get_path("search.enabled", True):
                         from tools.search import start_searxng
 
@@ -93,7 +100,6 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
                         state["memwatch"] = MemWatch(state["sylvie"], cfg.data_dir / "logs")
                         state["memwatch"].start()
                     # Index conversations from before episodic memory existed (when Lea is away).
-                    s = state["sylvie"]
                     s.bg.submit("episodes-backfill", lambda ev: s.episodes.backfill(stop=ev), backlog=True)
                 state["ready"] = True
                 log.info("Sylvie ready")
@@ -357,13 +363,20 @@ def create_app(sylvie: Sylvie | None = None, token: str | None = None, warm: boo
         if sch is not None and sch.proc is not None:
             # She just said "Sylvie": stop training now, while the greeting plays, not after her question.
             threading.Thread(target=sch.preempt, daemon=True).start()
+        S().prepare_voice()  # Whisper loads while the greeting plays (voice models load on demand)
         tts = S().text_to_speech()
         if tts is None:
             raise HTTPException(404, "system voice")
         text = str(body.get("text", "")).strip()
         if not text or len(text) > 1000:
             raise HTTPException(400, "text must be 1–1000 characters")
-        sp = tts.synthesize(text, str(body.get("language", "en")))
+        try:
+            sp = tts.synthesize(text, str(body.get("language", "en")))
+        except Exception as e:  # Kokoro missing or broken: the app speaks with the system voice
+            log.warning("Kokoro unavailable, using system voices: %s", e)
+            S()._tts = None
+            cfg["voice"]["tts"] = "system"
+            raise HTTPException(404, "system voice") from e
         return Response(sp.wav, media_type="audio/wav", headers={"Cache-Control": "no-store"})
 
     @app.post("/api/chat/{cid}/stop")

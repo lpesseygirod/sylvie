@@ -96,6 +96,13 @@ class Scheduler:
         self.used_tonight = 0.0
         self.night: str | None = None
         self.last_reason = "not checked yet"
+        # Memory guard (efficiency plan A2): the job starts only if what it needs is free once Sylvie
+        # has let go of her models, and is stopped past a hard cap or when macOS reports pressure.
+        self.job_memory_gb = float(cfg.get_path("schedule.job_memory_gb", 20))
+        self.max_job_gb = float(cfg.get_path("schedule.max_job_gb", 24))
+        self.guard_pause_minutes = float(cfg.get_path("schedule.guard_pause_minutes", 30))
+        self.blocked_until = 0.0
+        self._tight_ticks = 0
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
 
@@ -118,7 +125,34 @@ class Scheduler:
             self.night, self.used_tonight = night, 0.0
         if not self.always and self.used_tonight >= self.max_hours * 3600:
             return False, "tonight's time cap is used up"
+        if time.time() < self.blocked_until:
+            return False, "paused after running out of memory; trying again later"
+        guard = getattr(self.s, "guard", None)
+        if guard is not None:
+            from core.memwatch import GB, proc_usage
+
+            mine = (proc_usage(os.getpid()) or {}).get("footprint", 0) / GB  # freed by unload_models
+            ok, why = guard.heavy_ok(self.job_memory_gb, freed_gb=mine)
+            if not ok:
+                return False, why
         return True, "ok"
+
+    def _memory_check(self) -> str | None:
+        """While a job runs: a reason to stop it, or None. Past the hard cap, critical pressure, or
+        three minutes of "warn" pressure (the Mac starts swapping Lea's apps)."""
+        from core.memwatch import GB, tree_footprint
+
+        gb = tree_footprint(self.proc.pid) / GB
+        if gb > self.max_job_gb:
+            return f"it used {gb:.0f} GB, over the {self.max_job_gb:.0f} GB cap"
+        guard = getattr(self.s, "guard", None)
+        if guard is None or not guard.enabled:
+            return None
+        r = guard.reading()
+        self._tight_ticks = self._tight_ticks + 1 if r.tight else 0
+        if r.pressure == "critical" or self._tight_ticks >= max(1, int(180 / self.check_every)):
+            return f"memory pressure is {r.pressure} ({gb:.0f} GB for the job)"
+        return None
 
     def next_job(self) -> Job | None:
         """Overnight loop first; the fine-tune/eval cycle is started by the loop when it's due."""
@@ -142,6 +176,10 @@ class Scheduler:
                     self._finished(warm=not self.always)  # permanent mode: the next job starts soon
                 elif not self.manual and not self.always and not in_window(self.clock(), *self.window):
                     self._stop("the night window is over")  # safety net; jobs also get a time limit
+                elif why := self._memory_check():
+                    self.blocked_until = time.time() + self.guard_pause_minutes * 60
+                    self.last_reason = f"stopped: {why}"
+                    self._stop(f"memory guard: {why}")
                 return
             if self.pending_now and self.power():
                 self._start_now(*self.pending_now)
@@ -164,6 +202,14 @@ class Scheduler:
             if not self.power():
                 self.pending_now = (int(minutes), finetune)
                 return False, "on battery: it will start by itself as soon as the Mac is plugged in"
+            guard = getattr(self.s, "guard", None)
+            if guard is not None:
+                from core.memwatch import GB, proc_usage
+
+                mine = (proc_usage(os.getpid()) or {}).get("footprint", 0) / GB
+                ok, why = guard.heavy_ok(self.job_memory_gb, freed_gb=mine)
+                if not ok:
+                    return False, f"not enough memory right now: {why}. Closing some apps would help"
             self._start_now(int(minutes), finetune)
             return True, f"started for up to {minutes} min"
 
@@ -179,7 +225,7 @@ class Scheduler:
         env = {**os.environ, "HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1"}
         logf = open(self.s.cfg.data_dir / "logs" / f"{job.name}.log", "a")  # noqa: SIM115
         self.proc = subprocess.Popen(job.args, cwd=ROOT, env=env, stdout=logf, stderr=subprocess.STDOUT)
-        self.current, self.started_at = job, time.time()
+        self.current, self.started_at, self._tight_ticks = job, time.time(), 0
         self._pidfile().write_text(str(self.proc.pid))
         self._keep_awake(self.proc.pid)
 

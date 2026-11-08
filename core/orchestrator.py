@@ -116,6 +116,9 @@ class BackgroundWorker:
         self.busy = threading.Event()
         self.current: _Job | None = None
         self.hold = lambda: False  # True while a night job has the models unloaded
+        # Backlog jobs also wait for the memory guard (core/memguard.py): normal pressure, enough
+        # free memory, Lea away from the Mac. Conversation jobs are short and use the loaded model.
+        self.backlog_gate = lambda: True
         self._thread = threading.Thread(target=self._run, daemon=True, name="sylvie-bg")
         self._thread.start()
 
@@ -155,7 +158,12 @@ class BackgroundWorker:
             if not self.busy.is_set() and not self.hold():
                 if idle >= self.idle_seconds and not self.q.empty():
                     return self.q.get()
-                if idle >= self.backlog_idle_seconds and self.q.empty() and not self.backlog.empty():
+                if (
+                    idle >= self.backlog_idle_seconds
+                    and self.q.empty()
+                    and not self.backlog.empty()
+                    and self.backlog_gate()
+                ):
                     return self.backlog.get()
             time.sleep(0.2)
 
@@ -205,6 +213,9 @@ class Sylvie:
         self._stops: dict[str, threading.Event] = {}
         self._stt = None
         self._tts = None
+        self._voice_used = 0.0  # last time Whisper or Kokoro was asked for (unloaded when quiet)
+        self._voice_warming = False
+        self.guard = None  # set by the server (core/memguard.py)
 
     @classmethod
     def build(cls, cfg: Config | None = None) -> Sylvie:
@@ -265,6 +276,7 @@ class Sylvie:
         return out
 
     def speech_to_text(self):
+        self._voice_used = time.time()
         if self._stt is None:
             from voice.stt import SpeechToText
 
@@ -277,6 +289,7 @@ class Sylvie:
         """Kokoro on this Mac, or None when speech is spoken by the device's system voice."""
         if self.cfg.get_path("voice.tts", "system") != "kokoro":
             return None
+        self._voice_used = time.time()
         if self._tts is None:
             from voice.tts import TextToSpeech
 
@@ -308,25 +321,90 @@ class Sylvie:
         except Exception:
             pass
 
-    def warm(self) -> None:
-        """Load models and pre-read the system prompt so the first answer is fast.
-        Whisper warms up first: measured, warming it after the LLM made the first question ~1.3 s slower."""
-        if self.cfg.get_path("voice.enabled", True):
-            import numpy as np
+    # ---------- voice models: loaded when voice is used (efficiency plan A2) ----------
+    def warm_voice(self) -> None:
+        """Load and compile Whisper and Kokoro. Whisper's first transcription compiles its GPU kernels
+        (~4 s), Kokoro's first sentence per language too, so both get a throwaway run."""
+        import numpy as np
 
-            stt = self.speech_to_text()
-            stt.load()
-            # One throwaway transcription compiles Whisper's GPU kernels (first run is ~4 s).
-            stt.transcribe(np.sin(np.linspace(0, 2000, 16000)).astype(np.float32) * 0.1, language="en")
-            tts = self.text_to_speech()
-            if tts:
-                try:
-                    tts.load()
-                    tts.warm()  # first sentence per language compiles kernels (~4 s in total)
-                except Exception as e:  # missing model/espeak: the app falls back to the system voice
-                    log.warning("Kokoro unavailable, using system voices: %s", e)
-                    self._tts = None
-                    self.cfg["voice"]["tts"] = "system"
+        stt = self.speech_to_text()
+        stt.load()
+        stt.transcribe(np.sin(np.linspace(0, 2000, 16000)).astype(np.float32) * 0.1, language="en")
+        tts = self.text_to_speech()
+        if tts:
+            try:
+                tts.load()
+                tts.warm()
+            except Exception as e:  # missing model/espeak: the app falls back to the system voice
+                log.warning("Kokoro unavailable, using system voices: %s", e)
+                self._tts = None
+                self.cfg["voice"]["tts"] = "system"
+
+    def prepare_voice(self) -> None:
+        """Lea said "Sylvie": load the voice models in the background while the greeting plays and she
+        speaks, so the transcription is ready by the time her question arrives."""
+        self._voice_used = time.time()
+        if not self.cfg.get_path("voice.enabled", True):
+            return
+        if self._stt is not None and getattr(self._stt, "_model", None) is not None:
+            return
+        if self._voice_warming:
+            return
+        self._voice_warming = True
+
+        def run():
+            try:
+                import numpy as np
+
+                t0 = time.perf_counter()
+                # Whisper only: the greeting that's playing already loads Kokoro for its language.
+                stt = self.speech_to_text()
+                stt.load()
+                stt.transcribe(np.sin(np.linspace(0, 2000, 16000)).astype(np.float32) * 0.1, language="en")
+                log.info("Whisper loaded on demand in %.1f s", time.perf_counter() - t0)
+            except Exception:
+                log.exception("loading the voice models failed")
+            finally:
+                self._voice_warming = False
+
+        threading.Thread(target=run, daemon=True, name="sylvie-voice-warm").start()
+
+    def voice_idle_seconds(self) -> float:
+        return time.time() - self._voice_used if self._voice_used else float("inf")
+
+    def unload_voice(self) -> bool:
+        """Frees Whisper and Kokoro (~1.9 GB). Returns True if anything was loaded."""
+        if self._voice_warming:
+            return False
+        had = (self._stt is not None and getattr(self._stt, "_model", None) is not None) or (
+            self._tts is not None and getattr(self._tts, "_model", None) is not None
+        )
+        if not had:
+            return False
+        if self._stt is not None:
+            self._stt.unload()
+        if self._tts is not None:
+            with self._tts._lock:
+                self._tts._model, self._tts._packs = None, {}
+        import gc
+
+        gc.collect()
+        try:
+            import mlx.core as mx
+
+            mx.clear_cache()
+        except Exception:
+            pass
+        return True
+
+    def warm(self) -> None:
+        """Load the LLM and pre-read the system prompt so the first answer is fast. The voice models are
+        loaded on demand (`voice.load_on_demand`, default on): Lea mostly types, and Whisper + Kokoro
+        hold ~1.9 GB. With it off, Whisper warms first (measured: after the LLM, the first question was
+        ~1.3 s slower)."""
+        if self.cfg.get_path("voice.enabled", True) and not self.cfg.get_path("voice.load_on_demand", True):
+            self.warm_voice()
+            self._voice_used = time.time()
         self.llm.load()
         self.embedder.embed_one("warm up")
         self.llm.warm(self.current_system_prompt(), available_tools(self.tool_context()))

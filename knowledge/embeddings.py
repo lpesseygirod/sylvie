@@ -46,10 +46,12 @@ class Embedder:
             return np.zeros((0, self.dim), dtype=np.float32)
         import mlx.core as mx
 
-        with self._lock:
-            self._ensure()
-            out = []
-            for i in range(0, len(texts), batch_size):
+        out = []
+        for i in range(0, len(texts), batch_size):
+            # The lock is held per batch, not per call: a memory lookup for Lea waits for one batch
+            # (~0.2 s), not for a whole e-book (A1, 2026-11-08: a lookup waited 52 s for indexing).
+            with self._lock:
+                self._ensure()
                 batch = [(QUERY_INSTRUCTION + t) if query else t for t in texts[i : i + batch_size]]
                 ids = [self._tok.encode(t)[-self.max_tokens :] for t in batch]
                 lengths = [len(x) for x in ids]
@@ -63,7 +65,7 @@ class Embedder:
                 last = hidden[mx.arange(len(ids)), idx]
                 last = last / mx.linalg.norm(last, axis=-1, keepdims=True)
                 out.append(np.array(last.astype(mx.float32)))
-            return np.concatenate(out)[:, : self.dim]
+        return np.concatenate(out)[:, : self.dim]
 
     def embed_one(self, text: str, query: bool = False) -> np.ndarray:
         return self.embed([text], query=query)[0]

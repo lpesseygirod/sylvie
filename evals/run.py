@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import tempfile
@@ -316,11 +317,24 @@ def main() -> None:
     ap.add_argument("--model", default=None)
     ap.add_argument("--sets", default="math,finance,multilingual,tools,general,style,memory,lea_questions")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--force", action="store_true", help="run even when the memory guard says no")
     a = ap.parse_args()
     if a.rescore:
         for name, sm in rescore(Path(a.rescore))["summary"].items():
             print(f"  {name:<14} {sm['correct']}/{sm['scored']}  ({sm['accuracy']})")
         return
+    # An eval loads its own copy of Sylvie next to the live one: A1 found 11 runs adding to the day's
+    # memory pressure. Refuse when that doesn't fit (efficiency plan A2). Measured 2026-11-09: the eval
+    # peaked at 9.8 GB; started with 9.2 GB free, it swapped 4.5 GB and answers slowed 1.4 → 4.3 s.
+    from core.config import load_config
+    from core.memguard import MemoryGuard
+
+    ok, why = MemoryGuard(load_config()).heavy_ok(float(os.environ.get("SYLVIE_EVAL_GB", 11)))
+    if not ok and not a.force:
+        raise SystemExit(f"Not running the eval: {why}. Close some apps, or pass --force.")
+    from core.llm import limit_gpu_cache
+
+    limit_gpu_cache()
     run(a.label, a.sets.split(","), a.adapter, a.model, a.limit)
 
 
