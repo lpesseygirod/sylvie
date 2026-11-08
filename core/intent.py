@@ -115,7 +115,10 @@ LIVE_RE = re.compile(
     r"programme t[ée]l[ée]|films?|"
     r"what time (does|do|is) .{0,40}(open|close)|(is|are) .{0,30} open (today|now|on)|"
     r"a qu[eé] hora (abre|cierra|empieza|juega)|cierra|est[aá] abierto|"
-    r"[àa] quelle heure .{0,40}(ouvre|ferme)|ferme|ouvert)\b",
+    r"[àa] quelle heure .{0,40}(ouvre|ferme)|ferme|ouvert|"
+    # Lea asking for a look-up or for figures (2026-11-08: "búscame lo de los datos de la UE", "dame los datos")
+    r"b[uú]sca(me|lo|la)?|b[uú]scame|search( for)?|look (it |that |this )?up|google|find out|cherche|recherche|"
+    r"datos|estad[ií]sticas?|cifras|data|statistics|figures|donn[ée]es|chiffres)\b",
     re.I,
 )
 
@@ -138,6 +141,35 @@ NO_ACCESS_RE = re.compile(
     re.I,
 )
 
+# "Estoy buscando los datos…", "Let me look that up.", "Je cherche…": she says she's searching, but
+# nothing runs and the answer ends there. Measured 2026-11-08: three turns in a row, never a search.
+SEARCH_PROMISE_RE = re.compile(
+    r"\b(estoy buscando|voy a buscar|(te |lo |los |la |las )?busco( ahora| ya)?\b|d[eé]jame (buscar|mirar|consultar)|"
+    r"(ahora |ya )?(mismo )?lo (miro|consulto)|"
+    r"i'?m (searching|looking (it |that |this )?up|looking for|checking|pulling up)|let me (search|look|check|find)|"
+    r"i'?ll (search|look|check|find)|one moment while i|"
+    r"je (cherche|vais chercher|regarde|v[ée]rifie)|laisse-moi (chercher|regarder|v[ée]rifier))",
+    re.I,
+)
+
+SEARCH_PROMISE_NUDGE = (
+    "(Check: you said you're looking it up, but you didn't call any tool, so nothing is being searched and "
+    "Lea is left waiting. Call web_search now and answer her from what you find.)"
+)
+
+# Sylvie offered to look something up ("¿Quieres que busque…?") and Lea said yes.
+OFFER_SEARCH_RE = re.compile(
+    r"(quieres|te gustar[ií]a|prefieres) que (te )?(busque|mire|consulte)|"
+    r"(shall|should|do you want me to|want me to|would you like me to) (i )?(search|look|check|find)|"
+    r"(veux|voudrais)-tu que je (cherche|regarde)",
+    re.I,
+)
+YES_RE = re.compile(
+    r"^\W*(sylvie\W*)?(s[ií]|yes|yeah|yep|vale|ok(ay)?|claro|dale|venga|porfa(vor)?|por favor|please|sure|"
+    r"oui|d'accord|bien s[uû]r)\b",
+    re.I,
+)
+
 SEARCH_NUDGE = (
     "(Check: you said you can't get that, but you have web_search and didn't use it. Call web_search now "
     "with a generic query and answer Lea from what you find. Only if the search finds nothing, say so.)"
@@ -146,6 +178,14 @@ SEARCH_NUDGE = (
 
 def looks_live(text: str) -> bool:
     return bool(LIVE_RE.search(text))
+
+
+def promises_search(text: str) -> bool:
+    return bool(SEARCH_PROMISE_RE.search(text))
+
+
+def accepts_search_offer(text: str, previous_answer: str) -> bool:
+    return bool(previous_answer and OFFER_SEARCH_RE.search(previous_answer) and YES_RE.search(text))
 
 
 def says_no_access(text: str) -> bool:

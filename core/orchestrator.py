@@ -29,11 +29,14 @@ from core.intent import (
     MUSIC_DONE_NOTE,
     REPLY_LANGUAGE_NOTE,
     SEARCH_NUDGE,
+    SEARCH_PROMISE_NUDGE,
     WRITING_NOTE,
+    accepts_search_offer,
     claims_done,
     looks_like_action,
     looks_like_writing,
     looks_live,
+    promises_search,
     says_no_access,
 )
 from core.lang import guess_language, phrase, reply_language
@@ -470,8 +473,17 @@ class Sylvie:
             if writing:
                 notes.append(WRITING_NOTE)
             # 1g. Weather, what's on TV, news: she must look it up, not say she has no access (core/intent.py)
+            # "¿Quieres que busque…?" → "Sí": that's a request to search too
+            last_answer_text = next(
+                (
+                    m["content"]
+                    for m in reversed(self.convs.messages(cid))
+                    if m["role"] == "assistant" and m["content"]
+                ),
+                "",
+            )
             live = (
-                looks_live(text)
+                (looks_live(text) or accepts_search_offer(text, last_answer_text))
                 and not action_request
                 and not writing
                 and self.cfg.get_path("search.enabled", True)
@@ -716,14 +728,19 @@ class Sylvie:
                     and not nudged
                     and not stop.is_set()
                     and any(t["function"]["name"] == "web_search" for t in use_tools)
-                    and says_no_access(visible)
+                    and (says_no_access(visible) or promises_search(visible))
                 ):
                     # "I don't have access to real-time weather": she can search, so send her to do it.
                     log.warning("said she has no access instead of searching: %r", visible[:120])
                     nudged = True
                     display_parts.append(visible)
                     messages.append({"role": "assistant", "content": visible})
-                    messages.append({"role": "user", "content": SEARCH_NUDGE})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": SEARCH_NUDGE if says_no_access(visible) else SEARCH_PROMISE_NUDGE,
+                        }
+                    )
                     continue
                 if not calls and not visible and called_tools and not answer_nudged and not stop.is_set():
                     # Measured 2026-11-08 (make everyday): after four searches about the weekend's rain the

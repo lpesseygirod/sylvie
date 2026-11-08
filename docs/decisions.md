@@ -357,3 +357,7 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   Photos ("beach" 170 photos vs "playa" 28), so the tool asks for English things and local place names.
   Memory gets only who appears most. Lea's library: 17,019 photos (1980–2026), 6,519 with a place,
   4 people named — naming more people in Photos makes "photos with X" work for them.
+- "Estoy buscando los datos…" (Lea, 2026-11-08): three turns in a row she said she was searching and
+  never called a tool. Now: an answer that promises a search (EN/ES/FR) without one sends her back to
+  call web_search; "búscame", "look it up", "datos/estadísticas/data" count as look-up requests; a "sí"
+  to her own "¿quieres que lo busque?" does too. `make everyday` has these cases: 35/35.

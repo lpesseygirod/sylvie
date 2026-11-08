@@ -166,3 +166,47 @@ def test_empty_answer_after_searching_gets_one_more_try(tmp_path):
     assert "397,80" in text and "perdido" not in text
     assert "Answer Lea now in Spanish" in s.llm.calls[2]["messages"][-1]["content"]
     assert s.llm.calls[2]["tools"] is None
+
+
+def test_saying_im_searching_without_searching_is_sent_back(tmp_path):
+    """2026-11-08: "búscame los datos de la UE" → "Estoy buscando los datos…", three times, no search."""
+    import tools.registry as reg
+    from core.intent import accepts_search_offer, looks_live, promises_search
+    from tests.test_orchestrator import make, run
+
+    assert promises_search("Estoy buscando los datos de la Unión Europea sobre seguridad.")
+    assert promises_search("Let me look that up for you.") and promises_search("Je cherche ça.")
+    assert not promises_search("El riesgo por viaje es unas 10 veces mayor en coche.")
+    assert looks_live("Sylvie, buscame lo de los datos de la UE.") and looks_live("dame los datos")
+    offer = "Entendido. ¿Te gustaría que busque los datos de la Unión Europea sobre seguridad vial?"
+    assert accepts_search_offer("Sylvie, si.", offer) and not accepts_search_offer("Sylvie, si.", "Vale.")
+
+    call = "<tool_call>\n<function=web_search>\n<parameter=query>\nEU road air fatality rate per trip\n</parameter>\n</function>\n</tool_call>"
+    promise = "Estoy buscando los datos de la Unión Europea sobre seguridad en transporte."
+    s = make(
+        tmp_path,
+        [
+            offer,
+            "{}",
+            promise,
+            call,
+            "Según la Comisión Europea, el coche es unas 60 veces más peligroso.",
+            "{}",
+        ],
+    )
+    s.cfg["search"] = {**s.cfg["search"], "enabled": True}
+    original = reg.web_search
+    reg.web_search = lambda q, **kw: (
+        "EU: 0.06 deaths per 100M passenger-km by air, 3.2 by car",
+        [{"n": 1, "title": "t", "url": "https://a.example/"}],
+    )
+    try:
+        cid = run(s, "¿Es más peligroso el coche o el avión?")[0]["conversation_id"]
+        s.bg.drain()
+        ev = run(s, "Sylvie, si.", cid)
+    finally:
+        reg.web_search = original
+    said = [m["content"] for m in s.llm.calls[-1]["messages"] if m["role"] == "user"]
+    assert "call web_search first" in said[-2] and "Call web_search now" in said[-1]
+    assert any(e["type"] == "tool" and e["name"] == "web_search" for e in ev)
+    assert "60 veces" in "".join(e["text"] for e in ev if e["type"] == "text")

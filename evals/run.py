@@ -103,8 +103,9 @@ def score(item: dict, answer: str, tools: list[str]) -> bool | None:
 def everyday_problems(item: dict, answer: str, tools: list[str]) -> list[str]:
     """What went wrong with an everyday question (empty: she did it)."""
     c, problems = item["check"], []
-    if c.get("tool") and c["tool"] not in tools:
-        problems.append(f"didn't call {c['tool']} (called {', '.join(tools) or 'nothing'})")
+    wanted = [c["tool"]] if isinstance(c.get("tool"), str) else c.get("tool") or []
+    if wanted and not set(wanted) & set(tools):  # any of them (looking it up in Wikipedia is fine for facts)
+        problems.append(f"didn't call {' or '.join(wanted)} (called {', '.join(tools) or 'nothing'})")
     # The opening sentence tells best: lists of Spanish TV shows in an English answer aren't Spanish.
     first = re.split(r"(?<=[.!?:])\s|\n", answer.strip())[0]
     lang = reply_language(first) or reply_language(answer) or guess_language(answer, default="?")

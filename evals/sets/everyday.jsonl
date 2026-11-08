@@ -30,3 +30,6 @@
 {"set": "everyday", "id": "day-29", "prompt": "Sylvie, merci beaucoup, c'est parfait.", "before": ["Hola Sylvie."], "channel": "voice", "heard": "fr", "check": {"type": "everyday", "lang": "fr"}}
 {"set": "everyday", "id": "day-30", "prompt": "Sylvie, what time is it?", "channel": "voice", "heard": "en", "check": {"type": "everyday", "lang": "en"}}
 {"set": "everyday", "id": "day-31", "prompt": "I'm stressed about my exams.", "check": {"type": "everyday", "lang": "en"}}
+{"set": "everyday", "id": "day-32", "prompt": "Sylvie, búscame los datos de la UE sobre muertes en accidentes de coche y de avión.", "check": {"type": "everyday", "lang": "es", "tool": "web_search"}}
+{"set": "everyday", "id": "day-33", "prompt": "dame los datos de la Unión Europea", "before": ["¿Qué es más seguro, viajar en coche o en avión?"], "check": {"type": "everyday", "lang": "es", "tool": ["web_search", "wikipedia"]}}
+{"set": "everyday", "id": "day-34", "prompt": "Look up how many people live in Lyon.", "check": {"type": "everyday", "lang": "en", "tool": ["web_search", "wikipedia"]}}

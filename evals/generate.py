@@ -223,6 +223,19 @@ EVERYDAY = [
     },
     {"prompt": "Sylvie, what time is it?", "lang": "en", "channel": "voice", "heard": "en"},
     {"prompt": "I'm stressed about my exams.", "lang": "en"},
+    # asked to look something up (2026-11-08: "Estoy buscando…" three times and never a search)
+    {
+        "prompt": "Sylvie, búscame los datos de la UE sobre muertes en accidentes de coche y de avión.",
+        "lang": "es",
+        "tool": "web_search",
+    },
+    {
+        "before": ["¿Qué es más seguro, viajar en coche o en avión?"],
+        "prompt": "dame los datos de la Unión Europea",
+        "lang": "es",
+        "tool": ["web_search", "wikipedia"],
+    },
+    {"prompt": "Look up how many people live in Lyon.", "lang": "en", "tool": ["web_search", "wikipedia"]},
 ]
 
 
