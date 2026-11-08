@@ -321,3 +321,17 @@ def test_play_by_name_without_a_key_uses_web_search(tmp_path):
         )
     finally:
         r._web_api_search = original
+
+
+def test_spanish_claims_and_volume_requests_are_caught():
+    """2026-11-08, by voice: "Ya está la música puesta…" and "Subo el volumen" with no tool call."""
+    from core.intent import claims_done, looks_like_action
+
+    for said in ["Ya está la música puesta, es Sunny Beach.", "Subo el volumen un poco.",
+                 "La música está sonando.", "C'est parti !", "I turned it up.", "The music is on.",
+                 'Playing "Reina" on Spotify now.', "Now playing Reina."]:  # fmt: skip
+        assert claims_done(said), said
+    for asked in ["Sube un poco el volumen", "bájale", "turn it up", "monte le son", "louder please"]:
+        assert looks_like_action(asked), asked
+    for plain in ["¿Quieres que la suba un poco?", "What would you like to hear?"]:
+        assert not claims_done(plain), plain

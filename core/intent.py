@@ -14,6 +14,7 @@ ACTION_RE = re.compile(
     r"\b(play|put on|put (my|some|the)|pause|next song|skip|music|playlist|song|spotify|"
     r"pon(me)?|ponme|reproduce|m[uú]sica|canci[oó]n|lista|pausa|siguiente|"
     r"mets|joue|musique|chanson|"
+    r"volume|volumen|louder|quieter|turn (it )?(up|down)|sube|s[uú]bele|baja|b[aá]jale|monte|baisse|"
     r"calendar|event|meeting|appointment|remind|reminder|timer|alarm|open|"
     r"calendario|agenda|evento|cita|reuni[oó]n|recu[eé]rdame|recordatorio|temporizador|alarma|abre|"
     r"rendez-vous|rappelle|rappel|minuteur|ouvre)\b",
@@ -21,11 +22,16 @@ ACTION_RE = re.compile(
 )
 
 # "I'm putting it on", "Done!", "He añadido…", "Je lance…": she says it happened.
+# 2026-11-08: "Ya está la música puesta" and "Subo el volumen" slipped through (nothing played).
 CLAIM_RE = re.compile(
     r"\b(i'?m (putting|playing|starting|adding|opening|setting)|i'?ve (put|added|set|started|opened|created|scheduled)|"
     r"(it'?s|is) (playing|added|done|set)|playing (it|your|now)|done[.!]|"
+    r"(it'?s|music is) on\b|turn(ed|ing) (it )?(up|down)|^\W*(now )?playing\b|\bplaying\b.{0,80}\bnow\b|"
+    r"\b(est[aá] )?sonando\b|"
     r"(te )?(pongo|estoy poniendo|he puesto|he a[nñ]adido|he creado|a[nñ]adido|listo[.!]|hecho[.!])|"
-    r"je (lance|mets|joue|l'ai ajout|l'ai mis|t'ai ajout)|c'est fait|ajout[ée]|c'est lanc[ée])",
+    r"ya est[aá]|est[aá] (puest[ao]|sonando)|ya suena|(lo )?(subo|bajo)|he (subido|bajado)|"
+    r"je (lance|mets|joue|monte|baisse|l'ai ajout|l'ai mis|t'ai ajout)|j'ai (mont|baiss)|c'est parti|"
+    r"c'est fait|ajout[ée]|c'est lanc[ée])",
     re.I,
 )
 

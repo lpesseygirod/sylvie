@@ -8,6 +8,7 @@ is automatic (plan, Phase 2).
 from __future__ import annotations
 
 import io
+import re
 import threading
 import time
 import wave
@@ -20,6 +21,34 @@ LANGUAGES = ("en", "es", "fr")
 # A short hint in Whisper's "previous text" slot: teaches it the spelling of "Sylvie" and that Lea
 # mixes languages. Measured on test audio: fixed "Silvie" and a garbled ES/EN mixed sentence.
 INITIAL_PROMPT = "Sylvie, Lea. Hola Sylvie, can you check esto? Oui, merci Sylvie."
+
+
+# What Whisper writes when it hears music or near-silence (subtitle credits from its training data).
+# Measured 2026-11-08: 30 s of quiet or ducked music came back as "Sylvie. Merci.", "Sylvie. Thank
+# you." and "Sous-titrage ST' 501 So, boy.", and Sylvie answered them as if Lea had spoken.
+NOISE_RE = re.compile(
+    r"sous-?titr|amara\.org|subtitles? by|thanks? (you )?for watching|suscr[ií]bete|gracias por ver|"
+    r"merci d'avoir regard",
+    re.I,
+)
+BARE_THANKS = {
+    "merci",
+    "thank you",
+    "thanks",
+    "gracias",
+    "you",
+    "bye",
+    "merci beaucoup",
+    "thank you very much",
+}
+LONG_RECORDING_S = 15  # a real "Sylvie, merci" ends in a few seconds; 15 s+ of it is noise
+
+
+def is_noise_transcript(text: str, seconds_audio: float) -> bool:
+    if NOISE_RE.search(text):
+        return True
+    rest = re.sub(r"^\W*sylvie\W*", "", text.strip(), flags=re.I).strip(" .!?¡¿,").lower()
+    return not rest or (rest in BARE_THANKS and seconds_audio >= LONG_RECORDING_S)
 
 
 @dataclass
@@ -113,6 +142,8 @@ class SpeechToText:
         text = result["text"].strip()
         if text and text.lower().strip(" .") in INITIAL_PROMPT.lower():
             text = ""  # Whisper echoing its hint on near-silence
+        if text and is_noise_transcript(text, len(audio) / SAMPLE_RATE):
+            text = ""  # music or silence written down as subtitle credits / a bare "thank you"
         return Transcript(
             text=text,
             language=lang,

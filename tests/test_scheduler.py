@@ -51,7 +51,7 @@ def test_job_time_limit_never_runs_past_the_window(tmp_path):
     assert minutes_until(datetime(2026, 11, 6, 6, 55), "07:00") == 5
     assert minutes_until(datetime(2026, 11, 6, 23, 0), "07:00") == 480
     sc, _ = sched(tmp_path, hour=2)
-    assert sc.next_job().args[-1] == "300"  # 02:00: the 5-hour cap
+    assert sc.next_job().args[-1] == "240"  # 02:00: the 4-hour cap (Lea, 2026-11-08)
     sc.clock = lambda: datetime(2026, 11, 6, 6, 30)
     assert sc.next_job().args[-1] == "30"  # 06:30: only until 07:00
     sc.clock = lambda: datetime(2026, 11, 6, 6, 57)

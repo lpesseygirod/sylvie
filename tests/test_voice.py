@@ -275,3 +275,17 @@ def test_lea_rules_in_spanish_are_noticed():
     assert maybe_preference("Tienes que hablarme más despacio")
     assert maybe_preference("Je veux que tu répondes en français")
     assert maybe_preference("The rule is: never cut your answer")
+
+
+def test_music_and_silence_transcripts_are_dropped():
+    """2026-11-08: 30 s of ducked music or silence became "Sylvie. Merci." / "Sous-titrage ST' 501"."""
+    from voice.stt import is_noise_transcript
+
+    assert is_noise_transcript("Sous-titrage ST' 501 So, boy.", 31)
+    assert is_noise_transcript("Sous-titres réalisés par la communauté d'Amara.org", 4)
+    assert is_noise_transcript("Sylvie. Merci.", 31.6)
+    assert is_noise_transcript("Sylvie. Thank you.", 31.6)
+    assert is_noise_transcript("Sylvie.", 5)
+    assert not is_noise_transcript("Sylvie, merci.", 2.5)  # a real, quick thanks still gets an answer
+    assert not is_noise_transcript("Sylvie, pon música.", 9.3)
+    assert not is_noise_transcript("Thank you for the summary, can you shorten it?", 20)
