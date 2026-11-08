@@ -15,9 +15,28 @@ on isoToDate(s)
 end isoToDate
 """
 
+# Volume commands change the Mac's own volume, not Spotify's: the app turns Spotify down to 12 while
+# Sylvie listens and puts it back afterwards, which undid her changes (2026-11-08: "put the volume to
+# the max" set Spotify to 100, where it already was; the Mac stayed at 81). The result says the new level.
 SPOTIFY_COMMAND = """
 on run argv
     set cmd to item 1 of argv
+    if cmd is in {"volume_up", "volume_down", "set_volume"} then
+        set v to output volume of (get volume settings)
+        if cmd is "volume_up" then
+            set v to v + 12
+        else if cmd is "volume_down" then
+            set v to v - 12
+        else
+            set v to (item 2 of argv) as integer
+        end if
+        if v > 100 then set v to 100
+        if v < 0 then set v to 0
+        set volume output volume v without output muted
+        set volText to "Mac volume now " & (output volume of (get volume settings)) & "%. "
+    else
+        set volText to ""
+    end if
     tell application "Spotify"
         if cmd is "play" then
             play
@@ -27,17 +46,11 @@ on run argv
             next track
         else if cmd is "previous" then
             previous track
-        else if cmd is "volume_up" then
-            set sound volume to (sound volume + 15)
-        else if cmd is "volume_down" then
-            set sound volume to (sound volume - 15)
-        else if cmd is "set_volume" then
-            set sound volume to ((item 2 of argv) as integer)
         end if
         if player state is playing then
-            return (name of current track) & " — " & (artist of current track)
+            return volText & (name of current track) & " — " & (artist of current track)
         end if
-        return "paused"
+        return volText & "paused"
     end tell
 end run
 """

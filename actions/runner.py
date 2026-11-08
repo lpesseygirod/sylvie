@@ -48,7 +48,7 @@ TOOLS = {
     "music": _fn(
         "music",
         "Spotify playback controls with NO song name: play (= resume what was playing), pause, next, previous, "
-        "volume_up, volume_down, set_volume (0-100), now_playing. To play a specific song, artist, album or "
+        "volume_up, volume_down, set_volume (0-100; 'max' = 100), now_playing. Volume is the Mac's volume. To play a specific song, artist, album or "
         "playlist, use play_music instead.",
         {
             "command": {
