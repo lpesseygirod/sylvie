@@ -65,6 +65,10 @@ from tools.registry import ToolContext, available_tools, execute, validate
 log = logging.getLogger("sylvie")
 
 MAX_TOOL_ROUNDS = 4
+ANSWER_NUDGE = (
+    "(You have what you need. Answer Lea now in {lang} with what the tools found, even if it's partial: "
+    "say what you found and what you couldn't. No more tool calls.)"
+)
 CLAUDE_NOTE = (
     "This message was written to Claude, another AI assistant (often for coding), not to Sylvie, and "
     "there is no reply. Instructions about the task itself (what to build, run, fix, write or commit) "
@@ -623,9 +627,13 @@ class Sylvie:
                     tool_chars += len(result.content)
 
             called_tools = False
+            searched = (
+                False  # web_search ran this turn (Wikipedia alone isn't enough for prices or the weather)
+            )
             nudged = False
             greeting = GreetingStripper(active=not greets(text))
-            for round_no in range(MAX_TOOL_ROUNDS + 1):
+            answer_nudged = False
+            for round_no in range(MAX_TOOL_ROUNDS + 2):  # the last one only after a nudge below
                 # Tools are dropped on the last round, or after a second malformed call (retry once).
                 use_tools = (
                     tools
@@ -702,7 +710,7 @@ class Sylvie:
                 if (
                     not calls
                     and use_tools
-                    and not called_tools
+                    and not searched
                     and not nudged
                     and not stop.is_set()
                     and any(t["function"]["name"] == "web_search" for t in use_tools)
@@ -714,6 +722,15 @@ class Sylvie:
                     display_parts.append(visible)
                     messages.append({"role": "assistant", "content": visible})
                     messages.append({"role": "user", "content": SEARCH_NUDGE})
+                    continue
+                if not calls and not visible and called_tools and not answer_nudged and not stop.is_set():
+                    # Measured 2026-11-08 (make everyday): after four searches about the weekend's rain the
+                    # last round (no tools left) came back empty. Ask once more, plainly, for the answer.
+                    log.warning("empty answer after tools, asking for it: %r", sp.raw[:200])
+                    answer_nudged = True
+                    invalid_calls = 2  # no more tools
+                    lang = LANG_NAMES.get(said_in or guess_language(text), "English")
+                    messages.append({"role": "user", "content": ANSWER_NUDGE.format(lang=lang)})
                     continue
                 if not calls:
                     if not visible and not stop.is_set():
@@ -740,6 +757,7 @@ class Sylvie:
                     break
                 # Tool round
                 called_tools = True
+                searched = searched or any(c.name in ("web_search", "research") for c in calls)
                 if visible:
                     display_parts.append(visible)
                 assistant_msg = {

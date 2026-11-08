@@ -13,6 +13,9 @@ let wakeLog = Logger(subsystem: "app.sylvie.mac", category: "wake")
 final class WakeWordListener {
     var onWake: (() -> Void)?
     var onStopCommand: (() -> Void)?
+    /// "stop listening" / "deja de escuchar" / "arrête d'écouter": stop completely (mic off).
+    var onStopListening: (() -> Void)?
+    private var stopHeardAt = Date.distantPast
     /// Only while Sylvie is speaking or thinking: "stop" / "para" / "arrête" interrupts her.
     var listensForStop = false
     /// True while Sylvie speaks without echo cancellation: she'd hear her own voice (and her name),
@@ -143,6 +146,18 @@ final class WakeWordListener {
     }
 
     private func check(_ text: String) {
+        lock.lock()
+        let recentStop = Date().timeIntervalSince(stopHeardAt) < 2.5
+        lock.unlock()
+        if matcher.isStopListening(text) || (recentStop && matcher.isListenTail(text)) {
+            wakeLog.notice("stop listening heard")
+            lock.lock()
+            stopHeardAt = .distantPast
+            lock.unlock()
+            DispatchQueue.main.async { self.onStopListening?() }
+            restart()
+            return
+        }
         if deaf {
             // She's speaking and the mic hears her too: ignore her name, but Lea's "stop" still works.
             let stops = matcher.strongStopCount(in: text)
@@ -156,6 +171,9 @@ final class WakeWordListener {
             lock.unlock()
             if newStop {
                 wakeLog.notice("stop heard while speaking")
+                lock.lock()
+                stopHeardAt = Date()
+                lock.unlock()
                 DispatchQueue.main.async { self.onStopCommand?() }
                 restart()
             }
@@ -168,6 +186,10 @@ final class WakeWordListener {
         let stopMode = listensForStop
         lock.unlock()
         if stopMode && matcher.isStop(text) {
+            wakeLog.notice("stop heard")
+            lock.lock()
+            stopHeardAt = Date()
+            lock.unlock()
             DispatchQueue.main.async { self.onStopCommand?() }
             restart()
             return

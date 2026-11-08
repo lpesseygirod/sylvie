@@ -1,0 +1,32 @@
+{"set": "everyday", "id": "day-0", "prompt": "Sylvie, what's the weather going to be like tomorrow in Toledo?", "check": {"type": "everyday", "lang": "en", "tool": "web_search"}}
+{"set": "everyday", "id": "day-1", "prompt": "Sylvie, dime qué tiempo hará mañana en Toledo.", "check": {"type": "everyday", "lang": "es", "tool": "web_search"}}
+{"set": "everyday", "id": "day-2", "prompt": "Quel temps fera-t-il demain à Paris ?", "check": {"type": "everyday", "lang": "fr", "tool": "web_search"}}
+{"set": "everyday", "id": "day-3", "prompt": "Sylvie, dime qué películas hay hoy en televisión.", "check": {"type": "everyday", "lang": "es", "tool": "web_search"}}
+{"set": "everyday", "id": "day-4", "prompt": "What's on TV tonight in Spain?", "check": {"type": "everyday", "lang": "en", "tool": "web_search"}}
+{"set": "everyday", "id": "day-5", "prompt": "¿Cuáles son las noticias más importantes de hoy en España?", "check": {"type": "everyday", "lang": "es", "tool": "web_search"}}
+{"set": "everyday", "id": "day-6", "prompt": "What are today's top news headlines?", "check": {"type": "everyday", "lang": "en", "tool": "web_search"}}
+{"set": "everyday", "id": "day-7", "prompt": "¿Cómo quedó el último partido del Real Madrid?", "check": {"type": "everyday", "lang": "es", "tool": "web_search"}}
+{"set": "everyday", "id": "day-8", "prompt": "How much does an iPhone 17 Pro cost in Spain?", "check": {"type": "everyday", "lang": "en", "tool": "web_search"}}
+{"set": "everyday", "id": "day-9", "prompt": "¿A qué hora cierra Mercadona los domingos?", "check": {"type": "everyday", "lang": "es", "tool": "web_search"}}
+{"set": "everyday", "id": "day-10", "prompt": "Quelles sont les actualités du jour en France ?", "check": {"type": "everyday", "lang": "fr", "tool": "web_search"}}
+{"set": "everyday", "id": "day-11", "prompt": "What's the euro to dollar exchange rate right now?", "check": {"type": "everyday", "lang": "en", "tool": "web_search"}}
+{"set": "everyday", "id": "day-12", "prompt": "Sylvie, ¿va a llover este fin de semana en Madrid?", "check": {"type": "everyday", "lang": "es", "tool": "web_search"}}
+{"set": "everyday", "id": "day-13", "prompt": "What is the capital of Australia?", "check": {"type": "everyday", "lang": "en", "contains": "canberra"}}
+{"set": "everyday", "id": "day-14", "prompt": "¿Quién escribió Cien años de soledad?", "check": {"type": "everyday", "lang": "es", "contains": "garcía márquez"}}
+{"set": "everyday", "id": "day-15", "prompt": "Qui a peint la Joconde ?", "check": {"type": "everyday", "lang": "fr", "contains": "vinci"}}
+{"set": "everyday", "id": "day-16", "prompt": "Explain in two sentences what inflation is.", "check": {"type": "everyday", "lang": "en"}}
+{"set": "everyday", "id": "day-17", "prompt": "¿Cuánto es el 21% de 350 euros?", "check": {"type": "everyday", "lang": "es", "contains": "73,5"}}
+{"set": "everyday", "id": "day-18", "prompt": "What is 15% of 80?", "check": {"type": "everyday", "lang": "en", "contains": "12"}}
+{"set": "everyday", "id": "day-19", "prompt": "Sylvie, put the song Bloodline.", "check": {"type": "everyday", "lang": "en", "tool": "play_music"}}
+{"set": "everyday", "id": "day-20", "prompt": "Sylvie, pon la canción La Reina de Maluma.", "check": {"type": "everyday", "lang": "es", "tool": "play_music"}}
+{"set": "everyday", "id": "day-21", "prompt": "Sylvie, put the volume to the max.", "check": {"type": "everyday", "lang": "en", "tool": "music"}}
+{"set": "everyday", "id": "day-22", "prompt": "Sylvie, pausa la música.", "check": {"type": "everyday", "lang": "es", "tool": "music"}}
+{"set": "everyday", "id": "day-23", "prompt": "¿Qué tengo mañana en el calendario?", "check": {"type": "everyday", "lang": "es", "tool": "calendar_events"}}
+{"set": "everyday", "id": "day-24", "prompt": "Remind me to call my mom tomorrow at 10.", "check": {"type": "everyday", "lang": "en", "tool": "create_reminder"}}
+{"set": "everyday", "id": "day-25", "prompt": "Mets un minuteur de 5 minutes.", "check": {"type": "everyday", "lang": "fr", "tool": "set_timer"}}
+{"set": "everyday", "id": "day-26", "prompt": "Sylvie, how are you doing today?", "before": ["Hola Sylvie, ¿qué tal estás?"], "check": {"type": "everyday", "lang": "en"}}
+{"set": "everyday", "id": "day-27", "prompt": "Sylvie, stop listening.", "before": ["Sylvie, ¿qué hora es?"], "channel": "voice", "heard": "en", "check": {"type": "everyday", "lang": "en"}}
+{"set": "everyday", "id": "day-28", "prompt": "Sylvie, ¿me recomiendas una serie?", "before": ["Hi Sylvie, how are you?"], "check": {"type": "everyday", "lang": "es"}}
+{"set": "everyday", "id": "day-29", "prompt": "Sylvie, merci beaucoup, c'est parfait.", "before": ["Hola Sylvie."], "channel": "voice", "heard": "fr", "check": {"type": "everyday", "lang": "fr"}}
+{"set": "everyday", "id": "day-30", "prompt": "Sylvie, what time is it?", "channel": "voice", "heard": "en", "check": {"type": "everyday", "lang": "en"}}
+{"set": "everyday", "id": "day-31", "prompt": "I'm stressed about my exams.", "check": {"type": "everyday", "lang": "en"}}

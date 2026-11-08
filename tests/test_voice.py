@@ -87,16 +87,46 @@ def test_voice_answer_follows_the_language_whisper_heard(tmp_path):
     assert reply_language("Sylvie, what is the weather like?", heard="es") == "en"  # clear words win
     assert reply_language("Sylvie, stop listening.") is None  # typed, no telling words: can't tell
     assert reply_language("Gracias Sylvie") == "es"  # one telling word, nothing else
+    assert reply_language("Mets un minuteur de 5 minutes.") == "fr"  # was answered in Spanish (un, de)
+    assert reply_language("Sylvie, pon Bloodline please") is None  # mixed: she may mix too
     s = make(tmp_path, ["Okay, I stopped.", extraction()])
+
+    class STT:
+        def transcribe(self, wav):
+            return Transcript("Sylvie, Coldplay?", "en", 1.5, 90.0)  # no telling words: the audio decides
+
+    s._stt = STT()
+    list(voice_turn(s, b"RIFF"))
+    prompt = s.llm.calls[0]["messages"][-1]["content"]
+    assert prompt.endswith("(Reply in English.)") and "it sounds like English" in prompt
+
+
+def test_stop_and_stop_listening_need_no_model(tmp_path):
+    """Lea, 2026-11-08: "stop listening" stops her completely; "stop" cuts her and listens again."""
+    from tests.test_orchestrator import make
+    from voice.loop import stop_command, voice_turn
+    from voice.stt import Transcript
+
+    for text in [
+        "Sylvie, stop listening.",
+        "Deja de escuchar.",
+        "Sylvie, para de escucharme",
+        "Arrête d'écouter.",
+    ]:
+        assert stop_command(text) == "mute", text
+    for text in ["Stop.", "Sylvie, stop.", "Para, Sylvie.", "Basta ya.", "Arrête !"]:
+        assert stop_command(text) == "listen", text
+    for text in ["Stop the music and play jazz", "Para mañana, ¿qué tengo?", "Is the bus stop near?"]:
+        assert stop_command(text) is None, text
+    s = make(tmp_path, [])
 
     class STT:
         def transcribe(self, wav):
             return Transcript("Sylvie, stop listening.", "en", 1.5, 90.0)
 
     s._stt = STT()
-    list(voice_turn(s, b"RIFF"))
-    prompt = s.llm.calls[0]["messages"][-1]["content"]
-    assert prompt.endswith("(Reply in English.)") and "it sounds like English" in prompt
+    ev = list(voice_turn(s, b"RIFF"))
+    assert {"type": "control", "action": "mute"} in ev and ev[-1]["type"] == "done" and not s.llm.calls
 
 
 def test_voice_turn_with_silence(tmp_path):

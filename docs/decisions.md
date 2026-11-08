@@ -311,3 +311,27 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - Every interest starts as a "guess" (About Lea → Interests: confirm / not me / delete); sensitive
   topics are filtered as everywhere else. Facts from apps are memory only, never training data (rule 4).
 - First run: the chat window opens About Lea → Your apps until she ticks her apps or says "None of these".
+
+### T45 — Her language, her name, and looking things up (Lea, 2026-11-08)
+- Measured in the 13:34–13:40 voice conversation: every nameless turn ("la la la", "No, no, no…",
+  "Hey Nini") came from follow-up listening, not from a false wake word. Follow-up listening is now off
+  (`defaults write app.sylvie.mac followUpListening -bool true` brings it back): she only wakes on "Sylvie"
+  or the hotkey. This reverses Lea's 2026-11-06 request ("I need to repeat her name every sentence");
+  her latest wish wins.
+- The reply language for voice comes from Whisper's detection when the words alone don't tell
+  (`core/lang.reply_language`); clear words still win. "(Reply in X.)" is the last line she reads.
+- Weather / TV / news / prices / hours questions get a "call web_search first" note; an answer saying
+  she has no access (EN/ES/FR) sends her back to search once; recalled episodes with such refusals are
+  dropped so she doesn't copy them.
+- `make everyday`: 32 everyday questions checked for the tool she must call, the answer language, and
+  no "I don't have access". Fake apps and a throwaway database; checks only, no written answers, never
+  training data.
+- First `make everyday` run: 27/32. Fixed: French with shared words ("Mets un minuteur de 5 minutes"
+  answered in Spanish) — the guesser now also counts words only one language has; "I don't have access"
+  after looking only in offline Wikipedia now also sends her to web_search; opening-hours questions count
+  as live; an empty answer after tools gets one more plain "answer now" (was "me he perdido…").
+- "Stop" vs "stop listening" (Lea, 2026-11-08): "stop" cuts her off and listens for the next order
+  without the name (0.8 s later, so "stop listening" can still win); "stop listening" / "deja de
+  escuchar" / "arrête d'écouter" stops talking and turns the mic off until ⌥Space or the menu. Caught by
+  the on-device recognizer while she talks, and by the server (voice/loop.stop_command, no model) when it
+  arrives in a recording.

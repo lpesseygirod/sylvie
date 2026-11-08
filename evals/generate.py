@@ -162,6 +162,79 @@ def style_items() -> list[dict]:
     ]
 
 
+# Everyday questions (Lea, 2026-11-08: "make tests of common questions and see if she is able to do it").
+# Each checks what she must DO, never a written answer: the tool she must call, the language she must
+# answer in, and that she doesn't say she has no access. "before" turns set up a conversation in another
+# language; "channel"/"heard" make it a voice turn with the language Whisper detected.
+EVERYDAY = [
+    # needs the internet
+    {
+        "prompt": "Sylvie, what's the weather going to be like tomorrow in Toledo?",
+        "lang": "en",
+        "tool": "web_search",
+    },
+    {"prompt": "Sylvie, dime qué tiempo hará mañana en Toledo.", "lang": "es", "tool": "web_search"},
+    {"prompt": "Quel temps fera-t-il demain à Paris ?", "lang": "fr", "tool": "web_search"},
+    {"prompt": "Sylvie, dime qué películas hay hoy en televisión.", "lang": "es", "tool": "web_search"},
+    {"prompt": "What's on TV tonight in Spain?", "lang": "en", "tool": "web_search"},
+    {
+        "prompt": "¿Cuáles son las noticias más importantes de hoy en España?",
+        "lang": "es",
+        "tool": "web_search",
+    },
+    {"prompt": "What are today's top news headlines?", "lang": "en", "tool": "web_search"},
+    {"prompt": "¿Cómo quedó el último partido del Real Madrid?", "lang": "es", "tool": "web_search"},
+    {"prompt": "How much does an iPhone 17 Pro cost in Spain?", "lang": "en", "tool": "web_search"},
+    {"prompt": "¿A qué hora cierra Mercadona los domingos?", "lang": "es", "tool": "web_search"},
+    {"prompt": "Quelles sont les actualités du jour en France ?", "lang": "fr", "tool": "web_search"},
+    {"prompt": "What's the euro to dollar exchange rate right now?", "lang": "en", "tool": "web_search"},
+    {"prompt": "Sylvie, ¿va a llover este fin de semana en Madrid?", "lang": "es", "tool": "web_search"},
+    # she knows these
+    {"prompt": "What is the capital of Australia?", "lang": "en", "contains": "canberra"},
+    {"prompt": "¿Quién escribió Cien años de soledad?", "lang": "es", "contains": "garcía márquez"},
+    {"prompt": "Qui a peint la Joconde ?", "lang": "fr", "contains": "vinci"},
+    {"prompt": "Explain in two sentences what inflation is.", "lang": "en"},
+    {"prompt": "¿Cuánto es el 21% de 350 euros?", "lang": "es", "contains": "73,5"},
+    {"prompt": "What is 15% of 80?", "lang": "en", "contains": "12"},
+    # things to do (a fake app controller in the eval: nothing really plays or gets added)
+    {"prompt": "Sylvie, put the song Bloodline.", "lang": "en", "tool": "play_music"},
+    {"prompt": "Sylvie, pon la canción La Reina de Maluma.", "lang": "es", "tool": "play_music"},
+    {"prompt": "Sylvie, put the volume to the max.", "lang": "en", "tool": "music"},
+    {"prompt": "Sylvie, pausa la música.", "lang": "es", "tool": "music"},
+    {"prompt": "¿Qué tengo mañana en el calendario?", "lang": "es", "tool": "calendar_events"},
+    {"prompt": "Remind me to call my mom tomorrow at 10.", "lang": "en", "tool": "create_reminder"},
+    {"prompt": "Mets un minuteur de 5 minutes.", "lang": "fr", "tool": "set_timer"},
+    # switching language mid-conversation
+    {"before": ["Hola Sylvie, ¿qué tal estás?"], "prompt": "Sylvie, how are you doing today?", "lang": "en"},
+    {
+        "before": ["Sylvie, ¿qué hora es?"],
+        "prompt": "Sylvie, stop listening.",
+        "lang": "en",
+        "channel": "voice",
+        "heard": "en",
+    },
+    {"before": ["Hi Sylvie, how are you?"], "prompt": "Sylvie, ¿me recomiendas una serie?", "lang": "es"},
+    {
+        "before": ["Hola Sylvie."],
+        "prompt": "Sylvie, merci beaucoup, c'est parfait.",
+        "lang": "fr",
+        "channel": "voice",
+        "heard": "fr",
+    },
+    {"prompt": "Sylvie, what time is it?", "lang": "en", "channel": "voice", "heard": "en"},
+    {"prompt": "I'm stressed about my exams.", "lang": "en"},
+]
+
+
+def everyday_items() -> list[dict]:
+    items = []
+    for i, e in enumerate(EVERYDAY):
+        check = {"type": "everyday", **{k: e[k] for k in ("lang", "tool", "contains") if k in e}}
+        extra = {k: e[k] for k in ("before", "channel", "heard") if k in e}
+        items.append({"id": f"day-{i}", "prompt": e["prompt"], **extra, "check": check})
+    return items
+
+
 def main() -> None:
     rng = random.Random(20261105)
     SETS.mkdir(exist_ok=True)
@@ -172,6 +245,7 @@ def main() -> None:
         "tools": tool_items(),
         "general": general_items(),
         "style": style_items(),
+        "everyday": everyday_items(),
     }
     for name, items in sets.items():
         with open(SETS / f"{name}.jsonl", "w", encoding="utf-8") as f:

@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval finetune ui-test general-pack import-general learn-now mmlu wikipedia
+.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval everyday finetune ui-test general-pack import-general learn-now mmlu wikipedia
 
 setup:
 	uv sync
@@ -67,6 +67,9 @@ spotify:   # once: lets Sylvie start songs/playlists by name (free Spotify devel
 
 eval:
 	$(UV) python evals/run.py --label base
+
+everyday:   # ~32 everyday questions (weather, TV, songs, language switching); fake apps, throwaway memory
+	$(UV) python evals/run.py --label everyday --sets everyday
 
 learn-now:   # practice + fine-tune now instead of waiting for the night (stops when you talk to Sylvie)
 	$(UV) python scripts/api.py POST /api/schedule/now '{"minutes": $(or $(MINUTES),180)}'

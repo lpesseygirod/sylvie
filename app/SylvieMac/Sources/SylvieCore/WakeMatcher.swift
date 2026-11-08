@@ -39,6 +39,26 @@ public struct WakeMatcher {
         return folded.contains(last)
     }
 
+    static let quitWords: Set<String> = ["stop", "stopp", "quit", "deja", "dejas", "dejar", "para", "parar", "arrete", "arreter", "arretez"]
+    static let listenWords: Set<String> = ["listening", "listen", "escuchar", "escucharme", "escuches", "oir", "oirme", "ecouter", "m'ecouter"]
+
+    /// "stop listening", "deja de escuchar", "arrête d'écouter": Lea wants her to stop completely
+    /// (2026-11-08), not just to stop talking.
+    public func isStopListening(_ transcript: String) -> Bool {
+        let ws = Self.words(transcript)
+        for (i, w) in ws.enumerated() where Self.quitWords.contains(w) {
+            if ws[(i + 1)..<min(i + 4, ws.count)].contains(where: { Self.listenWords.contains($0) }) { return true }
+        }
+        return false
+    }
+
+    /// Just the end of "stop listening" ("listening", "de escuchar", "d'écouter"): after "stop" was
+    /// already caught and the recognizer restarted, the rest arrives on its own.
+    public func isListenTail(_ transcript: String) -> Bool {
+        let ws = Self.words(transcript)
+        return !ws.isEmpty && ws.count <= 3 && ws.contains(where: { Self.listenWords.contains($0) })
+    }
+
     /// True if the transcript ends with a stop command ("stop", "Sylvie stop", "para", "arrête").
     public func isStop(_ transcript: String) -> Bool {
         let ws = Self.words(transcript)

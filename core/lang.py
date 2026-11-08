@@ -8,15 +8,17 @@ import re
 _WORDS = {
     "es": set(
         "el la los las que qué de y es por para con una un cómo como dónde cuándo hola puedes está esta "
-        "mi me lo hay pero muy sí gracias".split()
+        "mi me lo hay pero muy sí gracias del al pon ponme dime hace hará tengo tienes quiero fue son su sus "
+        "yo eres estoy también ahora mañana hoy hecho listo música".split()
     ),
     "fr": set(
         "le la les des est et que qui une un pour avec pas je tu vous comment où quand bonjour merci c'est "
-        "mon ma mes ce cette dans sur oui".split()
+        "mon ma mes ce cette dans sur oui de du au aux il elle nous sont par mais très mets fais peux veux "
+        "dis moi toi ton ta été demain aujourd'hui".split()
     ),
     "en": set(
         "the is and what how where when you can please my to of a an in it this that do does hi hello "
-        "thanks with for are i".split()
+        "thanks with for are i what's it's i'm put play your be will was have much tell today tomorrow".split()
     ),
 }
 
@@ -63,6 +65,13 @@ def clear_language(text: str) -> str | None:
     best = max(scores, key=scores.get)
     if ranked[0] >= 2 and ranked[0] >= 2 * ranked[1] and best == guess_language(text):
         return best
+    # Words only one language has ("mets", "dime", "what's"). Measured 2026-11-08: "Mets un minuteur de
+    # 5 minutes." was answered in Spanish (un, de are Spanish words too).
+    own = {lang: sum(w in vocab and not any(w in v for o, v in _WORDS.items() if o != lang) for w in words)
+           for lang, vocab in _WORDS.items()}  # fmt: skip
+    top = max(own, key=own.get)
+    if own[top] and not any(n for lang, n in own.items() if lang != top) and top == guess_language(text):
+        return top
     return None
 
 

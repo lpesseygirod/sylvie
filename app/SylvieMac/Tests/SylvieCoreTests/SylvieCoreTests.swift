@@ -83,6 +83,19 @@ final class SylvieCoreTests: XCTestCase {
         XCTAssertEqual(m.strongStopCount(in: "esto es para ti"), 0)
     }
 
+    func testStopListening() {
+        let m = WakeMatcher()
+        XCTAssertTrue(m.isStopListening("Sylvie stop listening"))
+        XCTAssertTrue(m.isStopListening("deja de escuchar"))
+        XCTAssertTrue(m.isStopListening("Sylvie para de escucharme"))
+        XCTAssertTrue(m.isStopListening("arrête d'écouter"))
+        XCTAssertFalse(m.isStopListening("stop"))
+        XCTAssertFalse(m.isStopListening("I love to listen to music, stop"))  // "stop" after, not before
+        XCTAssertTrue(m.isListenTail("listening"))
+        XCTAssertTrue(m.isListenTail("de escuchar"))
+        XCTAssertFalse(m.isListenTail("can you listen to this song with me please"))
+    }
+
     func testRingBuffer() {
         var r = RingBuffer(capacity: 3)
         r.append([1, 2])

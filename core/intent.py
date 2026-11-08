@@ -112,14 +112,19 @@ LIVE_RE = re.compile(
     r"noticias|hoy|esta noche|ahora mismo|[uú]ltim[ao]s?|resultados?|marcador|precio|cu[aá]nto cuesta|"
     r"horarios?|televisi[oó]n|tele\b|cartelera|pel[ií]culas?|partido|"
     r"m[ée]t[ée]o|quel temps|pluie|actualit[ée]s|ce soir|aujourd'hui|prix|combien co[uû]te|horaires?|"
-    r"programme t[ée]l[ée]|films?)\b",
+    r"programme t[ée]l[ée]|films?|"
+    r"what time (does|do|is) .{0,40}(open|close)|(is|are) .{0,30} open (today|now|on)|"
+    r"a qu[eé] hora (abre|cierra|empieza|juega)|cierra|est[aá] abierto|"
+    r"[àa] quelle heure .{0,40}(ouvre|ferme)|ferme|ouvert)\b",
     re.I,
 )
 
 LIVE_NOTE = (
     "Lea's question may need current information (weather, news, what's on, prices, opening hours, results). "
     "You CAN look things up: call web_search first, with a generic query (the place and the day, never her "
-    "name), and answer from what you find. Never tell her you have no access to real-time information."
+    "name), and answer from what you find. For the weather, search in English ('<town> weather forecast "
+    "tomorrow'): those pages give the clearest numbers. Answer in her language anyway. Never tell her you "
+    "have no access to real-time information."
 )
 
 # "I don't have access to real-time data", "No tengo acceso…", "Je n'ai pas accès…": she gave up without looking.

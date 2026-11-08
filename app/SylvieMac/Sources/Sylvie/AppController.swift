@@ -176,7 +176,8 @@ final class AppController: ObservableObject {
         }
         pipeline.onBuffer = { [weak self] buffer in self?.wake.append(buffer) }
         wake.onWake = { [weak self] in self?.wakeWordHeard() }
-        wake.onStopCommand = { [weak self] in self?.interrupt() }
+        wake.onStopCommand = { [weak self] in self?.stopTalking() }
+        wake.onStopListening = { [weak self] in self?.stopCompletely() }
         do {
             try pipeline.start()
         } catch {
@@ -219,6 +220,11 @@ final class AppController: ObservableObject {
             return
         }
         guard let panel else { return }
+        if state == .muted {  // after "stop listening": the hotkey turns her back on
+            toggleMute()
+            panel.show()
+            return
+        }
         if panel.isVisible && state == .idle {
             panel.hide()
             return
@@ -336,6 +342,13 @@ final class AppController: ObservableObject {
         case "transcript":
             if let lang = event["language"] as? String { lastLanguage = lang }
             if (event["text"] as? String ?? "").isEmpty { state = .idle }
+        case "control":
+            // The server heard "stop listening" / a bare "stop" in a recording (voice/loop.py)
+            switch event["action"] as? String {
+            case "mute": stopCompletely()
+            case "listen": stopTalking()
+            default: break
+            }
         case "tool":
             let name = event["name"] as? String ?? ""
             if (name == "play_music" || name == "music"), event["ok"] as? Bool == true { musicThisTurn = true }
@@ -365,6 +378,39 @@ final class AppController: ObservableObject {
         default:
             break
         }
+    }
+
+    /// "stop" (Lea, 2026-11-08): cut herself off at once and listen for the next order, no name needed.
+    /// A short wait first, so "stop listening" can still turn into stopCompletely().
+    private var listenAfterStop: DispatchWorkItem?
+    private func stopTalking() {
+        interrupt()
+        listenAfterStop?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.state == .idle else { return }
+            self.listenAfterStop = nil
+            wakeLog.notice("stopped; listening for the next order")
+            self.beginListening(chime: true, greet: false, usePreRoll: false)
+        }
+        listenAfterStop = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
+    }
+
+    /// "stop listening" / "deja de escuchar" / "arrête d'écouter": stop talking and stop listening
+    /// completely (mic off) until Lea turns her back on (⌥Space or the menu).
+    private func stopCompletely() {
+        // While idle, someone in the room saying "stop listening" doesn't count: only after "Sylvie",
+        // while she listens, thinks or talks, or right after a "stop".
+        guard state != .idle || listenAfterStop != nil, state != .muted else { return }
+        listenAfterStop?.cancel()
+        listenAfterStop = nil
+        wakeLog.notice("stop listening: mic off")
+        interrupt()
+        wake.stop()
+        pipeline.stop()
+        state = .muted
+        detail = "Not listening. ⌥Space or the menu turns me back on."
+        NSSound(named: "Bottle")?.play()
     }
 
     /// "Sylvie, stop", a tap on the menu, or the wake word while she's talking.

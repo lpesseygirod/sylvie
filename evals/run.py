@@ -21,7 +21,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.lang import guess_language  # noqa: E402
+from core.intent import says_no_access  # noqa: E402
+from core.lang import PHRASES, guess_language, reply_language  # noqa: E402
 
 SETS_DIR = Path(__file__).parent / "sets"
 BANNED = re.compile(
@@ -94,7 +95,35 @@ def score(item: dict, answer: str, tools: list[str]) -> bool | None:
         same_lang = guess_language(answer) == guess_language(item["prompt"])
         emoji = bool(EMOJI.search(answer)) and not EMOJI.search(item["prompt"])
         return words <= c.get("max_words", 120) and not BANNED.search(answer) and same_lang and not emoji
+    if kind == "everyday":
+        return not everyday_problems(item, answer, tools)
     return None  # "judge" items are rated by Lea in the blind A/B
+
+
+def everyday_problems(item: dict, answer: str, tools: list[str]) -> list[str]:
+    """What went wrong with an everyday question (empty: she did it)."""
+    c, problems = item["check"], []
+    if c.get("tool") and c["tool"] not in tools:
+        problems.append(f"didn't call {c['tool']} (called {', '.join(tools) or 'nothing'})")
+    # The opening sentence tells best: lists of Spanish TV shows in an English answer aren't Spanish.
+    first = re.split(r"(?<=[.!?:])\s|\n", answer.strip())[0]
+    lang = reply_language(first) or reply_language(answer) or guess_language(answer, default="?")
+    if c.get("lang") and lang != c["lang"]:
+        problems.append(f"answered in {lang}, not {c['lang']}")
+    if says_no_access(answer):
+        problems.append("said she has no access")
+    if c.get("contains") and _norm(c["contains"]) not in _norm(answer):
+        if not (re.fullmatch(r"[\d.,]+", c["contains"]) and _num(c["contains"]) in number_candidates(answer)):
+            problems.append(f"no '{c['contains']}' in the answer")
+    if not answer.strip():
+        problems.append("empty answer")
+    elif any(answer.strip().startswith(t) for t in PHRASES["lost"].values()):
+        problems.append("gave up ('I got lost in what I found')")
+    return problems
+
+
+def _num(s: str) -> float:
+    return float(s.replace(".", "").replace(",", ".")) if "," in s else float(s)
 
 
 # ---------- running ----------
@@ -154,9 +183,18 @@ def run(
     for item in load_items(sets, limit):
         for fact in item.get("facts", []):
             s.memory.add(fact, source="eval")
+        cid = None
+        for before in item.get("before", []):  # earlier turns of the same conversation
+            for ev in s.turn(before, conversation_id=cid):
+                cid = ev["conversation_id"] if ev["type"] == "meta" else cid
         t0 = time.perf_counter()
         answer, tools, first = "", [], None
-        for ev in s.turn(item["prompt"]):
+        for ev in s.turn(
+            item["prompt"],
+            conversation_id=cid,
+            channel=item.get("channel", "chat"),
+            language=item.get("heard"),
+        ):
             if ev["type"] == "text":
                 first = first or time.perf_counter() - t0
                 answer += ev["text"]
@@ -168,7 +206,12 @@ def run(
              "first_word_s": round(first or 0, 2), "total_s": round(time.perf_counter() - t0, 2)}
         )  # fmt: skip
         mark = {True: "✓", False: "✗", None: "·"}[ok]
-        print(f"{mark} {item['id']:<10} {answer[:90]!r}", flush=True)
+        why = (
+            "  <- " + "; ".join(everyday_problems(item, answer, tools))
+            if ok is False and item["check"]["type"] == "everyday"
+            else ""
+        )
+        print(f"{mark} {item['id']:<10} {answer[:90]!r}{why}", flush=True)
     summary = {}
     for r in results:
         sm = summary.setdefault(r["set"], {"n": 0, "scored": 0, "correct": 0})

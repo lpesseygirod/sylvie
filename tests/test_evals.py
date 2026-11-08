@@ -46,3 +46,25 @@ def test_scorer_handles_typographic_minus_and_spanish_thousands():
     assert score(
         {"prompt": "x", "check": {"type": "contains", "value": "3600"}}, "¡Hola! 3.600 segundos.", []
     )
+
+
+def test_everyday_checks_tool_language_and_refusals():
+    from evals.run import everyday_problems
+
+    item = {
+        "prompt": "Sylvie, dime qué tiempo hará mañana.",
+        "check": {"type": "everyday", "lang": "es", "tool": "web_search"},
+    }
+    assert everyday_problems(item, "Mañana hará sol, unos 18 grados.", ["web_search"]) == []
+    bad = everyday_problems(item, "No tengo acceso a servicios de clima en tiempo real.", [])
+    assert any("web_search" in p for p in bad) and "said she has no access" in bad
+    en = {"prompt": "What's on TV tonight?", "check": {"type": "everyday", "lang": "en"}}
+    assert (
+        everyday_problems(en, "Here's what's on TV tonight:\n- La 1: El tiempo de los Reyes, de la serie", [])
+        == []
+    )
+    pct = {
+        "prompt": "¿Cuánto es el 21% de 350 euros?",
+        "check": {"type": "everyday", "lang": "es", "contains": "73,5"},
+    }
+    assert everyday_problems(pct, "El 21% de 350 euros es 73,50 euros.", []) == []

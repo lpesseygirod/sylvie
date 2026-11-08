@@ -108,7 +108,9 @@ def test_weather_question_is_looked_up_not_refused(tmp_path):
 
     assert looks_live("Sylvie, dime que tiempo hará mañana en Toledo.")
     assert looks_live("what's on TV tonight?") and looks_live("quel temps fera-t-il demain ?")
-    assert not looks_live("what is 17% of 2340?")
+    assert not looks_live("what is 17% of 2340?") and not looks_live("What is 15% of 80?")
+    assert looks_live("¿A qué hora cierra Mercadona los domingos?")  # made up an hour without searching
+    assert looks_live("How much does an iPhone 17 Pro cost in Spain?")
     assert says_no_access("No tengo acceso a servicios de clima en tiempo real.")
     assert says_no_access("I can't give you the current weather since I don't have access to a live service")
     assert not says_no_access("Mañana hará sol en Toledo, unos 18 grados.")
@@ -130,3 +132,37 @@ def test_weather_question_is_looked_up_not_refused(tmp_path):
     assert "call web_search first" in said[-2] and "web_search now" in said[-1]  # told, then sent back
     assert any(e["type"] == "tool" and e["name"] == "web_search" for e in ev)
     assert "18 grados" in "".join(e["text"] for e in ev if e["type"] == "text")
+
+
+def test_wikipedia_is_not_enough_for_live_questions(tmp_path):
+    """2026-11-08 (make everyday): looked in offline Wikipedia, then "I don't have access to real-time prices"."""
+    import tools.registry as reg
+    from tests.test_orchestrator import make, run
+
+    wiki = "<tool_call>\n<function=calculator>\n<parameter=expression>\n1+1\n</parameter>\n</function>\n</tool_call>"
+    call = "<tool_call>\n<function=web_search>\n<parameter=query>\niPhone 17 Pro price Spain\n</parameter>\n</function>\n</tool_call>"
+    s = make(tmp_path, [wiki, "I don't have access to real-time prices.", call, "It costs 1.319 €.", "{}"])
+    s.cfg["search"] = {**s.cfg["search"], "enabled": True}
+    original = reg.web_search
+    reg.web_search = lambda q, **kw: (
+        "iPhone 17 Pro: 1.319 €",
+        [{"n": 1, "title": "t", "url": "https://a.example/"}],
+    )
+    try:
+        ev = run(s, "How much does an iPhone 17 Pro cost in Spain?")
+    finally:
+        reg.web_search = original
+    assert [e["name"] for e in ev if e["type"] == "tool"] == ["calculator", "web_search"]
+    assert "1.319" in "".join(e["text"] for e in ev if e["type"] == "text")
+
+
+def test_empty_answer_after_searching_gets_one_more_try(tmp_path):
+    """2026-11-08 (make everyday): "¿va a llover este fin de semana?" → four searches, then nothing."""
+    from tests.test_orchestrator import TOOL_CALL, make, run
+
+    s = make(tmp_path, [TOOL_CALL, "", "Son 397,80 €.", "{}"])
+    ev = run(s, "¿Cuánto es el 17% de 2340 euros?")
+    text = "".join(e["text"] for e in ev if e["type"] == "text")
+    assert "397,80" in text and "perdido" not in text
+    assert "Answer Lea now in Spanish" in s.llm.calls[2]["messages"][-1]["content"]
+    assert s.llm.calls[2]["tools"] is None

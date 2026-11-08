@@ -8,6 +8,7 @@ written.
 from __future__ import annotations
 
 import queue
+import re
 import threading
 import time
 from collections.abc import Iterator
@@ -19,6 +20,28 @@ from voice.speech import DocFilter, SentenceStreamer
 FIRST_FILLER_S = 2.5  # nothing spoken yet after this → "One moment…"
 STILL_WORKING_S = 12.0  # then, while still quiet → "Still on it…" (at most twice)
 _DONE = object()
+
+# Lea, 2026-11-08: "stop listening" = stop talking AND stop listening, completely (the app mutes the mic);
+# a bare "stop" = stop talking and listen for the next order right away. No model needed for either.
+STOP_LISTENING_RE = re.compile(
+    r"\b(stop|quit) listening\b|\b(deja|dejas|para|parar|dejar) de (escuchar|o[ií]r)(me)?\b|"
+    r"\barr[eê]te[rz]? d'?\s?[ée]couter\b",
+    re.I,
+)
+BARE_STOP_RE = re.compile(
+    r"^\W*((hey|oye)\W+)?(sylvie\W*)?(stop|para|basta|arr[eê]te|c[aá]llate|tais-toi|cállate ya)"
+    r"(\W+(sylvie|please|por favor|ya|s'il te pla[iî]t))*\W*$",
+    re.I,
+)
+
+
+def stop_command(text: str) -> str | None:
+    """'mute' for "stop listening", 'listen' for a bare "stop", else None."""
+    if STOP_LISTENING_RE.search(text):
+        return "mute"
+    if BARE_STOP_RE.match(text):
+        return "listen"
+    return None
 
 
 def with_fillers(events: Iterator[dict], lang: str, first_after: float = FIRST_FILLER_S,
@@ -80,6 +103,11 @@ def voice_turn(
         yield {"type": "done", "message_id": None, "conversation_id": conversation_id, "empty": True}
         return
     lang = tr.language
+    if action := stop_command(tr.text):
+        sylvie.bg.turn_finished()
+        yield {"type": "control", "action": action}
+        yield {"type": "done", "message_id": None, "conversation_id": conversation_id, "empty": True}
+        return
     yield from with_fillers(_answer(sylvie, tr.text, lang, conversation_id, channel), lang)
 
 
