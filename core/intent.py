@@ -100,3 +100,48 @@ WRITING_NOTE = (
 
 def looks_like_writing(text: str) -> bool:
     return bool(WRITING_RE.search(text))
+
+
+# Questions only the internet can answer. Measured 2026-11-08 by voice: "dime qué tiempo hará mañana en
+# Toledo" and "dime qué películas hay hoy en televisión" got "No tengo acceso a servicios de clima en
+# tiempo real…" although web_search was there. Earlier refusals she remembered made it worse.
+LIVE_RE = re.compile(
+    r"\b(weather|forecast|rain(ing)?|temperature|news|headlines?|tonight|today'?s|right now|latest|"
+    r"score|results?|price|costs?|open(ing)? hours|schedule|on tv|tv guide|cinema|movies? (on|playing)|"
+    r"tiempo (hace|hará|hara|va a hacer)|qu[eé] tiempo|clima|lluvia|llover|temperatura|pron[oó]stico|"
+    r"noticias|hoy|esta noche|ahora mismo|[uú]ltim[ao]s?|resultados?|marcador|precio|cu[aá]nto cuesta|"
+    r"horarios?|televisi[oó]n|tele\b|cartelera|pel[ií]culas?|partido|"
+    r"m[ée]t[ée]o|quel temps|pluie|actualit[ée]s|ce soir|aujourd'hui|prix|combien co[uû]te|horaires?|"
+    r"programme t[ée]l[ée]|films?)\b",
+    re.I,
+)
+
+LIVE_NOTE = (
+    "Lea's question may need current information (weather, news, what's on, prices, opening hours, results). "
+    "You CAN look things up: call web_search first, with a generic query (the place and the day, never her "
+    "name), and answer from what you find. Never tell her you have no access to real-time information."
+)
+
+# "I don't have access to real-time data", "No tengo acceso…", "Je n'ai pas accès…": she gave up without looking.
+NO_ACCESS_RE = re.compile(
+    r"(i (don'?t|do not|can'?t|cannot) (have )?(access|look up|check|browse|get)|"
+    r"(no|without) (access|connection) to (the )?(internet|real[- ]time|live|current)|"
+    r"\breal[- ]time\b|check (a|an|the) (trusted |reliable |local )?(weather |news )?(app|website|site|service)|"
+    r"no tengo acceso|no puedo (acceder|consultar|buscar|ver|darte (el|la|los|las) (tiempo|informaci))|"
+    r"en tiempo real|te recomiendo consultar|consulta (una|la|el) (app|aplicaci[oó]n|web|p[aá]gina)|"
+    r"je n'ai pas acc[eè]s|je ne peux pas (consulter|acc[eé]der|chercher)|en temps r[ée]el)",
+    re.I,
+)
+
+SEARCH_NUDGE = (
+    "(Check: you said you can't get that, but you have web_search and didn't use it. Call web_search now "
+    "with a generic query and answer Lea from what you find. Only if the search finds nothing, say so.)"
+)
+
+
+def looks_live(text: str) -> bool:
+    return bool(LIVE_RE.search(text))
+
+
+def says_no_access(text: str) -> bool:
+    return bool(NO_ACCESS_RE.search(text))

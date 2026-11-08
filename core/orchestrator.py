@@ -24,15 +24,19 @@ from core.devices import Devices
 from core.intent import (
     ACTION_NOTE,
     CLAIM_NUDGE,
+    LIVE_NOTE,
     MUSIC_DONE_EXAMPLE,
     MUSIC_DONE_NOTE,
     REPLY_LANGUAGE_NOTE,
+    SEARCH_NUDGE,
     WRITING_NOTE,
     claims_done,
     looks_like_action,
     looks_like_writing,
+    looks_live,
+    says_no_access,
 )
-from core.lang import clear_language, guess_language, phrase
+from core.lang import guess_language, phrase, reply_language
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
 from core.quick import GreetingStripper, greets, quick_reply
 from core.router import route
@@ -331,7 +335,9 @@ class Sylvie:
         channel: str = "chat",
         attachments: list[Attachment] | None = None,
         thinking: bool | None = None,
+        language: str | None = None,
     ) -> Iterator[dict]:
+        """`language`: what Whisper heard, for voice turns (decides when the words alone don't tell)."""
         trace = Trace()
         self.bg.turn_started()
         self.bg.interrupt(timeout=5)  # let a background job release the model before we use it
@@ -354,10 +360,12 @@ class Sylvie:
                 "title": conv["title"],
             }
 
+            # The language Lea spoke in (None: can't tell, she follows the conversation)
+            said_in = reply_language(text, language)
             notes: list[str] = []
             base_notes = 1 if channel in ("voice", "phone") else 0  # notes beyond these mean "special turn"
             if channel in ("voice", "phone"):
-                lang_name = LANG_NAMES.get(guess_language(text), "English")
+                lang_name = LANG_NAMES.get(said_in or guess_language(text), "English")
                 if self.cfg.get_path("voice.speak_full_answer", True):
                     notes.append(
                         "Lea is talking to you by voice. Answer in the SAME language as her message below "
@@ -457,6 +465,15 @@ class Sylvie:
             writing = looks_like_writing(text)
             if writing:
                 notes.append(WRITING_NOTE)
+            # 1g. Weather, what's on TV, news: she must look it up, not say she has no access (core/intent.py)
+            live = (
+                looks_live(text)
+                and not action_request
+                and not writing
+                and self.cfg.get_path("search.enabled", True)
+            )
+            if live:
+                notes.append(LIVE_NOTE)
 
             # 1c. "Hello" / "thanks" / "bye": an instant answer, no model (core/quick.py)
             reply = None
@@ -507,6 +524,8 @@ class Sylvie:
                         self.convs.set(cid, aside_used=(conv.get("aside_used") or 0) + 1)
                 # What was said in earlier conversations (memory/episodes.py), with dates
                 past = self.episodes.relevant(text, cid) if self.cfg.get_path("memory.episodes", True) else []
+                # An old "I can't check the weather" teaches her to refuse again (measured 2026-11-08)
+                past = [e for e in past if not says_no_access(e.text)]
                 if past:
                     notes.append(
                         "From earlier conversations with Lea (use only if it helps; say when it was if you refer "
@@ -523,7 +542,6 @@ class Sylvie:
             user_model = wrap_user_message(model_text, context)
             # Last thing she reads before answering: the language Lea used. Measured 2026-11-08: in a Spanish
             # conversation, English questions got Spanish answers (the note above, before her message, wasn't enough).
-            said_in = clear_language(text)
             if said_in:
                 user_model += f"\n\n(Reply in {LANG_NAMES[said_in]}.)"
             self.db.execute("UPDATE messages SET model_content = ? WHERE id = ?", (user_model, user_mid))
@@ -681,6 +699,22 @@ class Sylvie:
                     messages.append({"role": "assistant", "content": visible})
                     messages.append({"role": "user", "content": CLAIM_NUDGE})
                     continue
+                if (
+                    not calls
+                    and use_tools
+                    and not called_tools
+                    and not nudged
+                    and not stop.is_set()
+                    and any(t["function"]["name"] == "web_search" for t in use_tools)
+                    and says_no_access(visible)
+                ):
+                    # "I don't have access to real-time weather": she can search, so send her to do it.
+                    log.warning("said she has no access instead of searching: %r", visible[:120])
+                    nudged = True
+                    display_parts.append(visible)
+                    messages.append({"role": "assistant", "content": visible})
+                    messages.append({"role": "user", "content": SEARCH_NUDGE})
+                    continue
                 if not calls:
                     if not visible and not stop.is_set():
                         # Never leave Lea with silence: say plainly that this one didn't work out.
@@ -747,7 +781,7 @@ class Sylvie:
                                 + "\n…(trimmed: you have enough material now; answer Lea with it)"
                             )
                         yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
-                        reply_lang = LANG_NAMES.get(guess_language(text), "English")
+                        reply_lang = LANG_NAMES.get(said_in or guess_language(text), "English")
                         if call.name in ("play_music", "music") and result.ok:
                             # Lea, 2026-11-08: a song request gets "done", not questions ("¿Te gusta el ritmo?").
                             example = MUSIC_DONE_EXAMPLE.get(reply_lang, MUSIC_DONE_EXAMPLE["English"])

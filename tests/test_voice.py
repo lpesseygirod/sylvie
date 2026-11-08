@@ -76,6 +76,29 @@ def test_voice_turn_streams_speak_events(tmp_path):
     assert "by voice" in s.llm.calls[0]["messages"][-1]["content"]
 
 
+def test_voice_answer_follows_the_language_whisper_heard(tmp_path):
+    """2026-11-08: "Sylvie, stop listening." in a Spanish conversation got a Spanish answer."""
+    from core.lang import reply_language
+    from tests.test_orchestrator import extraction, make
+    from voice.loop import voice_turn
+    from voice.stt import Transcript
+
+    assert reply_language("Sylvie, stop listening.", heard="en") == "en"
+    assert reply_language("Sylvie, what is the weather like?", heard="es") == "en"  # clear words win
+    assert reply_language("Sylvie, stop listening.") is None  # typed, no telling words: can't tell
+    assert reply_language("Gracias Sylvie") == "es"  # one telling word, nothing else
+    s = make(tmp_path, ["Okay, I stopped.", extraction()])
+
+    class STT:
+        def transcribe(self, wav):
+            return Transcript("Sylvie, stop listening.", "en", 1.5, 90.0)
+
+    s._stt = STT()
+    list(voice_turn(s, b"RIFF"))
+    prompt = s.llm.calls[0]["messages"][-1]["content"]
+    assert prompt.endswith("(Reply in English.)") and "it sounds like English" in prompt
+
+
 def test_voice_turn_with_silence(tmp_path):
     from tests.test_orchestrator import make
     from voice.loop import voice_turn

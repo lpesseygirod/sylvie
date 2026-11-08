@@ -68,3 +68,19 @@ def clear_language(text: str) -> str | None:
 
 def phrase(key: str, text: str) -> str:
     return PHRASES[key][guess_language(text)]
+
+
+def reply_language(text: str, heard: str | None = None) -> str | None:
+    """The language to answer `text` in, or None when it can't be told (then she follows the conversation).
+
+    `heard` is what Whisper detected from Lea's voice. It decides when the words alone aren't clear:
+    measured 2026-11-08, "Sylvie, stop listening." (no telling words) got a Spanish answer in a Spanish
+    conversation although Whisper had heard English. Clear words still win over the audio."""
+    clear = clear_language(text)
+    if clear:
+        return clear
+    if heard in _WORDS:
+        return heard
+    words = re.findall(r"[\w']+", text.lower())
+    found = {lang for lang, vocab in _WORDS.items() if any(w in vocab for w in words)}
+    return found.pop() if len(found) == 1 else None

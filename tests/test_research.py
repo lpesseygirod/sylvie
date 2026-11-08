@@ -98,3 +98,35 @@ def test_an_empty_answer_becomes_an_honest_sentence(tmp_path):
     ev = run(s, "¿Qué opinas de esto?")
     text = "".join(e["text"] for e in ev if e["type"] == "text")
     assert text.startswith("Perdona") and ev[-1]["type"] == "done"
+
+
+def test_weather_question_is_looked_up_not_refused(tmp_path):
+    """2026-11-08: "dime qué tiempo hará mañana en Toledo" got "No tengo acceso a servicios de clima"."""
+    import tools.registry as reg
+    from core.intent import looks_live, says_no_access
+    from tests.test_orchestrator import make, run
+
+    assert looks_live("Sylvie, dime que tiempo hará mañana en Toledo.")
+    assert looks_live("what's on TV tonight?") and looks_live("quel temps fera-t-il demain ?")
+    assert not looks_live("what is 17% of 2340?")
+    assert says_no_access("No tengo acceso a servicios de clima en tiempo real.")
+    assert says_no_access("I can't give you the current weather since I don't have access to a live service")
+    assert not says_no_access("Mañana hará sol en Toledo, unos 18 grados.")
+
+    call = "<tool_call>\n<function=web_search>\n<parameter=query>\ntiempo mañana Toledo\n</parameter>\n</function>\n</tool_call>"
+    refusal = "No tengo acceso a servicios de clima en tiempo real."
+    s = make(tmp_path, [refusal, call, "Mañana hará sol, unos 18 grados.", "{}"])
+    s.cfg["search"] = {**s.cfg["search"], "enabled": True}
+    original = reg.web_search
+    reg.web_search = lambda q, **kw: (
+        "Toledo mañana: soleado, 18 °C",
+        [{"n": 1, "title": "t", "url": "https://a.example/"}],
+    )
+    try:
+        ev = run(s, "Sylvie, dime qué tiempo hará mañana en Toledo.")
+    finally:
+        reg.web_search = original
+    said = [m["content"] for m in s.llm.calls[-1]["messages"] if m["role"] == "user"]
+    assert "call web_search first" in said[-2] and "web_search now" in said[-1]  # told, then sent back
+    assert any(e["type"] == "tool" and e["name"] == "web_search" for e in ev)
+    assert "18 grados" in "".join(e["text"] for e in ev if e["type"] == "text")

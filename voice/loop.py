@@ -87,7 +87,7 @@ def _answer(sylvie, text: str, lang: str, conversation_id: str | None, channel: 
     full = bool(sylvie.cfg.get_path("voice.speak_full_answer", True))
     speaker = SentenceStreamer(full=full)
     docs = DocFilter()  # documents Sylvie writes go to the screen, not the speaker
-    for ev in sylvie.turn(text, conversation_id=conversation_id, channel=channel):
+    for ev in sylvie.turn(text, conversation_id=conversation_id, channel=channel, language=lang):
         if ev["type"] == "status" and ev.get("text"):
             yield ev
             yield {"type": "speak", "text": ev["text"], "language": lang, "filler": True}
