@@ -374,3 +374,11 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   apps, a made-up photo library and made-up WhatsApp chats. First run 25/28 ("Llama a mamá" answered in
   English; she copied the example song "La Reina, by Maluma" from her own instructions; "Abre Spotify"
   played music) → fixed → 28/28; everyday 35/35.
+- Lea, 2026-11-08: "Yes, ask me first": send_message and send_email are always read back for her yes,
+  whatever actions.confirm says. The contact is looked up before the read-back (two "Inés" → she asks
+  which one first). An answer claiming "sent" after a failed or still-pending send is corrected.
+- English questions in a Spanish conversation still got Spanish answers (live, "Sylvie, can you put
+  Bridgerton on Netflix please?", with "(Reply in English.)" in the prompt). Now the first ~60 characters
+  are held back and checked (core/lang.LanguageGuard): a start in the wrong language is dropped and redone
+  once with "Answer ONLY in English…" before anything is shown or spoken. With Whisper's language known,
+  only a clear majority of words overrules it ("make me a plan" had been taken for Spanish).

@@ -18,7 +18,8 @@ _WORDS = {
     ),
     "en": set(
         "the is and what how where when you can please my to of an in it this that do does hi hello "
-        "thanks with for are i what's it's i'm put play your be will was have much tell today tomorrow done".split()
+        "thanks with for are i what's it's i'm put play your be will was have much tell today tomorrow done me "
+        "make give show send call open find get need want let's now okay i'll".split()
     ),
 }
 
@@ -56,7 +57,7 @@ def guess_language(text: str, default: str = "en") -> str:
     return best if scores[best] > 0 else default
 
 
-def clear_language(text: str) -> str | None:
+def clear_language(text: str, strong_only: bool = False) -> str | None:
     """The language of `text` when it's clear (2+ telling words and a clear lead), else None.
     Mixed or very short messages get None, so she may mix the way Lea does (persona)."""
     words = re.findall(r"[\w']+", text.lower())
@@ -65,6 +66,8 @@ def clear_language(text: str) -> str | None:
     best = max(scores, key=scores.get)
     if ranked[0] >= 2 and ranked[0] >= 2 * ranked[1] and best == guess_language(text):
         return best
+    if strong_only:
+        return None
     # Words only one language has ("mets", "dime", "what's"). Measured 2026-11-08: "Mets un minuteur de
     # 5 minutes." was answered in Spanish (un, de are Spanish words too).
     own = {lang: sum(w in vocab and not any(w in v for o, v in _WORDS.items() if o != lang) for w in words)
@@ -85,7 +88,9 @@ def reply_language(text: str, heard: str | None = None) -> str | None:
     `heard` is what Whisper detected from Lea's voice. It decides when the words alone aren't clear:
     measured 2026-11-08, "Sylvie, stop listening." (no telling words) got a Spanish answer in a Spanish
     conversation although Whisper had heard English. Clear words still win over the audio."""
-    clear = clear_language(text)
+    # With Whisper's answer, only a clear majority of words overrules it: one "me" made "make me a plan"
+    # Spanish (2026-11-08).
+    clear = clear_language(text, strong_only=heard in _WORDS)
     if clear:
         return clear
     if heard in _WORDS:
@@ -93,3 +98,44 @@ def reply_language(text: str, heard: str | None = None) -> str | None:
     words = re.findall(r"[\w']+", text.lower())
     found = {lang for lang, vocab in _WORDS.items() if any(w in vocab for w in words)}
     return found.pop() if len(found) == 1 else None
+
+
+LANG_NAMES = {"en": "English", "es": "Spanish", "fr": "French"}
+LANGUAGE_RETRY = (
+    "(Lea wrote this in {lang}. Answer ONLY in {lang}, even though earlier messages in this conversation "
+    "were in another language.)"
+)
+
+
+class LanguageGuard:
+    """Holds back the start of an answer until its language is clear, so a wrong-language start can be
+    redone before Lea hears or sees it. Measured 2026-11-08: "Sylvie, can you put Bridgerton on Netflix
+    please?" (with "(Reply in English.)" at the end) was answered in Spanish, like the conversation before.
+
+    feed() returns (text to pass on now, wrong): text is held until ~60 characters or a sentence end."""
+
+    def __init__(self, want: str | None):
+        self.want = want
+        self.buf = ""
+        self.done = want is None
+
+    def feed(self, s: str) -> tuple[str, bool]:
+        if self.done:
+            return s, False
+        self.buf += s
+        if len(self.buf) < 60 and not re.search(
+            r"[.!?…:]\s", self.buf + " " if self.buf.endswith((".", "!", "?")) else self.buf
+        ):
+            return "", False
+        return self._decide()
+
+    def flush(self) -> tuple[str, bool]:
+        return self._decide() if not self.done else ("", False)
+
+    def _decide(self) -> tuple[str, bool]:
+        self.done = True
+        got = clear_language(self.buf)
+        if got and got != self.want:
+            return "", True
+        out, self.buf = self.buf, ""
+        return out, False

@@ -30,16 +30,18 @@ from core.intent import (
     REPLY_LANGUAGE_NOTE,
     SEARCH_NUDGE,
     SEARCH_PROMISE_NUDGE,
+    UNSENT_NUDGE,
     WRITING_NOTE,
     accepts_search_offer,
     claims_done,
+    claims_sent,
     looks_like_action,
     looks_like_writing,
     looks_live,
     promises_search,
     says_no_access,
 )
-from core.lang import guess_language, phrase, reply_language
+from core.lang import LANGUAGE_RETRY, LanguageGuard, guess_language, phrase, reply_language
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
 from core.quick import GreetingStripper, greets, quick_reply
 from core.router import route
@@ -647,6 +649,8 @@ class Sylvie:
             nudged = False
             greeting = GreetingStripper(active=not greets(text))
             answer_nudged = False
+            unsent: list[str] = []  # sends that failed or wait for Lea's yes, this turn
+            lang_guard = LanguageGuard(said_in)  # the answer's first words must be in Lea's language
             for round_no in range(MAX_TOOL_ROUNDS + 2):  # the last one only after a nudge below
                 # Tools are dropped on the last round, or after a second malformed call (retry once).
                 use_tools = (
@@ -655,6 +659,7 @@ class Sylvie:
                     else None
                 )
                 sp = StreamSplitter(thinking=r.thinking)
+                wrong_lang = False
                 with trace.stage("llm"):
                     for chunk in self.llm.stream(
                         messages,
@@ -682,21 +687,49 @@ class Sylvie:
                                 s = greeting.feed(s)  # no "Hola Lea." opener unless she greeted
                                 if not s:
                                     continue
+                                s, wrong_lang = lang_guard.feed(s)
+                                if wrong_lang:
+                                    break
+                                if not s:
+                                    continue  # held until its language is clear (a few words)
                                 trace.mark("first_token")
                             yield {"type": kind, "text": s}
+                        if wrong_lang:
+                            break  # stop generating: this start gets redone in her language
                         if sp.in_tool and not announced:
                             # Say "let me check" the moment a tool call starts, not after it's written.
                             announced = True
                             trace.mark("first_status")
                             yield {"type": "status", "text": phrase("checking", text)}
-                    for kind, s in sp.flush():
-                        if kind == "text":
-                            s = greeting.feed(s)
-                            if not s:
-                                continue
-                        yield {"type": kind, "text": s}
-                    if rest := greeting.flush():
-                        yield {"type": "text", "text": rest}
+                    if not wrong_lang:
+                        tail = []
+                        for kind, s in sp.flush():
+                            if kind == "text":
+                                s = greeting.feed(s)
+                                if not s:
+                                    continue
+                                s, wrong_lang = lang_guard.feed(s)
+                                if wrong_lang:
+                                    break
+                            tail.append((kind, s))
+                        if not wrong_lang:
+                            rest, wrong_lang = lang_guard.feed(greeting.flush())
+                            held, wrong2 = lang_guard.flush()
+                            wrong_lang = wrong_lang or wrong2
+                            if not wrong_lang:
+                                for kind, s in tail:
+                                    if s:
+                                        yield {"type": kind, "text": s}
+                                if rest + held:
+                                    yield {"type": "text", "text": rest + held}
+                if wrong_lang and not stop.is_set():
+                    log.warning("answer started in the wrong language (wanted %s), redoing it", said_in)
+                    lang_guard = LanguageGuard(None)  # one retry
+                    greeting = GreetingStripper(active=not greets(text))
+                    messages.append(
+                        {"role": "user", "content": LANGUAGE_RETRY.format(lang=LANG_NAMES[said_in])}
+                    )
+                    continue
                 visible = greeting.clean(sp.visible_text.strip())
                 calls = sp.tool_calls if use_tools and not stop.is_set() else []
                 if not calls and not visible and sp.raw.strip() and not stop.is_set() and use_tools:
@@ -741,6 +774,14 @@ class Sylvie:
                             "content": SEARCH_NUDGE if says_no_access(visible) else SEARCH_PROMISE_NUDGE,
                         }
                     )
+                    continue
+                if not calls and unsent and not nudged and not stop.is_set() and claims_sent(visible):
+                    # "I sent it" when it wasn't sent: correct it before Lea believes it.
+                    log.warning("claimed a send that didn't happen: %r", visible[:120])
+                    nudged = True
+                    display_parts.append(visible)
+                    messages.append({"role": "assistant", "content": visible})
+                    messages.append({"role": "user", "content": UNSENT_NUDGE.format(why=unsent[-1][:300])})
                     continue
                 if not calls and not visible and called_tools and not answer_nudged and not stop.is_set():
                     # Measured 2026-11-08 (make everyday): after four searches about the weekend's rain the
@@ -834,6 +875,8 @@ class Sylvie:
                                 )
                         if result.pending:
                             yield {"type": "action", "status": "pending", **result.pending}
+                        if call.name in ("send_message", "send_email") and (not result.ok or result.pending):
+                            unsent.append(result.content)
                         if result.photos:
                             shown_photos += result.photos
                             yield {"type": "photos", "items": result.photos}

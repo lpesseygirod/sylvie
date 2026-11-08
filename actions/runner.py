@@ -384,6 +384,10 @@ class ActionRunner:
         cmd = str(args.get("command", ""))
         if name in ("run_command", "run_shortcut") and after_untrusted:
             return True
+        if name in ("send_message", "send_email"):
+            # Lea, 2026-11-08: "Yes, ask me first" — anything sent to a person is read back for her yes,
+            # whatever the confirm setting says.
+            return True
         if mode == "never":
             return False
         if name in ("send_email", "send_message"):
@@ -517,6 +521,12 @@ class ActionRunner:
             return "due must look like 2026-11-05T15:30."
         if name == "open_in_browser" and not str(a.get("url", "")).startswith(("https://", "http://")):
             return "only http(s) addresses can be opened."
+        if name == "send_message" and a.get("app") != "whatsapp":
+            # Who exactly, before the read-back: "Inés" with two Inés in Contacts is a question, not a yes.
+            handle, who = self._resolve(str(a.get("to", "")))
+            if handle is None:
+                return f"not sent: {who}"
+            a["to"] = who
         if name == "set_timer":
             try:
                 m = float(a["minutes"])

@@ -118,7 +118,7 @@ def everyday_problems(item: dict, answer: str, tools: list[str], calls: list | N
     lang = reply_language(first) or reply_language(answer) or guess_language(answer, default="?")
     if c.get("lang") and lang != c["lang"]:
         problems.append(f"answered in {lang}, not {c['lang']}")
-    if says_no_access(answer):
+    if says_no_access(answer) and "web_search" not in tools:  # "check their website" after searching is fine
         problems.append("said she has no access")
     if c.get("contains") and _norm(c["contains"]) not in _norm(answer):
         if not (re.fullmatch(r"[\d.,]+", c["contains"]) and _num(c["contains"]) in number_candidates(answer)):

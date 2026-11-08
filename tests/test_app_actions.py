@@ -58,11 +58,17 @@ def test_contacts_by_how_lea_calls_them():
 def test_send_message_reads_contacts_and_sends(tmp_path):
     r, osa, _ = runner(tmp_path)
     out = r.call("send_message", {"to": "Mamá", "text": "Llego tarde, a las 9"}, None)
+    assert (
+        out.pending_id and "Send a message to Mama" in out.content
+    )  # even with confirm: never (Lea, 2026-11-08)
+    out = r.confirm(out.pending_id)
     assert out.ok and out.content == "Message sent to Mama."
     sent = [args for script, args in osa.calls if script == MESSAGES_SEND]
     assert sent == [("Llego tarde, a las 9", "+34 600 111 222")]
-    out = r.call("send_message", {"to": "Inés", "text": "hola"}, None)
-    assert not out.ok and "Inés Gil, Inés Pérez" in out.content
+    out = r.call("send_message", {"to": "Inés", "text": "hola"}, None)  # asked before any read-back
+    assert not out.ok and not out.pending_id and "Inés Gil, Inés Pérez" in out.content
+    out = r.call("send_message", {"to": "Inés Pérez", "text": "hola"}, None)
+    assert 'Send a message to Inés Pérez (Messages): "hola"' in out.content
 
 
 def test_send_message_waits_for_a_yes_when_lea_wants_that(tmp_path):
@@ -89,3 +95,24 @@ def test_call_directions_and_notes(tmp_path):
     if aid:
         r.undo(aid)
         assert any(s == NOTE_DELETE for s, _ in osa.calls)
+
+
+def test_saying_sent_when_it_was_not_is_corrected(tmp_path):
+    """2026-11-08 (make apps): WhatsApp isn't installed, yet "I sent the message to Ana on WhatsApp"."""
+    from tests.test_actions import call
+    from tests.test_orchestrator import run
+
+    send = call("send_message", to="Ana", text="I'll be there in 10 minutes", app="whatsapp")
+    s = make(
+        tmp_path,
+        [
+            send,
+            "I sent the message to Ana on WhatsApp.",
+            "I couldn't send it: WhatsApp isn't on this Mac.",
+            "{}",
+        ],
+    )
+    ev = run(s, "Text Ana on WhatsApp that I'll be there in 10 minutes")
+    said = [m["content"] for m in s.llm.calls[2]["messages"] if m["role"] == "user"]
+    assert said[-1].startswith("(Check: nothing was sent.")
+    assert "couldn't send it" in "".join(e["text"] for e in ev if e["type"] == "text")

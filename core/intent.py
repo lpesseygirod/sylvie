@@ -45,7 +45,8 @@ CLAIM_RE = re.compile(
 )
 
 ACTION_NOTE = (
-    "Lea may be asking you to do something (music, calendar, reminders, a timer, opening an app). If so, "
+    "Lea may be asking you to do something (music, a series on Netflix, a message, a call, directions in "
+    "Maps, a note, calendar, reminders, a timer, opening an app). If so, "
     "do it by calling the matching tool: nothing happens unless you call it. Never say it's done or "
     "happening unless the tool call succeeded in this turn; if a tool fails, say so plainly. Never invent "
     "results a tool didn't give you (playlists, songs, events, files). For music, don't ask Lea which song "
@@ -197,3 +198,21 @@ def accepts_search_offer(text: str, previous_answer: str) -> bool:
 
 def says_no_access(text: str) -> bool:
     return bool(NO_ACCESS_RE.search(text))
+
+
+# "I sent the message to Ana", "Ya he enviado el mensaje": measured 2026-11-08 (make apps) after the
+# send had failed (WhatsApp not installed) or was still waiting for Lea's yes.
+SENT_CLAIM_RE = re.compile(
+    r"\b(i'?ve sent|i sent|(it'?s|message|email) (been )?sent|he enviado|ya (est[aá] )?enviad[oa]|"
+    r"(mensaje|correo|email) enviad[oa]|lo he mandado|ya se lo he mandado|j'ai envoy[ée]|(message|mail) envoy[ée])",
+    re.I,
+)
+
+UNSENT_NUDGE = (
+    "(Check: nothing was sent. The tool said: {why} Tell Lea plainly, in her language, that it was NOT "
+    "sent and why; if it's waiting for her yes, read it back and ask.)"
+)
+
+
+def claims_sent(text: str) -> bool:
+    return bool(SENT_CLAIM_RE.search(text))

@@ -342,3 +342,31 @@ def test_music_and_silence_transcripts_are_dropped():
     assert not is_noise_transcript("Sylvie, merci.", 2.5)  # a real, quick thanks still gets an answer
     assert not is_noise_transcript("Sylvie, pon música.", 9.3)
     assert not is_noise_transcript("Thank you for the summary, can you shorten it?", 20)
+
+
+def test_a_spanish_start_to_an_english_question_is_redone(tmp_path):
+    """2026-11-08: "Sylvie, can you put Bridgerton on Netflix please?" after Spanish turns → Spanish answer,
+    although "(Reply in English.)" was there. The start is held, checked, and redone before anyone hears it."""
+    from tests.test_orchestrator import extraction, make, run
+
+    s = make(tmp_path, [
+        "¡Claro! Te pongo la música que quieras.", extraction(),
+        "Sí, puedo intentar reproducir Bridgerton en Netflix ahora mismo.", "Sure! Bridgerton is starting on Netflix.",
+        extraction(),
+    ])  # fmt: skip
+    cid = run(s, "Hola Sylvie, ¿qué tal estás hoy?")[0]["conversation_id"]
+    s.bg.drain()
+    ev = run(s, "Sylvie, can you put Bridgerton on Netflix please?", cid)
+    shown = "".join(e["text"] for e in ev if e["type"] == "text")
+    assert shown == "Sure! Bridgerton is starting on Netflix." and "Sí" not in shown
+    assert "Answer ONLY in English" in s.llm.calls[-2]["messages"][-1]["content"]
+
+
+def test_language_guard_passes_the_right_language_through():
+    from core.lang import LanguageGuard
+
+    g = LanguageGuard("en")
+    assert g.feed("Sure, ") == ("", False)  # held: too short to tell
+    out, wrong = g.feed("here is what I found for you today. And more")
+    assert not wrong and out.startswith("Sure, here is")
+    assert g.feed(" text") == (" text", False)  # decided once: no more holding
