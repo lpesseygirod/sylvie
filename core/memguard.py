@@ -58,6 +58,12 @@ class MemoryGuard:
         self.enabled = bool(g.get("enabled", True))
         self.lea_away_minutes = float(g.get("lea_away_minutes", 5))
         self.min_free_gb = float(g.get("backlog_min_free_gb", 6))
+        # Measured 2026-11-09 01:00–02:00: indexing started at 6 GB free, its own reading dropped it
+        # below 6, it was paused, and it started again: 105 pauses in an hour, each redoing a file.
+        # So a job needs 2 GB more to start than to keep going, and waits 10 minutes after a pause.
+        self.start_margin_gb = float(g.get("start_margin_gb", 2))
+        self.pause_cooldown = float(g.get("pause_cooldown_minutes", 10)) * 60
+        self.paused_at = 0.0
         self.reader = reader
         self.cache_seconds = cache_seconds
         self._last: tuple[float, Reading] | None = None
@@ -70,14 +76,16 @@ class MemoryGuard:
                 self._last = (now, self.reader())
             return self._last[1]
 
-    def backlog_ok(self) -> tuple[bool, str]:
-        """May a backlog job (indexing, history, downloads) run now?"""
+    def backlog_ok(self, starting: bool = True) -> tuple[bool, str]:
+        """May a backlog job (indexing, history, downloads) start (`starting`) or keep running?"""
         if not self.enabled:
             return True, "guard off"
+        if starting and time.time() - self.paused_at < self.pause_cooldown:
+            return False, "paused a few minutes ago"
         r = self.reading()
         if r.tight:
             return False, f"memory pressure is {r.pressure}"
-        if r.free_gb < self.min_free_gb:
+        if r.free_gb < self.min_free_gb + (self.start_margin_gb if starting else 0):
             return False, f"only {r.free_gb:.0f} GB free"
         if r.lea_idle_s is not None and r.lea_idle_s < self.lea_away_minutes * 60:
             return False, "Lea is using the Mac"
@@ -119,8 +127,9 @@ class GuardLoop:
     def tick(self) -> None:
         job = self.s.bg.current
         if job is not None and job.backlog_job and not job.stop.is_set():
-            ok, why = self.guard.backlog_ok()
+            ok, why = self.guard.backlog_ok(starting=False)
             if not ok:
+                self.guard.paused_at = time.time()
                 log.info("pausing %s: %s", job.name, why)
                 job.stop.set()  # backlog jobs are re-queued, never dropped
         tight = self.guard.reading().tight if self.guard.enabled else False

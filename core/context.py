@@ -54,7 +54,7 @@ def estimate_tokens(llm, messages: list[dict]) -> int:
     return llm.count_tokens(text) + 8 * len(messages)
 
 
-def maybe_summarize(llm, convs, cid: str, max_tokens: int) -> bool:
+def maybe_summarize(llm, convs, cid: str, max_tokens: int, stop=None) -> bool:
     """If the conversation is too long, summarize its older half. Returns True if it did."""
     conv = convs.get(cid)
     if conv is None:  # deleted meanwhile
@@ -79,5 +79,7 @@ def maybe_summarize(llm, convs, cid: str, max_tokens: int) -> bool:
         [{"role": "user", "content": SUMMARY_PROMPT.format(previous=previous, transcript=transcript)}],
         max_tokens=400,
     )
+    if stop is not None and stop.is_set():
+        return False  # cut short by Lea: don't keep half a summary
     convs.set(cid, summary=summary, summarized_upto=old[-1]["id"])
     return True

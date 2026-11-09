@@ -126,6 +126,8 @@ schedule:
   max_job_gb: 24                # A2: hard cap; the job (and its training child) is stopped above it, or after 3 min of pressure
   interest_research: daily
 learning:
+  learn_after_quiet_minutes: 5  # A5: facts/interests/style learned once a conversation is quiet this long (not after every message)
+  small_model: auto             # A3: fact extraction by Apple's on-device model once it passed `make extraction-check` (auto), apple, or sylvie
   # Lea chose autonomy (2026-11-07): night pairs on GENERAL questions that code verified, or that the
   # local judge re-graded at least this high, train without her spot-check. Personal ones still wait.
   auto_approve_judged: true
@@ -157,6 +159,8 @@ memguard:                       # efficiency plan A2 (core/memguard.py): heavy w
   enabled: true
   lea_away_minutes: 5           # backlog jobs (indexing, old chats, downloads) wait until Lea is away from the Mac this long
   backlog_min_free_gb: 6        # …and this much memory is really free (free + cached files, not macOS's "free %")
+  start_margin_gb: 2            # a job needs this much more to start than to keep running (no start/pause flapping)
+  pause_cooldown_minutes: 10    # after a pause, background jobs wait this long before trying again
 
 privacy:
   log_conversations: true

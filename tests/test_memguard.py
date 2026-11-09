@@ -20,6 +20,8 @@ def test_backlog_needs_room_and_lea_away(tmp_path):
     assert guard(tmp_path)[0].backlog_ok() == (True, "ok")
     assert "warn" in guard(tmp_path, pressure="warn")[0].backlog_ok()[1]
     assert "free" in guard(tmp_path, free_gb=3)[0].backlog_ok()[1]
+    g = guard(tmp_path, free_gb=7)[0]
+    assert not g.backlog_ok()[0] and g.backlog_ok(starting=False)[0]  # 2 GB more to start than to keep going
     assert "using the Mac" in guard(tmp_path, idle_s=20)[0].backlog_ok()[1]
     assert guard(tmp_path, idle_s=None)[0].backlog_ok()[0]  # idle time unknown: memory decides
 
@@ -62,6 +64,8 @@ def test_guard_pauses_a_running_backlog_job_and_requeues_it(tmp_path):
     while s.bg.current is not None and time.time() < end:
         time.sleep(0.05)
     assert s.bg.current is None and s.bg.backlog.qsize() == 1 and runs == [1]  # paused, not dropped
+    g.reader = lambda: Reading("normal", 50, 20, 900)  # Lea leaves again at once…
+    assert g.backlog_ok() == (False, "paused a few minutes ago")  # …but no restart for 10 minutes
 
 
 def test_voice_models_unload_after_quiet_minutes(tmp_path):

@@ -107,11 +107,21 @@ class BackgroundWorker:
     jobs; only after `backlog_idle_seconds`). Measured 2026-11-06: with the backlog running after
     every 8-second pause, a question took 135 s (memory lookup 25 s, prefill 61 s, 11 tok/s)."""
 
-    def __init__(self, idle_seconds: float = 8.0, backlog_idle_seconds: float = 600.0):
+    def __init__(
+        self,
+        idle_seconds: float = 8.0,
+        backlog_idle_seconds: float = 600.0,
+        sleep_idle_seconds: float = 300.0,
+    ):
         self.q: queue.Queue[_Job] = queue.Queue()
         self.backlog: queue.Queue[_Job] = queue.Queue()
         self.idle_seconds = idle_seconds
         self.backlog_idle_seconds = backlog_idle_seconds
+        # Sleep-time learning (efficiency plan A5): one job that learns from the conversation once it
+        # has gone quiet, instead of a model call 8 s after every message.
+        self.sleep_idle_seconds = sleep_idle_seconds
+        self.sleep_job: _Job | None = None
+        self._sleep_lock = threading.Lock()
         self.last_activity = 0.0
         self.busy = threading.Event()
         self.current: _Job | None = None
@@ -124,6 +134,13 @@ class BackgroundWorker:
 
     def submit(self, name: str, fn, backlog: bool = False) -> None:
         (self.backlog if backlog else self.q).put(_Job(name, fn, backlog_job=backlog))
+
+    def after_quiet(self, name: str, fn) -> None:
+        """Run `fn` once Lea has been quiet for `sleep_idle_seconds` (one pending at a time: the job
+        itself reads everything that is waiting)."""
+        with self._sleep_lock:
+            if self.sleep_job is None:
+                self.sleep_job = _Job(name, fn)
 
     def turn_started(self) -> None:
         self.busy.set()
@@ -148,7 +165,7 @@ class BackgroundWorker:
         """Tests/CLI: wait until the queue is empty."""
         end = time.time() + timeout
         while (
-            not self.q.empty() or not self.backlog.empty() or self.current is not None
+            not self.q.empty() or not self.backlog.empty() or self.current is not None or self.sleep_job
         ) and time.time() < end:
             time.sleep(0.05)
 
@@ -158,6 +175,11 @@ class BackgroundWorker:
             if not self.busy.is_set() and not self.hold():
                 if idle >= self.idle_seconds and not self.q.empty():
                     return self.q.get()
+                if idle >= self.sleep_idle_seconds and self.q.empty() and self.sleep_job is not None:
+                    with self._sleep_lock:
+                        job, self.sleep_job = self.sleep_job, None
+                    if job is not None:
+                        return job
                 if (
                     idle >= self.backlog_idle_seconds
                     and self.q.empty()
@@ -176,6 +198,9 @@ class BackgroundWorker:
                 job.fn(job.stop)
                 if job.stop.is_set() and job.backlog_job:
                     self.backlog.put(job)  # backlog work is never dropped, just postponed
+                elif job.stop.is_set() and job.name == "sleep-learn":
+                    with self._sleep_lock:  # what's still unlearned stays in the database for next time
+                        self.sleep_job = self.sleep_job or job
                 elif job.stop.is_set() and job.tries < 2:
                     job.tries += 1
                     self.q.put(job)
@@ -205,7 +230,14 @@ class Sylvie:
         self.episodes = Episodes(db, embedder)
         self.teacher = Teacher(self, self.learning)
         backlog_idle = cfg.get_path("learning.backlog_idle_minutes", 10) * 60 if idle_seconds > 0 else 0
-        self.bg = BackgroundWorker(idle_seconds=idle_seconds, backlog_idle_seconds=backlog_idle)
+        sleep_idle = cfg.get_path("learning.learn_after_quiet_minutes", 5) * 60 if idle_seconds > 0 else 0
+        self.bg = BackgroundWorker(
+            idle_seconds=idle_seconds, backlog_idle_seconds=backlog_idle, sleep_idle_seconds=sleep_idle
+        )
+        if self.db.one("SELECT value FROM meta WHERE key = ?", (LEARNED_UPTO,)) is None:
+            # From now on (efficiency plan A5): messages before this were already learned one by one.
+            top = self.db.one("SELECT COALESCE(MAX(id), 0) n FROM messages WHERE role = 'user'")["n"]
+            self._set_learned_upto(top)
         self.scheduler = None  # set by the server (learning/scheduler.py)
         self.bg.hold = lambda: self.scheduler is not None and self.scheduler.proc is not None
         self.claude_history = None  # set by the server (memory/claude_history.py)
@@ -216,6 +248,9 @@ class Sylvie:
         self._voice_used = 0.0  # last time Whisper or Kokoro was asked for (unloaded when quiet)
         self._voice_warming = False
         self.guard = None  # set by the server (core/memguard.py)
+        from core.small_model import SmallJobs
+
+        self.small = SmallJobs(cfg, llm)  # fact extraction: Apple's on-device model once it qualifies (A3)
 
     @classmethod
     def build(cls, cfg: Config | None = None) -> Sylvie:
@@ -977,10 +1012,13 @@ class Sylvie:
 
             # 7. Learn in the background
             answer = "\n\n".join(display_parts)
-            source = f"{cid}#{user_mid}"
-            self.bg.submit("episode", lambda ev: self.episodes.add(cid, user_mid, text, answer))
-            self.bg.submit("learn", lambda ev: self._learn(text, answer, source, ev))
+            self.bg.submit(
+                "episode", lambda ev: self.episodes.add(cid, user_mid, text, answer)
+            )  # embedding only
+            # Facts, interests, style and summaries: once the conversation goes quiet (A5), from the database.
+            self.bg.after_quiet("sleep-learn", self.sleep_learn)
             max_ctx = self.cfg.get_path("llm.summarize_after_tokens", 11000)
+            # Safety net only: a conversation that outgrows the context still gets summarized mid-way.
             self.bg.submit("summarize", lambda ev: maybe_summarize(self.llm, self.convs, cid, max_ctx))
         except Exception as e:
             log.exception("turn failed")
@@ -1009,14 +1047,69 @@ class Sylvie:
         if not stop.is_set():
             self._learn(message, "", source, stop, note=CLAUDE_NOTE)
 
-    def _learn(self, message: str, reply: str, source: str, stop: threading.Event, note: str = "") -> None:
-        if len(message.strip()) < 4:
-            return
+    # ---------- sleep-time learning (efficiency plan A5) ----------
+    def _set_learned_upto(self, mid: int) -> None:
+        self.db.execute(
+            "INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (LEARNED_UPTO, str(int(mid))),
+        )
+
+    def unlearned(self) -> list[dict]:
+        """Lea's messages not learned from yet, grouped by conversation in order:
+        [{"cid", "items": [(message_id, text, reply)]}]."""
+        row = self.db.one("SELECT value FROM meta WHERE key = ?", (LEARNED_UPTO,))
+        upto = int(row["value"]) if row else 0
+        rows = self.db.query(
+            "SELECT id, conversation_id, role, content FROM messages WHERE id > ? AND role IN ('user', 'assistant') "
+            "ORDER BY id",
+            (upto,),
+        )
+        groups: dict[str, list] = {}
+        for r in rows:
+            items = groups.setdefault(r["conversation_id"], [])
+            if r["role"] == "user":
+                items.append([r["id"], r["content"] or "", ""])
+            elif items and r["content"] and not items[-1][2]:
+                items[-1][2] = r["content"]  # the visible answer to that message
+        return [{"cid": c, "items": [tuple(i) for i in items]} for c, items in groups.items() if items]
+
+    def sleep_learn(self, stop: threading.Event) -> None:
+        """Learn from every conversation that has gone quiet: one model call per conversation (in parts
+        of ~3,000 characters) instead of one per message. A message where Lea says "remember…" is read
+        on its own, so only it can save a sensitive fact (rule 13). A long conversation is summarized
+        now, while she's away, so it isn't summarized in the middle of her next question."""
         before = self.current_system_prompt()
-        existing = recall(self.db, self.embedder, message, k=8)
-        ex = run_extraction(_Stoppable(self.llm, stop), message, reply, existing, note=note)
+        changed = False
+        for group in self.unlearned():
+            cid, items = group["cid"], group["items"]
+            for part in learning_parts(items):
+                if stop.is_set():
+                    return  # nothing marked learned: the next quiet spell does it again
+                changed |= self._learn_items(cid, part, stop)
+            if stop.is_set():
+                return
+            self._set_learned_upto(max(i[0] for i in items))
+            max_ctx = self.cfg.get_path("llm.summarize_after_tokens", 11000)
+            maybe_summarize(_Stoppable(self.llm, stop), self.convs, cid, int(max_ctx * 0.6), stop=stop)
+        if changed and not stop.is_set() and self.current_system_prompt() != before:
+            # The next new conversation will start with this prompt: read it into the cache now (once).
+            self.llm.warm(self.current_system_prompt(), available_tools(self.tool_context()))
+
+    def _learn_items(self, cid: str, items: list, stop: threading.Event) -> bool:
+        message, reply, note = join_for_learning(items)
+        return self._learn(message, reply, f"{cid}#{items[0][0]}", stop, note=note, warm=False)
+
+    def _learn(
+        self, message: str, reply: str, source: str, stop: threading.Event, note: str = "", warm: bool = True
+    ) -> bool:
+        """Returns True if anything was learned."""
+        if len(message.strip()) < 4:
+            return False
+        before = self.current_system_prompt() if warm else ""
+        existing = recall(self.db, self.embedder, message[:2000], k=8)
+        ex = run_extraction(_Stoppable(self.small, stop), message, reply, existing, note=note)
         if stop.is_set():
-            return  # interrupted: the job is re-queued and will run again
+            return False  # interrupted: the job is re-queued and will run again
         for f in ex.facts:
             self.memory.add(
                 f["fact"], key=f["key"], category=f["category"], source=source, sensitive=f["sensitive"]
@@ -1034,10 +1127,47 @@ class Sylvie:
             self.convs.log_event(
                 "learned", {"source": source, "facts": ex.facts, "interests": ex.interests, "style": ex.style}
             )
-        after = self.current_system_prompt()
-        if after != before and not stop.is_set():
-            # The next new conversation will start with this prompt: read it into the cache now.
-            self.llm.warm(after, available_tools(self.tool_context()))
+        if warm and not stop.is_set():
+            after = self.current_system_prompt()
+            if after != before:
+                # The next new conversation will start with this prompt: read it into the cache now.
+                self.llm.warm(after, available_tools(self.tool_context()))
+        return bool(ex.facts or ex.interests or ex.interests_removed or ex.style)
+
+
+LEARNED_UPTO = "learning.upto"  # meta: the last of Lea's message ids already learned from
+LEARN_BATCH_CHARS = 3000  # Lea's messages read in one extraction call
+BATCH_NOTE = (
+    "This time <message> holds several of Lea's messages from one conversation, numbered [1], [2]…, "
+    "and <reply> Sylvie's answers with the same numbers. Learn from all of them together."
+)
+
+
+def join_for_learning(items: list) -> tuple[str, str, str]:
+    """[(message_id, text, reply)] → (message, reply, note) for one extraction call."""
+    if len(items) == 1:
+        return items[0][1], items[0][2], ""
+    message = "\n".join(f"[{n}] {text}" for n, (_, text, _r) in enumerate(items, 1))
+    reply = "\n".join(f"[{n}] {r[:300]}" for n, (_, _t, r) in enumerate(items, 1) if r)
+    return message, reply, BATCH_NOTE
+
+
+def learning_parts(items: list) -> list[list]:
+    """Explicit "remember…" messages alone (only they may save a sensitive fact), the rest in parts."""
+    explicit = [i for i in items if REMEMBER_RE.search(i[1])]
+    rest = [i for i in items if i not in explicit and len(i[1].strip()) >= 4]
+    return [[i] for i in explicit] + _parts(rest, LEARN_BATCH_CHARS)
+
+
+def _parts(items: list, limit: int) -> list[list]:
+    out, cur, size = [], [], 0
+    for it in items:
+        if cur and size + len(it[1]) > limit:
+            out.append(cur)
+            cur, size = [], 0
+        cur.append(it)
+        size += len(it[1])
+    return out + ([cur] if cur else [])
 
 
 class _Stoppable:
@@ -1048,6 +1178,9 @@ class _Stoppable:
 
     def complete(self, messages, **kw):
         return self.llm.complete(messages, stop=self.stop, **kw)
+
+    def __getattr__(self, name):  # count_tokens etc.
+        return getattr(self.llm, name)
 
 
 def _title_from(text: str) -> str:

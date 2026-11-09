@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval everyday apps finetune ui-test general-pack import-general learn-now mmlu wikipedia
+.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval everyday apps finetune ui-test general-pack import-general learn-now mmlu wikipedia small-model extraction-check
 
 setup:
 	uv sync
@@ -49,6 +49,12 @@ index:
 
 app:
 	zsh scripts/build_mac_app.sh
+
+small-model:   # the helper for Apple's on-device model (efficiency plan A3; needs Apple Intelligence on)
+	swift build -c release --package-path app/SmallModel
+
+extraction-check:   # learning facts from conversations: Apple's model vs Sylvie's; saves the verdict
+	$(UV) python scripts/extraction_check.py --compare
 
 ui-test:   # the web UI in headless Chrome against the dev server; VOICE=1 adds a real spoken round trip
 	VOICE=$(VOICE) $(UV) python scripts/ui_check.py
