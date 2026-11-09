@@ -421,5 +421,6 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **Rule 13 kept:** a "remember…" message is extracted on its own; sensitive facts from a batch are dropped by the existing parser (tested).
 - **What (A3):** `app/SmallModel` (Swift, Foundation Models) + `core/small_model.py`. Extraction uses Apple's model only if Apple Intelligence is on and `make extraction-check` found it within 1 item of the 9B with no forbidden fact (`small-model.json`); otherwise, or after 3 failures, the 9B. Summaries stay on the 9B (4K context). Today Apple Intelligence is off (LEA-TODO 24).
 - **Alternatives:** a separate small MLX model (more memory, the opposite of the goal); extraction at night only (facts from the morning would be missing all day).
+- **Measured (05:49):** extraction eval with the 9B, single 12/16 (37 calls, 27.5 s) → batch 15/16 (17 calls, 17.9 s), 0 forbidden facts in both. Batch catches facts spread over two messages, and missed ext-9. The check needs 6.1 GB at peak, so its memory gate went from 11 to 8 GB.
 - **Also:** the A2 guard flapped (105 pauses in an hour); start needs 2 GB more than keep-going, 10 min cooldown after a pause.
 - **Change it:** `learning.learn_after_quiet_minutes`, `learning.small_model: auto|apple|sylvie`, `memguard.start_margin_gb / pause_cooldown_minutes`.

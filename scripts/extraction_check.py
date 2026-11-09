@@ -118,7 +118,8 @@ def main() -> None:
 
     cfg = load_config()
     if (a.compare or a.model == "sylvie") and not a.force:
-        ok, why = MemoryGuard(cfg).heavy_ok(11)  # loads its own copy of Sylvie's model
+        # It loads its own copy of Sylvie's model: 6.1 GB peak (measured 2026-11-09), plus a margin.
+        ok, why = MemoryGuard(cfg).heavy_ok(8)
         if not ok:
             raise SystemExit(f"Not running: {why}. Close some apps, or pass --force.")
     if not a.compare:
