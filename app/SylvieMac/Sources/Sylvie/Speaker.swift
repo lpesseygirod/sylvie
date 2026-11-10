@@ -44,8 +44,14 @@ final class Speaker {
         queue.removeAll()
         synth.stopSpeaking(at: .immediate)
         pipeline.player.stop()
+        pipeline.player.volume = 1
         isSpeaking = false
         isPlaying = false
+    }
+
+    /// Someone is talking over her: her voice goes down so the recognizer can hear "stop" (AppController).
+    func setDucked(_ ducked: Bool) {
+        pipeline.player.volume = ducked ? 0.15 : 1
     }
 
     private func voice(for language: String) -> AVSpeechSynthesisVoice? {

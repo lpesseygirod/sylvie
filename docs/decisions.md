@@ -431,3 +431,16 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **Changed from the request:** Claude can be connected as a helper for answers ("ask Claude…", `tools/claude.py`), not as a trainer. Anthropic's terms don't allow Claude's outputs to train other AI models, and build-plan rule 4 says the same. Sylvie trains alone, as Lea said: owner feedback, code checks plus her own thinking mode as grader (A7), and open datasets.
 - **Passwords:** saved in the Keychain only. Each is used only on its own site (against prompt-injection tricks). She asks before every login and before anything that sends, buys, deletes or posts. She never pays on her own. Each service's own sign-in page is preferred where one exists.
 - **Lea decides:** when to merge the new-owner branch (`claude/youthful-cray-5fa0cc`), the license (MIT or Apache 2.0), and publishing (she pushes herself).
+
+### T53 — "Sylvie, stop" works while she talks (2026-11-10)
+- **Problem (Lea):** saying "Sylvie, stop" while she talked didn't stop her. The log at 17:31 showed nothing heard during a long answer. Echo cancellation is off on Lea's MacBook (T-entry of 2026-11-06), so the speech recognizer mostly heard Sylvie's own voice, and Lea's words were lost under it.
+- **What:** `BargeInDetector` (SylvieCore). The app measures how loud it plays (a tap on the mixer) and compares it with the mic.
+  - Mic level beyond what her own echo explains (the loud end, the 90th percentile of this answer's echo, +6 dB), or a voice during her pauses, is someone talking over her.
+  - Her voice then drops to 15% at once, and comes back 1.5 s after the other voice stops.
+  - Meanwhile her name counts as Lea's: "Sylvie" interrupts her, like "stop" already did.
+  - ⌥Space while she talks or thinks also stops her.
+- **Measured (built-in speakers and mic, the Mac's own voice playing Lea's part):**
+  - First version (median echo): 16 false triggers during one answer. Her echo varies (mic minus played: −19 / −8 / −4 dB at the 10th / 50th / 90th percentile).
+  - With the 90th percentile: 0 false triggers in a 52 s answer.
+  - "Sylvie, stop" said mid-answer: heard and stopped her (2 tries out of 2).
+- **Not yet measured:** Lea's own voice. Each answer now logs, as numbers only, how often someone talked over her and her echo spread (Console, subsystem app.sylvie.mac), to tune if needed.

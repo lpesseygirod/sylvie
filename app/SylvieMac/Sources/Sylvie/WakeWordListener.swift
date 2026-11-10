@@ -19,8 +19,12 @@ final class WakeWordListener {
     /// Only while Sylvie is speaking or thinking: "stop" / "para" / "arrête" interrupts her.
     var listensForStop = false
     /// True while Sylvie speaks without echo cancellation: she'd hear her own voice (and her name),
-    /// so only a strong "stop" counts.
+    /// so only a strong "stop" counts, or her name said while someone is talking over her.
     var deaf = false
+    /// Until when someone was last heard talking over her (BargeInDetector, via leaTalkingOverVoice()).
+    private var overVoiceUntil = Date.distantPast
+    /// Her name appeared in the transcript just before the talking-over was noticed.
+    private var pendingWakeAt = Date.distantPast
 
     private let recognizer: SFSpeechRecognizer?
     private let matcher = WakeMatcher()
@@ -139,6 +143,22 @@ final class WakeWordListener {
 
     private var resetStopsOnNext = false
 
+    /// The app heard someone talking over Sylvie (and turned her down): for the next 2 s, her name in the
+    /// transcript is Lea's, not Sylvie's own voice. A name heard just before also counts (the recognizer
+    /// is sometimes faster than the level check).
+    func leaTalkingOverVoice() {
+        lock.lock()
+        overVoiceUntil = Date().addingTimeInterval(2)
+        let fire = Date().timeIntervalSince(pendingWakeAt) < 1.5
+        if fire { pendingWakeAt = .distantPast }
+        lock.unlock()
+        if fire {
+            wakeLog.notice("her name heard over her voice")
+            DispatchQueue.main.async { self.onWake?() }
+            restart()
+        }
+    }
+
     private func isCurrent(_ gen: Int) -> Bool {
         lock.lock()
         defer { lock.unlock() }
@@ -159,16 +179,29 @@ final class WakeWordListener {
             return
         }
         if deaf {
-            // She's speaking and the mic hears her too: ignore her name, but Lea's "stop" still works.
+            // She's speaking and the mic hears her too: her name only counts while someone is heard
+            // talking over her (she may say it herself), but Lea's "stop" always works.
             let stops = matcher.strongStopCount(in: text)
+            let wakes = matcher.wakeCount(in: text)
             lock.lock()
             if resetStopsOnNext {
                 seenStops = stops
+                seenWakes = wakes
                 resetStopsOnNext = false
             }
             let newStop = stops > seenStops
+            let newWake = wakes > seenWakes
             seenStops = max(seenStops, stops)
+            seenWakes = max(seenWakes, wakes)
+            let overVoice = Date() < overVoiceUntil
+            if newWake && !overVoice { pendingWakeAt = Date() }
             lock.unlock()
+            if newWake && overVoice && !newStop {
+                wakeLog.notice("her name heard over her voice")
+                DispatchQueue.main.async { self.onWake?() }
+                restart()
+                return
+            }
             if newStop {
                 wakeLog.notice("stop heard while speaking")
                 lock.lock()

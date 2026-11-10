@@ -61,6 +61,9 @@ final class AppController: ObservableObject {
     private let pipeline = AudioPipeline()
     private let wake = WakeWordListener()
     private let vad = VoiceActivityDetector()
+    /// Someone talking over Sylvie while she speaks (no echo cancellation on Lea's Mac).
+    private var bargeIn = BargeInDetector()
+    private var restoreVoice: DispatchWorkItem?
     private lazy var speaker = Speaker(pipeline: pipeline)
     private var panel: PanelController?
     private var chat: ChatWindowController?
@@ -222,6 +225,10 @@ final class AppController: ObservableObject {
             orbPressed()
             return
         }
+        if state == .speaking || state == .thinking {  // ⌥Space while she talks: stop her, like "stop"
+            stopTalking()
+            return
+        }
         guard let panel else { return }
         if state == .muted {  // after "stop listening": the hotkey turns her back on
             toggleMute()
@@ -276,7 +283,11 @@ final class AppController: ObservableObject {
     private func handle(_ samples: [Float]) {
         preRoll.append(samples)
         guard recordingActive else {
-            if !speaker.isSpeaking { vad.trackBackground(samples) }  // keep the noise floor current
+            if !speaker.isSpeaking {
+                vad.trackBackground(samples)  // keep the noise floor current
+            } else if speaker.isPlaying && !pipeline.echoCancelled {
+                checkTalkingOver(samples)
+            }
             return
         }
         // Without echo cancellation the mic hears Sylvie herself (her "Hello Lea", the chime): measured
@@ -300,6 +311,34 @@ final class AppController: ObservableObject {
                 state = .idle
             }
         }
+    }
+
+    /// Lea talks over Sylvie: turn her voice down at once, so the recognizer can hear "stop" or her name
+    /// over it (measured 2026-11-10: at full volume it heard only Sylvie and missed "Sylvie, stop").
+    /// Her voice comes back 1.5 s after the other voice stops, if it wasn't a stop.
+    private func checkTalkingOver(_ samples: [Float]) {
+        guard bargeIn.process(samples, outputPower: pipeline.recentOutputPower(), noiseFloorDB: vad.noiseFloorDB) else { return }
+        if restoreVoice == nil {
+            let f = bargeIn.lastFired
+            let why = f.explained.map { String(format: "her echo explains %.0f dB", $0) } ?? "during her pause"
+            wakeLog.notice("someone is talking over Sylvie: her voice goes down (mic \(String(format: "%.0f", f.mic), privacy: .public) dB, played \(String(format: "%.0f", f.played), privacy: .public) dB, \(why, privacy: .public))")
+        }
+        speaker.setDucked(true)
+        wake.leaTalkingOverVoice()
+        restoreVoice?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.restoreVoice = nil
+            self.speaker.setDucked(false)
+        }
+        restoreVoice = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+    }
+
+    private func endTalkingOver() {
+        restoreVoice?.cancel()
+        restoreVoice = nil
+        speaker.setDucked(false)
     }
 
     private func finishRecording() {
@@ -360,11 +399,18 @@ final class AppController: ObservableObject {
         case "speak":
             guard let text = event["text"] as? String else { return }
             spokeThisTurn = true
-            if state != .speaking { wake.markStopsSeen() }  // only a "stop" said from now on counts
+            if state != .speaking {
+                wake.markStopsSeen()  // only a "stop" said from now on counts
+                bargeIn.reset()  // learn how loud her own voice comes back for this answer
+            }
             state = .speaking
             wake.deaf = !pipeline.echoCancelled
             speaker.onFinished = { [weak self] in
                 guard let self, self.state == .speaking else { return }
+                // Numbers only (never what was said), to tune the talking-over check on Lea's Mac.
+                let ratio = self.bargeIn.echoSpreadDB.map { String(format: "%.0f/%.0f/%.0f dB", $0.low, $0.mid, $0.high) } ?? "not learned"
+                wakeLog.notice("answer spoken: talked over \(self.bargeIn.detections, privacy: .public) time(s), her echo \(ratio, privacy: .public), room \(String(format: "%.0f dB", self.vad.noiseFloorDB), privacy: .public)")
+                self.endTalkingOver()
                 self.state = .idle
                 self.wake.listensForStop = false
                 self.wake.deaf = false
@@ -420,6 +466,7 @@ final class AppController: ObservableObject {
 
     /// "Sylvie, stop", a tap on the menu, or the wake word while she's talking.
     func interrupt() {
+        endTalkingOver()
         speaker.stop()
         turnTask?.cancel()
         turnTask = nil

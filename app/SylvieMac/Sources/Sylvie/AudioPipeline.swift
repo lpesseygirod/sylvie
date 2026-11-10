@@ -22,6 +22,11 @@ final class AudioPipeline {
     /// False when macOS refused echo cancellation and the mic runs without it (see start()).
     private(set) var echoCancelled = true
 
+    /// How loud the app itself played lately (mean square per buffer, with its time): tells Sylvie's own
+    /// voice apart from Lea's in the mic (BargeInDetector).
+    private var outputLevels: [(Date, Float)] = []
+    private let outputLock = NSLock()
+
     /// Measured 2026-11-06 on Lea's MacBook: the voice-processing unit failed to initialise
     /// ("client-side input and output formats do not match", -10875), so the app never listened.
     /// Then it starts without echo cancellation instead of giving up.
@@ -59,12 +64,34 @@ final class AudioPipeline {
                 if let mono = self.monoBuffer(samples) { self.onBuffer?(mono) }
             }
         }
+        let mixer = engine.mainMixerNode
+        mixer.removeTap(onBus: 0)
+        mixer.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
+            guard let self, let data = buffer.floatChannelData, buffer.frameLength > 0 else { return }
+            let n = Int(buffer.frameLength)
+            var sum: Float = 0
+            for i in 0..<n { sum += data[0][i] * data[0][i] }
+            let now = Date()
+            self.outputLock.lock()
+            self.outputLevels.append((now, sum / Float(n)))
+            self.outputLevels.removeAll { now.timeIntervalSince($0.0) > 1 }
+            self.outputLock.unlock()
+        }
         engine.prepare()
         try engine.start()
     }
 
+    /// The loudest level the app played in the last `seconds` (long enough to cover the echo's delay).
+    func recentOutputPower(seconds: TimeInterval = 0.3) -> Float {
+        let now = Date()
+        outputLock.lock()
+        defer { outputLock.unlock() }
+        return outputLevels.filter { now.timeIntervalSince($0.0) <= seconds }.map(\.1).max() ?? 0
+    }
+
     private func teardown() {
         engine.inputNode.removeTap(onBus: 0)
+        engine.mainMixerNode.removeTap(onBus: 0)
         player.stop()
         engine.stop()
         engine.reset()
@@ -73,6 +100,7 @@ final class AudioPipeline {
     func stop() {
         guard running else { return }
         engine.inputNode.removeTap(onBus: 0)
+        engine.mainMixerNode.removeTap(onBus: 0)
         player.stop()
         engine.stop()
         running = false

@@ -129,6 +129,78 @@ final class SylvieCoreTests: XCTestCase {
         }
     }
 
+    // MARK: Talking over Sylvie (BargeInDetector)
+
+    /// A deterministic "voice": noise in syllables of ~200 ms with short gaps, at a varying loudness.
+    private func voice(seconds: Double, amplitude: Float, seed: UInt64) -> [Float] {
+        var state = seed
+        func rnd() -> Float {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return Float(Int64(bitPattern: state >> 11) % 2000) / 1000 - 1
+        }
+        let n = Int(seconds * 16000)
+        return (0..<n).map { i in
+            let syllable = (i / 3200) % 5 == 4 ? Float(0.1) : 0.6 + 0.4 * sin(Float(i) / 900)
+            return amplitude * syllable * rnd()
+        }
+    }
+
+    /// Runs the detector over 20 ms chunks: the mic hears her echo (delayed 60 ms, at `echo` of her
+    /// level), room noise, and `other` (someone else). Returns the chunk indexes where it fired.
+    private func runBargeIn(output: [Float], other: [Float], echo: Float = 0.3) -> [Int] {
+        var d = BargeInDetector()
+        let delay = 960
+        var noiseState: UInt64 = 7
+        var fired: [Int] = []
+        var powers: [Float] = []  // output power per chunk
+        for c in 0..<(output.count / 320) {
+            let range = (c * 320)..<((c + 1) * 320)
+            powers.append(range.reduce(0) { $0 + output[$1] * output[$1] } / 320)
+            let mic: [Float] = range.map { i in
+                noiseState = noiseState &* 6364136223846793005 &+ 1
+                let noise = Float(Int64(bitPattern: noiseState >> 11) % 2000) / 1000 - 1
+                let heard = i >= delay ? output[i - delay] * echo : 0
+                return heard + (i < other.count ? other[i] : 0) + 0.002 * noise
+            }
+            let recent = powers.suffix(15).max() ?? 0  // the last 0.3 s
+            if d.process(mic, outputPower: recent, noiseFloorDB: -57) { fired.append(c) }
+        }
+        return fired
+    }
+
+    func testBargeInIgnoresHerOwnVoice() {
+        let her = voice(seconds: 8, amplitude: 0.4, seed: 1)
+        XCTAssertEqual(runBargeIn(output: her, other: []), [], "her own echo is not someone else")
+    }
+
+    func testBargeInHearsLeaOverHerVoice() {
+        let her = voice(seconds: 6, amplitude: 0.4, seed: 1)
+        // Lea says "Sylvie, stop" at 3 s, about as loud at the mic as Sylvie's echo is.
+        let lea = [Float](repeating: 0, count: 48000) + voice(seconds: 0.8, amplitude: 0.25, seed: 9)
+        let fired = runBargeIn(output: her, other: lea)
+        XCTAssertFalse(fired.isEmpty, "Lea talking over her is heard")
+        XCTAssertGreaterThanOrEqual(fired.first ?? 0, 150, "not before Lea starts (3 s)")
+        XCTAssertLessThanOrEqual(fired.first ?? 999, 165, "within 0.3 s of Lea starting")
+    }
+
+    func testBargeInDuringHerPause() {
+        // She finished a sentence (silence, the next one is still being prepared) and Lea speaks.
+        let her = voice(seconds: 2, amplitude: 0.4, seed: 1) + [Float](repeating: 0, count: 32000)
+        let lea = [Float](repeating: 0, count: 44800) + voice(seconds: 0.6, amplitude: 0.1, seed: 5)
+        let fired = runBargeIn(output: her, other: lea)
+        XCTAssertFalse(fired.isEmpty)
+        XCTAssertGreaterThanOrEqual(fired.first ?? 0, 140)
+        // Room noise alone during her pause is nothing.
+        XCTAssertEqual(runBargeIn(output: her, other: []), [])
+    }
+
+    func testBargeInIgnoresQuietBackgroundTalk() {
+        // Someone far away (10 dB below the threshold above the room noise) while she talks.
+        let her = voice(seconds: 6, amplitude: 0.4, seed: 1)
+        let far = [Float](repeating: 0, count: 48000) + voice(seconds: 1, amplitude: 0.004, seed: 3)
+        XCTAssertEqual(runBargeIn(output: her, other: far), [])
+    }
+
     private func pixel(_ img: CGImage, x: Int, y: Int) throws -> (UInt8, UInt8, UInt8, UInt8) {
         let data = try XCTUnwrap(img.dataProvider?.data as Data?)
         let i = y * img.bytesPerRow + x * 4
