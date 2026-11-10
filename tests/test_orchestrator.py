@@ -226,3 +226,114 @@ def test_interrupted_backlog_job_is_postponed_not_dropped():
     assert len(runs) == 4 and bg.current is not None  # still being retried, never dropped
     bg.turn_started()
     bg.interrupt(timeout=2)
+
+
+# ---------- Her to-do list (2026-11-10) ----------
+def reminder_call(title):
+    return (
+        f"<tool_call>\n<function=create_reminder>\n<parameter=title>\n{title}\n</parameter>\n"
+        "</function>\n</tool_call>"
+    )
+
+
+def test_todo_goes_into_reminders_and_she_just_says_got_it(tmp_path):
+    from actions.osa import FakeOSA
+
+    osa = FakeOSA({"make new reminder": "rem-1"})
+    # Two things in one request: two calls. Her own words are never shown or spoken.
+    s = make(
+        tmp_path,
+        ["Got it, I'll add these!\n" + reminder_call("Call dad") + reminder_call("Send the emails")],
+        osa=osa,
+    )
+    ev = run(s, "Sylvie, remind me to call my dad and to send the emails", channel="voice")
+    assert "".join(e["text"] for e in ev if e["type"] == "text") == "Got it."
+    assert [args[0] for _, args in osa.calls] == ["Call dad", "Send the emails"]
+    assert [e["name"] for e in ev if e["type"] == "tool"] == ["create_reminder", "create_reminder"]
+    msgs = s.convs.visible_messages(ev[0]["conversation_id"])
+    assert msgs[-1]["content"] == "Got it." and msgs[-1]["channel"] == "voice"
+    assert ev[-1]["type"] == "done" and ev[-1]["message_id"] == msgs[-1]["id"]
+
+
+def test_todo_in_spanish_and_without_a_call_first(tmp_path):
+    from actions.osa import FakeOSA
+
+    osa = FakeOSA({"make new reminder": "rem-1"})
+    # First she only talks about it: sent back once, and only the saved reminder counts.
+    s = make(tmp_path, ["Vale, te lo apunto.", reminder_call("Llamar al dentista")], osa=osa)
+    ev = run(s, "Sylvie, recuérdame que tengo que llamar al dentista", channel="voice")
+    assert "".join(e["text"] for e in ev if e["type"] == "text") == "Apuntado."
+    assert len(osa.calls) == 1
+
+
+def test_todo_that_fails_is_said_plainly(tmp_path):
+    from actions.osa import OSAError
+
+    class Denied:
+        calls = []
+
+        def run(self, script, *args, timeout=20):
+            raise OSAError("macOS hasn't allowed Sylvie to control this app yet (Automation permission)")
+
+    s = make(tmp_path, [reminder_call("Call dad"), "I couldn't add it: macOS hasn't allowed me to use Reminders yet."],
+             osa=Denied())  # fmt: skip
+    ev = run(s, "Remind me to call my dad")
+    text = "".join(e["text"] for e in ev if e["type"] == "text")
+    assert "couldn't" in text and text != "Got it."
+    assert [e["ok"] for e in ev if e["type"] == "tool"] == [False]
+
+
+def test_whats_on_my_todo_list_reads_reminders_first(tmp_path):
+    from actions.osa import FakeOSA
+
+    osa = FakeOSA({"completed is false": "\tCall dad\tPersonal\n"})
+    s = make(tmp_path, ["You need to call your dad."], osa=osa)
+    ev = run(s, "Sylvie, can you remind me of the things that I need to do?", channel="voice")
+    assert [e["name"] for e in ev if e["type"] == "tool"] == ["list_reminders"]
+    seen = s.llm.calls[-1]["messages"][-1]["content"]
+    assert "Call dad" in seen and "to-do list" in seen
+
+
+def test_todo_requests():
+    from core.intent import todo_request
+
+    assert todo_request("Okay Sylvie, I also need you to remind me to call my dad.") == "add"
+    assert (
+        todo_request("Sylvie, also add that I need to work into looking what I want for Christmas.") == "add"
+    )
+    assert todo_request("Rappelle-moi d'appeler ma grand-mère") == "add"
+    assert todo_request("Apúntame que tengo que comprar leche") == "add"
+    assert todo_request("Sylvie, can you remind me of the things that I need to do?") == "list"
+    assert todo_request("¿Qué tengo que hacer?") == "list"
+    # Not to-dos: questions, calendar events, and how she should answer
+    assert todo_request("Remind me what the capital of Australia is") is None
+    assert todo_request("Remind me to add the meeting to my calendar") is None
+    assert todo_request("When I ask you for reminders, just say got it") is None
+    assert todo_request("Do you remember what my favourite band is?") is None
+
+
+def test_saying_she_will_add_it_counts_as_a_claim():
+    from core.intent import claims_done
+
+    assert claims_done("Got it. I'll add a reminder to look for the computer.")
+    assert claims_done("Got it. I'll remind you to call your dad.")
+    assert not claims_done("The capital of Australia is Canberra.")
+
+
+def test_tomorrow_is_set_by_code():
+    from datetime import date
+
+    from core.intent import fix_due_day
+
+    d = date(2026, 11, 10)
+    assert (
+        fix_due_day("Remind me tomorrow at 9 to hand in the essay", "2026-11-21T09:00", d)
+        == "2026-11-11T09:00"
+    )
+    assert fix_due_day("Recuérdame mañana a las 9", "2026-11-12T09:00", d) == "2026-11-11T09:00"
+    assert fix_due_day("Recuérdame esta mañana a las 11", "2026-11-11T11:00", d) == "2026-11-10T11:00"
+    assert fix_due_day("Rappelle-moi après-demain à 10h", "2026-11-11T10:00", d) == "2026-11-12T10:00"
+    assert (
+        fix_due_day("Remind me on Friday at 5", "2026-11-13T17:00", d) == "2026-11-13T17:00"
+    )  # not relative
+    assert fix_due_day("Remind me tomorrow", "", d) == ""

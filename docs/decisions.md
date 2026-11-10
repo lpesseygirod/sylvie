@@ -444,3 +444,16 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   - With the 90th percentile: 0 false triggers in a 52 s answer.
   - "Sylvie, stop" said mid-answer: heard and stopped her (2 tries out of 2).
 - **Not yet measured:** Lea's own voice. Each answer now logs, as numbers only, how often someone talked over her and her echo spread (Console, subsystem app.sylvie.mac), to tune if needed.
+
+### T54 — To-dos go into Reminders, and she just says "Got it" (2026-11-10)
+- **Problem (Lea, by voice, 16:26–16:31):** eight to-do requests in a row ("remind me to call my dad", "also add that I need to…"). Each got "Got it, I'll add a reminder…", often with a `<doc>` block and "anything else?", and **no tool call**: nothing was saved. "Remind me of the things I need to do" was answered from the open chat only. Lea asked four times for just "Got it". The claim check missed it, because "I'll add…" is a promise, not "I've added". The preference detector also narrowed her rule to "say got it when asked for a reminder to call dad".
+- **What:** code decides (`core/intent.py`: `todo_request`).
+  - **Adding:** one model round whose text is never shown. It may only produce `create_reminder` calls (one per thing; it is sent back once if it only talks). Then a fixed reply: "Got it." / "Apuntado." / "C'est noté.". If a call fails (e.g. no Automation permission yet), she answers normally and says it failed.
+  - **Reading:** "what do I need to do?" → `list_reminders` runs first, then she reads them out in plain sentences.
+  - **Dates:** "tomorrow / mañana / demain", "today", "day after tomorrow" set the day in code (`fix_due_day`); the model keeps only the time. One run saved "tomorrow at 9" on the 10th as the 21st.
+  - **Not to-dos:** calendar events, music, timers, questions ("remind me what the capital of…") and instructions about answering ("when I ask you…, just say got it").
+  - Voice answers: no `<doc>` blocks unless she asks for a document. "I'll add / I'll remind you / te lo apunto" now count as claims (the check sends her back to the tool).
+  - Her preference fixed: the narrowed one (#14) replaced by "When Lea asks you to remind her of something or to note something down, answer only 'Got it'" (#15).
+- **Why Reminders:** it's her Mac's and iPhone's to-do list, so items sync to her phone and can be ticked off there, and `list_reminders` already existed. Notes and Sylvie's memory would only be readable through Sylvie.
+- **Measured (new eval set `todo`, 15 items: Lea's own 8 phrasings + Spanish, French, a timed one, 2 list requests, 2 non-to-dos):** 3/15 → **15/15**. Saved to Reminders: 4/11 → **11/11**. Short answer: 0/11 → **11/11**. List requests read Reminders: 2/2 → 2/2 (one before had a `<doc>` block). Time to her reply for a to-do: ~0.5–1.5 s. Neither version saved a reminder for a question.
+- **Not measured live:** the first real reminder makes macOS ask "Sylvie wants to control Reminders" (LEA-TODO 25).

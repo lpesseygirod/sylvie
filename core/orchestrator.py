@@ -24,25 +24,32 @@ from core.devices import Devices
 from core.intent import (
     ACTION_NOTE,
     CLAIM_NUDGE,
+    GOT_IT,
     LIVE_NOTE,
     MUSIC_DONE_EXAMPLE,
     MUSIC_DONE_NOTE,
     REPLY_LANGUAGE_NOTE,
     SEARCH_NUDGE,
     SEARCH_PROMISE_NUDGE,
+    TODO_ADD_NOTE,
+    TODO_LIST_NOTE,
+    TODO_NUDGE,
     UNSENT_NUDGE,
     WRITING_NOTE,
     accepts_search_offer,
     claims_done,
     claims_sent,
+    fix_due_day,
     looks_like_action,
     looks_like_writing,
     looks_live,
     promises_search,
     says_no_access,
+    todo_request,
 )
 from core.lang import LANGUAGE_RETRY, LanguageGuard, guess_language, phrase, reply_language
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
+from core.persona import now as local_now
 from core.quick import GreetingStripper, greets, quick_reply
 from core.router import route
 from core.settings import INTENT_NOTE as SETTING_NOTE
@@ -492,14 +499,15 @@ class Sylvie:
                     notes.append(
                         "Lea is talking to you by voice. Answer in the SAME language as her message below "
                         f"(it sounds like {lang_name}). Your whole answer is read aloud, so write it to be "
-                        "spoken: plain sentences, no markdown, no lists or tables unless she asks for them."
+                        "spoken: plain sentences, no markdown, no lists or tables unless she asks for them, "
+                        "and no <doc> blocks unless she asks you to write or make a document."
                     )
                 else:
                     notes.append(
                         "Lea is talking to you by voice. Answer in the SAME language as her message below "
                         f"(it sounds like {lang_name}). Start with a short spoken answer: 1-3 plain sentences, "
                         "no markdown, no lists. If details help, add them after a blank line: they are shown "
-                        "on screen, not read aloud."
+                        "on screen, not read aloud. No <doc> blocks unless she asks you to write or make a document."
                     )
             # 1. "Sylvie, forget that"
             with trace.stage("forget"):
@@ -581,7 +589,12 @@ class Sylvie:
                 notes.append(SETTING_NOTE)
             # 1e. "play my playlist", "add it to my calendar": the action must really happen (core/intent.py)
             action_request = looks_like_action(text)
-            if action_request:
+            # "Remind me to call my dad" → Reminders, then just "Got it"; "what do I need to do?" → read them
+            todo = todo_request(text) if not attachments else None
+            if todo == "add":
+                notes.append(TODO_ADD_NOTE)
+                action_request = True
+            elif action_request:
                 notes.append(ACTION_NOTE)
             # 1f. Essays and reports: real sources, exact citations, room for a long answer (core/intent.py)
             writing = looks_like_writing(text)
@@ -752,6 +765,44 @@ class Sylvie:
                     messages.append({"role": "tool", "content": result.content})
                     self.convs.add_message(cid, "tool", "", model_content=result.content)
                     tool_chars += len(result.content)
+
+            # 5d. Her to-do list (Lea, 2026-11-10): reading it is a lookup code does first; adding to it is
+            # one model round that may only call create_reminder, then a fixed "Got it" (core/intent.py).
+            has_tool = {t["function"]["name"] for t in tools}
+            if todo == "list" and "list_reminders" in has_tool:
+                call = ToolCall("list_reminders", {})
+                announced = True
+                trace.mark("first_status")
+                yield {"type": "status", "text": phrase("checking", text)}
+                result = self._run_tool(call, tools, tctx, trace)
+                if result is not None:
+                    assistant_msg = {"role": "assistant", "content": "", "tool_calls": [call.to_message()]}
+                    messages.append(assistant_msg)
+                    self.convs.add_message(cid, "assistant", "", model_content="",
+                                           tool_calls=assistant_msg["tool_calls"], mode=mode)  # fmt: skip
+                    yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
+                    lang = LANG_NAMES.get(said_in or guess_language(text), "English")
+                    content = result.content + (TODO_LIST_NOTE if result.ok else "")
+                    messages.append(
+                        {"role": "tool", "content": content + REPLY_LANGUAGE_NOTE.format(lang=lang)}
+                    )
+                    self.convs.add_message(cid, "tool", "", model_content=result.content)
+                    tool_chars += len(result.content)
+            elif todo == "add" and "create_reminder" in has_tool:
+                saved = yield from self._add_todos(
+                    text, cid, messages, tools, tctx, trace, stop, mode, said_in
+                )
+                if saved is not None:
+                    final_mid = self.convs.add_message(
+                        cid, "assistant", saved, model_content=saved, trace=trace.to_dict(), mode=mode,
+                        channel=channel,
+                    )  # fmt: skip
+                    trace_d = trace.to_dict()
+                    yield {"type": "done", "message_id": final_mid, "conversation_id": cid,
+                           "trace": trace_d, "stopped": False}  # fmt: skip
+                    self.bg.submit("episode", lambda ev: self.episodes.add(cid, user_mid, text, saved))
+                    self.bg.after_quiet("sleep-learn", self.sleep_learn)
+                    return
 
             called_tools = False
             # web_search ran this turn (Wikipedia alone isn't enough for prices or the weather)
@@ -1027,6 +1078,70 @@ class Sylvie:
             if cid:
                 self._stops.pop(cid, None)
             self.bg.turn_finished()
+
+    def _add_todos(self, text, cid, messages, tools, tctx, trace, stop, mode, said_in):
+        """Puts what Lea asked to remember into Reminders. Yields the turn's events; returns the reply
+        ("Got it.") when everything was saved, or None to answer normally (no call came, or a call
+        failed: the results are then in `messages`, so she can say what went wrong).
+
+        Nothing the model writes here is shown: measured 2026-11-10, its text was "Got it. I'll add a
+        reminder…" plus a <doc> block and "anything else?", which Lea asked four times not to hear."""
+        attempt = list(messages)
+        for _ in range(2):
+            sp = StreamSplitter(thinking=False)
+            with trace.stage("llm"):
+                for chunk in self.llm.stream(attempt, tools=tools, thinking=False, stop=stop):
+                    if chunk.done:
+                        if chunk.stats:
+                            st = chunk.stats
+                            trace.llm_rounds.append({"prompt": st.prompt_tokens, "cached": st.cached_tokens,
+                                                     "prefill_ms": round(st.prefill_s * 1000),
+                                                     "ttft_ms": round(st.time_to_first_token * 1000),
+                                                     "generated": st.generation_tokens,
+                                                     "tok_s": round(st.generation_tps, 1)})  # fmt: skip
+                        break
+                    sp.feed(chunk.text)
+                sp.flush()
+            if stop.is_set():
+                return None
+            calls = [c for c in sp.tool_calls if c.name == "create_reminder"]
+            if calls:
+                break
+            attempt = attempt + [
+                {"role": "assistant", "content": sp.visible_text.strip()},
+                {"role": "user", "content": TODO_NUDGE},
+            ]
+        else:
+            log.warning("to-do request, but no create_reminder call came")
+            return None
+        yield {"type": "status", "text": phrase("checking", text)}
+        assistant_msg = {"role": "assistant", "content": "", "tool_calls": [c.to_message() for c in calls]}
+        messages.append(assistant_msg)
+        self.convs.add_message(cid, "assistant", "", model_content="", tool_calls=assistant_msg["tool_calls"],
+                               mode=mode)  # fmt: skip
+        all_ok = True
+        lang = LANG_NAMES.get(said_in or guess_language(text), "English")
+        for call in calls:
+            if call.arguments.get("due"):
+                call.arguments["due"] = fix_due_day(
+                    text, str(call.arguments["due"]), local_now(self.cfg).date()
+                )
+            result = self._run_tool(call, tools, tctx, trace)
+            if result is None:
+                all_ok = False
+                content = f"Error: {validate(call, tools) or 'Invalid tool call.'}"
+            else:
+                all_ok = all_ok and result.ok
+                content = result.content
+                yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
+            messages.append({"role": "tool", "content": content + REPLY_LANGUAGE_NOTE.format(lang=lang)})
+            self.convs.add_message(cid, "tool", "", model_content=content)
+        if not all_ok:
+            return None
+        reply = GOT_IT.get(lang, GOT_IT["English"])
+        trace.mark("first_token")
+        yield {"type": "text", "text": reply}
+        return reply
 
     def _note_lookup(self, text: str, call: ToolCall) -> None:
         sc = self.shortcuts.record(text, call.name, call.arguments)

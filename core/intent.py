@@ -40,7 +40,10 @@ CLAIM_RE = re.compile(
     r"(te )?(pongo|estoy poniendo|he puesto|he a[nñ]adido|he creado|a[nñ]adido|listo[.!]|hecho[.!])|"
     r"ya est[aá]|est[aá] (puest[ao]|sonando)|ya suena|(lo )?(subo|bajo)|he (subido|bajado)|"
     r"je (lance|mets|joue|monte|baisse|l'ai ajout|l'ai mis|t'ai ajout)|j'ai (mont|baiss)|c'est parti|"
-    r"c'est fait|ajout[ée]|c'est lanc[ée])",
+    r"c'est fait|ajout[ée]|c'est lanc[ée]|"
+    # 2026-11-10: "Got it. I'll add a reminder…", "I'll keep a note…", "Te lo apunto": a promise, nothing saved
+    r"i'?ll (add|note|keep|put|save|set|remind|remember|make a note)|i'?ve noted|noted[.!]|"
+    r"(te )?lo (apunto|anoto|guardo)|(te lo )?recordar[eé]|je (le )?note|je te le rappellerai)",
     re.I,
 )
 
@@ -230,3 +233,104 @@ UNSENT_NUDGE = (
 
 def claims_sent(text: str) -> bool:
     return bool(SENT_CLAIM_RE.search(text))
+
+
+# ---------- Her to-do list (Apple Reminders) ----------
+# Measured 2026-11-10 by voice: eight "remind me to…" / "add that I need to…" requests in a row got
+# "Got it, I'll add a reminder…" (often with a <doc> block and "anything else?") and no tool call, so
+# nothing was saved; "remind me of the things I need to do" was answered from the open chat only.
+# Lea asked four times for just "Got it". Now code decides: a to-do goes into Reminders and the
+# answer is a fixed "Got it"; "what do I need to do?" reads Reminders before she answers.
+_NOT_A_QUESTION = r"(?!\s+(of |about )?(what|who|whom|where|when|why|how|which|if|whether|the things|everything|all the things)\b)"
+
+TODO_LIST_RE = re.compile(
+    r"\b((remind|tell) me (of |about )?(the things|what|everything|all the things) (that )?i (need|have|got) to do|"
+    r"what (do|did|else do) i (still )?(need|have) to do|"
+    r"what(?:'s| is| do i have)( still)? (on|in) my (to-?do|todo|reminders?|list)|"
+    r"(read|show|tell|give) me my (to-?do|todo|reminders|tasks|list)|"
+    r"qu[eé] (tengo|me queda) (que hacer|pendiente|en (mi|la) lista)|"
+    r"(recu[eé]rdame|dime|l[eé]eme) (lo que|las cosas que|todo lo que|qu[eé]) (tengo|me queda) (que hacer|pendiente)|"
+    r"(dime|l[eé]eme) (mis|los) (recordatorios|tareas|pendientes)|"
+    r"qu'est-ce que (je dois faire|j'ai [àa] faire)|rappelle-moi ce que (je dois|j'ai [àa]) faire|"
+    r"(lis|dis)-moi (ma liste|mes rappels))",
+    re.I,
+)
+
+TODO_ADD_RE = re.compile(
+    r"\b(remind me" + _NOT_A_QUESTION + r"|remember me (that|to|about)|"
+    r"(give|set|add|create|make|put) (me )?(a|one more|another) reminder|"
+    r"(add|put) (it |that |this )?(to|on|in) my (to-?do|todo|list|reminders)|"
+    r"(also )?add (that|to) |to[- ]?do (things|list|items?)\b|don'?t let me forget|"
+    r"recu[eé]rda(me|melo)\b" + _NOT_A_QUESTION.replace("of |about ", "de ") + r"|"
+    r"ap[uú]nta(me|lo|la)?\b|a[nñ]ade(lo)? (a|en) (mi|la) lista|(pon|crea|hazme)(me)? un recordatorio|no me dejes olvidar|"
+    r"rappelle-moi\b(?!\s+(ce que|qui|quoi|o[uù]|quand|comment))|(ajoute|mets)(-le)? (à|a|sur|dans) ma liste|"
+    r"(cr[ée]e|mets)(-moi)? un rappel|note que)",
+    re.I,
+)
+
+# A calendar event, a song or a note in Notes isn't a to-do (create_event, play_music, create_note do those).
+_NOT_TODO_RE = re.compile(
+    r"\b(calendar|calendario|calendrier|agenda|event|evento|[ée]v[ée]nement|meeting|reuni[oó]n|r[ée]union|"
+    r"playlist|spotify|song|canci[oó]n|chanson|in (my )?notes|en (mis )?notas|dans (mes )?notes|timer|alarm|"
+    r"temporizador|alarma|minuteur)\b|"
+    # How she wants to-dos handled, not a to-do: "when I ask you to remind me of something, just say got it"
+    r"\b(say|respond|answer|reply)\b.{0,25}\bgot it\b|\bjust say\b|\bnothing more\b|"
+    r"\b(di|dime|responde|contesta) (solo|s[oó]lo|solamente)\b|nada m[aá]s\b|\b(dis|r[ée]ponds) (juste|seulement)\b|rien de plus",
+    re.I,
+)
+
+
+def todo_request(text: str) -> str | None:
+    """'add' (put something on her to-do list), 'list' (read it to her) or None."""
+    if TODO_LIST_RE.search(text):
+        return "list"
+    if TODO_ADD_RE.search(text) and not _NOT_TODO_RE.search(text):
+        return "add"
+    return None
+
+
+TODO_ADD_NOTE = (
+    "Lea is adding to her to-do list. Call create_reminder once for each separate thing she asks you to "
+    "remember (two different emails are two reminders), with a short title in her own words and her "
+    'language, starting with the verb ("Call dad", "Send the emails to the professors"). Add \'due\' only '
+    "if she said a day or time. Call the tool and write nothing else: Sylvie's reply is added for you."
+)
+TODO_NUDGE = (
+    "(Check: nothing was saved, because you didn't call create_reminder. Call it now for each thing Lea "
+    "asked to remember. Write nothing else.)"
+)
+TODO_LIST_NOTE = (
+    "\n(These are Lea's open reminders, her to-do list. Tell her what's on it in plain spoken sentences: "
+    "only the things to do and any due dates, not the list names. Don't add anything that isn't there.)"
+)
+# Lea, 2026-11-10: "when I ask you for reminders and anything, just say, got it."
+GOT_IT = {"English": "Got it.", "Spanish": "Apuntado.", "French": "C'est noté."}
+
+
+# Measured 2026-11-10: "Remind me tomorrow at 9…" asked on the 10th was saved for the 21st in one run and
+# the 11th in another. The model keeps the time; code sets the day when Lea named it relatively.
+_RELATIVE_DAYS = [
+    (re.compile(r"\b(day after tomorrow|pasado ma[nñ]ana|apr[eè]s-demain)\b", re.I), 2),
+    (re.compile(r"\b(this morning|esta ma[nñ]ana|ce matin)\b", re.I), 0),
+    (re.compile(r"\b(tomorrow|demain)\b|(?<!la )(?<!esta )\bma[nñ]ana\b", re.I), 1),
+    (
+        re.compile(
+            r"\b(today|tonight|this (afternoon|evening)|hoy|esta (tarde|noche)|aujourd'hui|ce soir)\b", re.I
+        ),
+        0,
+    ),
+]
+_ISO_DUE = re.compile(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})")
+
+
+def fix_due_day(text: str, due: str, today) -> str:
+    """`due` with its date set from "tomorrow", "hoy", "demain"… in Lea's words (time kept)."""
+    m = _ISO_DUE.match(due or "")
+    if not m:
+        return due
+    for rx, offset in _RELATIVE_DAYS:
+        if rx.search(text):
+            from datetime import timedelta
+
+            return (today + timedelta(days=offset)).isoformat() + m.group(1)
+    return due

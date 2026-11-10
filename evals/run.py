@@ -114,9 +114,19 @@ def everyday_problems(item: dict, answer: str, tools: list[str], calls: list | N
     wanted = [c["tool"]] if isinstance(c.get("tool"), str) else c.get("tool") or []
     if wanted and not set(wanted) & set(tools):  # any of them (looking it up in Wikipedia is fine for facts)
         problems.append(f"didn't call {' or '.join(wanted)} (called {', '.join(tools) or 'nothing'})")
+    if c.get("not_tool") and c["not_tool"] in tools:
+        problems.append(f"called {c['not_tool']}")
+    # Lea, 2026-11-10: "when I ask you for reminders… just say got it" (todo set)
+    if c.get("max_words") and len(re.findall(r"\w+", answer)) > c["max_words"]:
+        problems.append(f"answer longer than {c['max_words']} words")
+    if "<doc" in answer and item.get("channel") == "voice":
+        problems.append("a <doc> block in a spoken answer")
     # The opening sentence tells best: lists of Spanish TV shows in an English answer aren't Spanish.
     first = re.split(r"(?<=[.!?:])\s|\n", answer.strip())[0]
     lang = reply_language(first) or reply_language(answer) or guess_language(answer, default="?")
+    # A one-word reply ("Apuntado.") has no detectable language: the fixed to-do replies say which they are.
+    fixed = {"Got it.": "en", "Apuntado.": "es", "C'est noté.": "fr"}
+    lang = fixed.get(answer.strip(), lang)
     if c.get("lang") and lang != c["lang"]:
         problems.append(f"answered in {lang}, not {c['lang']}")
     if says_no_access(answer) and "web_search" not in tools:  # "check their website" after searching is fine
@@ -212,6 +222,10 @@ def run(
 
         essay = docx(fake / "Ensayo criminología.docx", "La teoría de la anomia de Merton explica el delito.")
         s.docs.index_file(essay)
+    if "todo" in sets:  # made-up reminders, never Lea's own
+        s.actions.osa.outputs.update({"make new reminder": "rem-1",
+                                      "completed is false": "2026-11-09T18:00:00\tComprar regalo\tPersonal\n"
+                                                            "\tLlamar a Ana\tPersonal\n"})  # fmt: skip
     s.warm()
     results = []
     for item in load_items(sets, limit):
