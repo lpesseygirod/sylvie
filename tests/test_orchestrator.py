@@ -349,3 +349,16 @@ def test_stop_talking_is_one_word_and_no_tools(tmp_path):
     assert wants_quiet("Sylvie, cállate un momento") and wants_quiet("Arrête de parler")
     assert not wants_quiet("Stop the music")
     assert not wants_quiet("Why did you stop talking?")
+
+
+def test_skip_backwards_runs_from_code(tmp_path):
+    from actions.osa import FakeOSA
+
+    osa = FakeOSA()
+    s = make(tmp_path, ["I'll go back to the previous message in our conversation."], osa=osa)
+    ev = run(s, "Skip backwards.", channel="voice")
+    assert "".join(e["text"] for e in ev if e["type"] == "text") == "Done."
+    assert [(e["name"], e["args"]) for e in ev if e["type"] == "tool"] == [("music", {"command": "previous"})]
+    assert s.llm.calls == [] and len(osa.calls) == 1
+    ev = run(s, "Sylvie, para la música", channel="voice")
+    assert "".join(e["text"] for e in ev if e["type"] == "text") == "Listo."

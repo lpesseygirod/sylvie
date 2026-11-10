@@ -133,7 +133,7 @@ def looks_like_writing(text: str) -> bool:
 LIVE_RE = re.compile(
     r"\b(weather|forecast|rain(ing)?|temperature|news|headlines?|tonight|today'?s|right now|latest|"
     r"score|results?|price|costs?|open(ing)? hours|schedule|on tv|tv guide|cinema|movies? (on|playing)|"
-    r"tiempo (hace|hará|hara|va a hacer)|qu[eé] tiempo|clima|lluvia|llover|temperatura|pron[oó]stico|"
+    r"tiempo (hace|hará|hara|va a hacer)|qu[eé] tiempo|clima|climate|climat|lluvia|llover|temperatura|pron[oó]stico|"
     r"noticias|hoy|esta noche|ahora mismo|[uú]ltim[ao]s?|resultados?|marcador|precio|cu[aá]nto cuesta|"
     r"horarios?|televisi[oó]n|tele\b|cartelera|pel[ií]culas?|partido|"
     r"m[ée]t[ée]o|quel temps|pluie|actualit[ée]s|ce soir|aujourd'hui|prix|combien co[uû]te|horaires?|"
@@ -350,3 +350,51 @@ QUIET_REPLY = {"English": "Okay.", "Spanish": "Vale.", "French": "D'accord."}
 def wants_quiet(text: str) -> bool:
     """She wants Sylvie to stop talking, and nothing else (a short message, not a question)."""
     return bool(QUIET_RE.search(text)) and "?" not in text and len(re.findall(r"\w+", text)) <= 14
+
+
+# Playback controls with no song name: code runs them, she says "Done" (Lea, 2026-11-08: "just say done").
+# Measured 2026-11-11 on her own words: "Skip backwards." got "Skip" or "I'll go back to the previous
+# message", and "the song that was before" once got a web search.
+MUSIC_CONTROLS = [
+    (
+        re.compile(
+            r"\b(previous (song|track)|(the )?(song|track) (that was )?before|skip back(wards?)?|go back a song|"
+            r"(canci[oó]n|tema) anterior|la (canci[oó]n )?de antes|vuelve a la (canci[oó]n )?anterior|"
+            r"(chanson|morceau) pr[ée]c[ée]dent(e)?)\b",
+            re.I,
+        ),
+        "previous",
+    ),
+    (
+        re.compile(
+            r"\b(next (song|track)|skip (this|the)? ?(song|track)|^\W*(sylvie\W*)?skip\W*$|"
+            r"(siguiente|otra) canci[oó]n|p[aá]sala|s[aá]ltala|(chanson|morceau) suivant(e)?)",
+            re.I,
+        ),
+        "next",
+    ),
+    (
+        re.compile(
+            r"\b((stop|pause) (the )?(music|spotify|song)|(para|pausa|det[eé]n|quita) (la m[uú]sica|spotify|la canci[oó]n)|"
+            r"(arr[eê]te|coupe|mets en pause) (la musique|spotify))\b",
+            re.I,
+        ),
+        "pause",
+    ),
+]
+
+
+_QUESTION_START = re.compile(
+    r"^\W*(sylvie\W*)?(what|which|who|when|why|how|qu[eé]|cu[aá]l|qui[eé]n|cu[aá]ndo|por qu[eé]|c[oó]mo|quel|quelle|qui|pourquoi|comment)\b",
+    re.I,
+)
+
+
+def music_control(text: str) -> str | None:
+    """'previous', 'next' or 'pause' for a short playback command with no song name, else None."""
+    if len(re.findall(r"\w+", text)) > 14 or _QUESTION_START.match(text):
+        return None
+    for rx, command in MUSIC_CONTROLS:
+        if rx.search(text):
+            return command
+    return None

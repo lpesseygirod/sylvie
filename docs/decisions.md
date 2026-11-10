@@ -463,4 +463,8 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **Audit (230 messages from Lea, 6–10 Nov):** 23 requests to *do* something got no tool call, and 6 times her next message was a correction. Most were already fixed on 8 Nov (music claimed but not played, "turn it up", Netflix) or on 10 Nov (to-dos, T54). Still open:
   - **"Just stop talking, I want to listen the song"** → she paused the music and explained. Now a short "stop talking / cállate / deja de hablar / tais-toi" gets "Okay." / "Vale." / "D'accord." from code: no model, no tools.
   - **Whisper's made-up tails:** "Sylvie, stop Spotify, por favor. ¡Suscríbete al canal!" The noise filter of 8 Nov drops the whole thing, losing her real "stop Spotify". Now only the made-up sentence is dropped (`strip_noise`).
-- **New eval set `requests`:** 22 of her real voice requests, word for word (music, volume, previous song, Netflix, calendar, weather, "stop talking"). Not run yet: with Lea working there was 4.8–6.6 GB free (8 GB needed) and 12.7 GB of swap in use, so it waits for room rather than slowing her Mac. Results go in this entry.
+- **Playback commands from code:** "skip backwards", "the song that was before", "next song", "stop Spotify / para la música / arrête la musique" (short, not a question) run `music` directly, then "Done." / "Listo." / "C'est fait.". "Skip backwards." had got "Skip" or "I'll go back to the previous message". "Climate / climat" now counts as a weather question (web search, not Wikipedia).
+- **New eval set `requests`:** 22 of her real voice requests, word for word (music, volume, previous song, Netflix, calendar, weather, "stop talking"). Run 2026-11-11 00:25–00:30, once memory allowed:
+  - before today's fixes (5ac202f): requests **18/22**, todo **4/15**;
+  - after: requests **21/22**, todo **15/15**.
+  - Still missed: "veux-tu song One Republic please?" (mixed languages): she said the title wasn't found without searching.

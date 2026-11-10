@@ -44,6 +44,7 @@ from core.intent import (
     looks_like_action,
     looks_like_writing,
     looks_live,
+    music_control,
     promises_search,
     says_no_access,
     todo_request,
@@ -792,21 +793,27 @@ class Sylvie:
                     )
                     self.convs.add_message(cid, "tool", "", model_content=result.content)
                     tool_chars += len(result.content)
-            elif todo == "add" and "create_reminder" in has_tool:
+            saved = None
+            control = music_control(text) if todo is None and "music" in has_tool else None
+            if todo == "add" and "create_reminder" in has_tool:
                 saved = yield from self._add_todos(
                     text, cid, messages, tools, tctx, trace, stop, mode, said_in
                 )
-                if saved is not None:
-                    final_mid = self.convs.add_message(
-                        cid, "assistant", saved, model_content=saved, trace=trace.to_dict(), mode=mode,
-                        channel=channel,
-                    )  # fmt: skip
-                    trace_d = trace.to_dict()
-                    yield {"type": "done", "message_id": final_mid, "conversation_id": cid,
-                           "trace": trace_d, "stopped": False}  # fmt: skip
-                    self.bg.submit("episode", lambda ev: self.episodes.add(cid, user_mid, text, saved))
-                    self.bg.after_quiet("sleep-learn", self.sleep_learn)
-                    return
+            elif control is not None:
+                saved = yield from self._music_control(
+                    text, control, cid, messages, tools, tctx, trace, mode, said_in
+                )
+            if saved is not None:
+                final_mid = self.convs.add_message(
+                    cid, "assistant", saved, model_content=saved, trace=trace.to_dict(), mode=mode,
+                    channel=channel,
+                )  # fmt: skip
+                trace_d = trace.to_dict()
+                yield {"type": "done", "message_id": final_mid, "conversation_id": cid,
+                       "trace": trace_d, "stopped": False}  # fmt: skip
+                self.bg.submit("episode", lambda ev: self.episodes.add(cid, user_mid, text, saved))
+                self.bg.after_quiet("sleep-learn", self.sleep_learn)
+                return
 
             called_tools = False
             # web_search ran this turn (Wikipedia alone isn't enough for prices or the weather)
@@ -1082,6 +1089,28 @@ class Sylvie:
             if cid:
                 self._stops.pop(cid, None)
             self.bg.turn_finished()
+
+    def _music_control(self, text, command, cid, messages, tools, tctx, trace, mode, said_in):
+        """ "Skip backwards", "stop Spotify": the playback command runs from code, then "Done." (in her
+        language). Returns None if it failed: the result is then in `messages` for a normal answer."""
+        call = ToolCall("music", {"command": command})
+        result = self._run_tool(call, tools, tctx, trace)
+        if result is None:
+            return None
+        assistant_msg = {"role": "assistant", "content": "", "tool_calls": [call.to_message()]}
+        messages.append(assistant_msg)
+        self.convs.add_message(cid, "assistant", "", model_content="", tool_calls=assistant_msg["tool_calls"],
+                               mode=mode)  # fmt: skip
+        yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
+        lang = LANG_NAMES.get(said_in or guess_language(text), "English")
+        messages.append({"role": "tool", "content": result.content + REPLY_LANGUAGE_NOTE.format(lang=lang)})
+        self.convs.add_message(cid, "tool", "", model_content=result.content)
+        if not result.ok:
+            return None
+        reply = MUSIC_DONE_EXAMPLE.get(lang, MUSIC_DONE_EXAMPLE["English"]) + "."
+        trace.mark("first_token")
+        yield {"type": "text", "text": reply}
+        return reply
 
     def _add_todos(self, text, cid, messages, tools, tctx, trace, stop, mode, said_in):
         """Puts what Lea asked to remember into Reminders. Yields the turn's events; returns the reply
