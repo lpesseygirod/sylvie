@@ -344,6 +344,17 @@ def test_music_and_silence_transcripts_are_dropped():
     assert not is_noise_transcript("Thank you for the summary, can you shorten it?", 20)
 
 
+def test_only_the_made_up_part_is_dropped():
+    from voice.stt import strip_noise
+
+    assert (
+        strip_noise("Sylvie, stop Spotify, por favor. ¡Suscríbete al canal!")
+        == "Sylvie, stop Spotify, por favor."
+    )
+    assert strip_noise("Sous-titrage ST' 501 So, boy.") == ""
+    assert strip_noise("Sylvie, pon música.") == "Sylvie, pon música."
+
+
 def test_a_spanish_start_to_an_english_question_is_redone(tmp_path):
     """2026-11-08: "Sylvie, can you put Bridgerton on Netflix please?" after Spanish turns → Spanish answer,
     although "(Reply in English.)" was there. The start is held, checked, and redone before anyone hears it."""

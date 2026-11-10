@@ -337,3 +337,15 @@ def test_tomorrow_is_set_by_code():
         fix_due_day("Remind me on Friday at 5", "2026-11-13T17:00", d) == "2026-11-13T17:00"
     )  # not relative
     assert fix_due_day("Remind me tomorrow", "", d) == ""
+
+
+def test_stop_talking_is_one_word_and_no_tools(tmp_path):
+    from core.intent import wants_quiet
+
+    s = make(tmp_path, ["Entendido. Voy a pausar el audio."])
+    ev = run(s, "Just stop talking, I want to listen the song.", channel="voice")
+    assert "".join(e["text"] for e in ev if e["type"] == "text") == "Okay."
+    assert not [e for e in ev if e["type"] == "tool"] and s.llm.calls == []
+    assert wants_quiet("Sylvie, cállate un momento") and wants_quiet("Arrête de parler")
+    assert not wants_quiet("Stop the music")
+    assert not wants_quiet("Why did you stop talking?")

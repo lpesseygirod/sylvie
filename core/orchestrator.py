@@ -28,6 +28,7 @@ from core.intent import (
     LIVE_NOTE,
     MUSIC_DONE_EXAMPLE,
     MUSIC_DONE_NOTE,
+    QUIET_REPLY,
     REPLY_LANGUAGE_NOTE,
     SEARCH_NUDGE,
     SEARCH_PROMISE_NUDGE,
@@ -46,6 +47,7 @@ from core.intent import (
     promises_search,
     says_no_access,
     todo_request,
+    wants_quiet,
 )
 from core.lang import LANGUAGE_RETRY, LanguageGuard, guess_language, phrase, reply_language
 from core.persona import build_system_prompt, build_turn_context, wrap_user_message
@@ -623,6 +625,8 @@ class Sylvie:
             reply = None
             if forgotten is None and pending is None and not attachments and len(notes) == base_notes:
                 reply = quick_reply(text, self.cfg)
+            if not reply and forgotten is None and pending is None and not attachments and wants_quiet(text):
+                reply = QUIET_REPLY.get(LANG_NAMES.get(said_in or guess_language(text), "English"), "Okay.")
             if reply:
                 trace.mark("first_token")
                 yield {"type": "status", "mode": "quick", "reason": "greeting"}

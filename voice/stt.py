@@ -44,6 +44,13 @@ BARE_THANKS = {
 LONG_RECORDING_S = 15  # a real "Sylvie, merci" ends in a few seconds; 15 s+ of it is noise
 
 
+def strip_noise(text: str) -> str:
+    """Drops only the sentences Whisper made up. Measured 2026-11-07: "Sylvie, stop Spotify, por favor.
+    ¡Suscríbete al canal!" was Lea's real request with a made-up tail; dropping all of it lost her "stop"."""
+    parts = re.split(r"(?<=[.!?])\s+|\s+(?=[¡¿])", text.strip())
+    return " ".join(p for p in parts if p and not NOISE_RE.search(p)).strip()
+
+
 def is_noise_transcript(text: str, seconds_audio: float) -> bool:
     if NOISE_RE.search(text):
         return True
@@ -142,6 +149,7 @@ class SpeechToText:
         text = result["text"].strip()
         if text and text.lower().strip(" .") in INITIAL_PROMPT.lower():
             text = ""  # Whisper echoing its hint on near-silence
+        text = strip_noise(text)
         if text and is_noise_transcript(text, len(audio) / SAMPLE_RATE):
             text = ""  # music or silence written down as subtitle credits / a bare "thank you"
         return Transcript(

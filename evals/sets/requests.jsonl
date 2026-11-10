@@ -1,0 +1,22 @@
+{"set": "requests", "id": "req-0", "channel": "voice", "prompt": "Sylvie, pon música.", "check": {"type": "everyday", "lang": "es", "tool": "play_music"}}
+{"set": "requests", "id": "req-1", "channel": "voice", "prompt": "Sylvie, sube dos puntos el volumen.", "check": {"type": "everyday", "lang": "es", "tool": "music", "arg": ["command", "volume"]}}
+{"set": "requests", "id": "req-2", "channel": "voice", "prompt": "Subo un poco el volumen.", "check": {"type": "everyday", "lang": "es", "tool": "music", "arg": ["command", "volume"]}}
+{"set": "requests", "id": "req-3", "channel": "voice", "prompt": "It was just a casual comment. Can you please put in Spotify the song Reina?", "check": {"type": "everyday", "lang": "en", "tool": "play_music", "arg": ["query", "reina"]}}
+{"set": "requests", "id": "req-4", "channel": "voice", "prompt": "Just stop talking, I want to listen the song.", "check": {"type": "everyday", "lang": "en", "not_tool": "music", "max_words": 4}}
+{"set": "requests", "id": "req-5", "channel": "voice", "prompt": "Sylvie, please put my Spotify Ada.", "check": {"type": "everyday", "lang": "en", "tool": "play_music", "arg": ["query", "ada"]}}
+{"set": "requests", "id": "req-6", "channel": "voice", "prompt": "Sylvie, can you put the song that was before?", "check": {"type": "everyday", "lang": "en", "tool": "music", "arg": ["command", "previous"]}}
+{"set": "requests", "id": "req-7", "channel": "voice", "prompt": "Skip backwards.", "check": {"type": "everyday", "lang": "en", "tool": "music", "arg": ["command", "previous"]}}
+{"set": "requests", "id": "req-8", "channel": "voice", "prompt": "Sylvie, can you put Bridgerton on Netflix please?", "check": {"type": "everyday", "lang": "en", "tool": "watch", "arg": ["title", "bridgerton"]}}
+{"set": "requests", "id": "req-9", "channel": "voice", "prompt": "Sylvie, can you please put the song Fireball in my... Sylvie.", "check": {"type": "everyday", "lang": "en", "tool": "play_music", "arg": ["query", "fireball"]}}
+{"set": "requests", "id": "req-10", "channel": "voice", "prompt": "Sylvie, can you put my playlist ERA?", "check": {"type": "everyday", "lang": "en", "tool": "play_music", "arg": ["query", "era"]}}
+{"set": "requests", "id": "req-11", "channel": "voice", "prompt": "Sylvie, stop Spotify, por favor.", "check": {"type": "everyday", "lang": "es", "tool": "music", "arg": ["command", "pause"]}}
+{"set": "requests", "id": "req-12", "channel": "voice", "prompt": "Sylvie, put the song higher in.", "check": {"type": "everyday", "lang": "en", "tool": "music", "arg": ["command", "volume"]}}
+{"set": "requests", "id": "req-13", "channel": "voice", "prompt": "Sylvie, can you please put the volume to the max?", "check": {"type": "everyday", "lang": "en", "tool": "music", "arg": ["command", "volume"]}}
+{"set": "requests", "id": "req-14", "channel": "voice", "prompt": "Sylvie, can you please tell me what I have in the calendar for tomorrow?", "check": {"type": "everyday", "lang": "en", "tool": "calendar_events"}}
+{"set": "requests", "id": "req-15", "channel": "voice", "prompt": "Sylvie, can you please tell me the weather today?", "check": {"type": "everyday", "lang": "en", "tool": "web_search"}}
+{"set": "requests", "id": "req-16", "channel": "voice", "prompt": "tell me the climate in toledo", "check": {"type": "everyday", "lang": "en", "tool": "web_search"}}
+{"set": "requests", "id": "req-17", "channel": "voice", "prompt": "Sylvie, veux-tu song One Republic please?", "check": {"type": "everyday", "tool": "play_music", "arg": ["query", "republic"]}}
+{"set": "requests", "id": "req-18", "channel": "voice", "prompt": "Sylvie, ponme música por favor.", "check": {"type": "everyday", "lang": "es", "tool": "play_music"}}
+{"set": "requests", "id": "req-19", "channel": "voice", "prompt": "Sylvie, pon la gunfireball de Pitbull.", "check": {"type": "everyday", "lang": "es", "tool": "play_music", "arg": ["query", "pitbull"]}}
+{"set": "requests", "id": "req-20", "channel": "voice", "prompt": "Sylvie, the song is Fireball from Pitbull.", "check": {"type": "everyday", "lang": "en", "tool": "play_music", "arg": ["query", "fireball"]}}
+{"set": "requests", "id": "req-21", "channel": "voice", "prompt": "Sylvie, put the song Bloodline.", "check": {"type": "everyday", "lang": "en", "tool": "play_music", "arg": ["query", "bloodline"]}}

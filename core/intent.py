@@ -334,3 +334,19 @@ def fix_due_day(text: str, due: str, today) -> str:
 
             return (today + timedelta(days=offset)).isoformat() + m.group(1)
     return due
+
+
+# "Just stop talking, I want to listen the song" (Lea, 2026-11-08) got "Entendido. Voy a pausar el audio…":
+# the model paused her music and explained itself. "Be quiet" is answered by code: one word, no tools.
+QUIET_RE = re.compile(
+    r"\b(stop talking|stop speaking|just stop|be quiet|quiet,? please|shut up|enough talking|don'?t talk|"
+    r"c[aá]llate|deja de hablar|para de hablar|no hables|silencio,? por favor|"
+    r"tais-toi|taisez-vous|arr[eê]te de parler|chut)\b",
+    re.I,
+)
+QUIET_REPLY = {"English": "Okay.", "Spanish": "Vale.", "French": "D'accord."}
+
+
+def wants_quiet(text: str) -> bool:
+    """She wants Sylvie to stop talking, and nothing else (a short message, not a question)."""
+    return bool(QUIET_RE.search(text)) and "?" not in text and len(re.findall(r"\w+", text)) <= 14

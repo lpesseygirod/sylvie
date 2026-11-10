@@ -457,3 +457,10 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
 - **Why Reminders:** it's her Mac's and iPhone's to-do list, so items sync to her phone and can be ticked off there, and `list_reminders` already existed. Notes and Sylvie's memory would only be readable through Sylvie.
 - **Measured (new eval set `todo`, 15 items: Lea's own 8 phrasings + Spanish, French, a timed one, 2 list requests, 2 non-to-dos):** 3/15 → **15/15**. Saved to Reminders: 4/11 → **11/11**. Short answer: 0/11 → **11/11**. List requests read Reminders: 2/2 → 2/2 (one before had a `<doc>` block). Time to her reply for a to-do: ~0.5–1.5 s. Neither version saved a reminder for a question.
 - **Not measured live:** the first real reminder makes macOS ask "Sylvie wants to control Reminders" (LEA-TODO 25).
+
+### T55 — "Listen and actually do what I say": audit of Lea's requests (2026-11-11)
+- **Lea:** "I would like overall that Sylvie listens and actually does what I say."
+- **Audit (230 messages from Lea, 6–10 Nov):** 23 requests to *do* something got no tool call, and 6 times her next message was a correction. Most were already fixed on 8 Nov (music claimed but not played, "turn it up", Netflix) or on 10 Nov (to-dos, T54). Still open:
+  - **"Just stop talking, I want to listen the song"** → she paused the music and explained. Now a short "stop talking / cállate / deja de hablar / tais-toi" gets "Okay." / "Vale." / "D'accord." from code: no model, no tools.
+  - **Whisper's made-up tails:** "Sylvie, stop Spotify, por favor. ¡Suscríbete al canal!" The noise filter of 8 Nov drops the whole thing, losing her real "stop Spotify". Now only the made-up sentence is dropped (`strip_noise`).
+- **New eval set `requests`:** 22 of her real voice requests, word for word (music, volume, previous song, Netflix, calendar, weather, "stop talking"). Not run yet: with Lea working there was 4.8–6.6 GB free (8 GB needed) and 12.7 GB of swap in use, so it waits for room rather than slowing her Mac. Results go in this entry.
