@@ -1,5 +1,9 @@
 # Sylvie
 
+![Status: in progress](https://img.shields.io/badge/status-in%20progress-orange)
+
+**Work in progress.** I started Sylvie in November 2026 and I'm building her step by step. Everything under *What she can do* works today; *Next* is what I'm working on now.
+
 **A personal AI assistant that runs entirely on my laptop.** Sylvie talks by voice in English, Spanish and French, remembers what I tell her, searches the web and my own documents, acts on my apps, and learns from my corrections. Nothing personal leaves the computer.
 
 > The source code is private because it lives next to my personal data (memory, documents, conversations). This page describes the system, its design and its measured results. I'm happy to walk through the code in an interview.
