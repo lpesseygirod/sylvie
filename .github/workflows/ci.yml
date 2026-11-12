@@ -8,6 +8,9 @@ on:
 jobs:
   test:
     runs-on: macos-latest
+    env:
+      UV_PYTHON_PREFERENCE: only-managed   # the runner's own Python can't load SQLite extensions (sqlite-vec)
+      UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
