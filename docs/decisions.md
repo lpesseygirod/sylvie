@@ -1,5 +1,8 @@
 # Decisions
 
+> **About this log.** I kept it while building Sylvie with Claude Code. The technical decisions (T1, T2, …) were
+> proposed by Claude; the product decisions are mine. LEA-TODO is my private to-do list and isn't published.
+
 Every technical or design decision, with what / why / alternatives. Lea can change any of them — say so and it gets changed.
 
 ## Technical decisions (made by Claude)
