@@ -121,4 +121,4 @@ I designed Sylvie and made the product calls; I built her with Claude Code as my
 
 Python, FastAPI, Apple MLX, Qwen, LoRA/QLoRA, Whisper, Kokoro, SQLite, SearXNG, Swift/SwiftUI, Tailscale
 
-[Lea Pessey Girod](https://github.com/lpesseygirod)
+[Lea Pessey Girod](https://github.com/lpesseygirod) · Copyright 2026 · GPL-3.0 licensed (the voice uses GPL-3.0 libraries, phonemizer and espeak-ng)
