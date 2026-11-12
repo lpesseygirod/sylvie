@@ -252,8 +252,18 @@ TODO_LIST_RE = re.compile(
     r"(recu[eé]rdame|dime|l[eé]eme) (lo que|las cosas que|todo lo que|qu[eé]) (tengo|me queda) (que hacer|pendiente)|"
     r"(dime|l[eé]eme) (mis|los) (recordatorios|tareas|pendientes)|"
     r"qu'est-ce que (je dois faire|j'ai [àa] faire)|rappelle-moi ce que (je dois|j'ai [àa]) faire|"
-    r"(lis|dis)-moi (ma liste|mes rappels))",
+    r"(lis|dis)-moi (ma liste|mes rappels)|"
+    # Measured 2026-11-12: "what i told you was in my to do list" was taken as a new to-do (no reply).
+    r"what (did )?i (told|tell|said|say|asked|ask|gave|give|put) (you|on|in)\b.{0,40}\b(to-?do|todo|list|remind)|"
+    r"what (was|were|is|'s|are) (on|in) (my|the) (to-?do|todo|reminders?|list)|"
+    r"qu[eé] (te dije|te ped[ií]|te cont[eé]|ten[ií]a|hab[ií]a|hay) .{0,40}(lista|pendiente|que hacer|recordar|apuntar)|"
+    r"qu'est-ce que je t'ai (dit|demand[ée]) .{0,40}(liste|faire|rappel|noter)|"
+    r"qu'est-ce qu'il y a(vait)? (sur|dans) ma liste)",
     re.I,
+)
+# "What … my to-do list / mi lista / ma liste …?" is a question about the list, not something to add to it.
+_LIST_WORDS_RE = re.compile(
+    r"\b(to-?do|todo|my list|mi lista|ma liste|my reminders|mis recordatorios|mes rappels|pendientes)\b", re.I
 )
 
 TODO_ADD_RE = re.compile(
@@ -284,9 +294,45 @@ def todo_request(text: str) -> str | None:
     """'add' (put something on her to-do list), 'list' (read it to her) or None."""
     if TODO_LIST_RE.search(text):
         return "list"
+    if _QUESTION_START.search(text) and _LIST_WORDS_RE.search(text):
+        return "list"
     if TODO_ADD_RE.search(text) and not _NOT_TODO_RE.search(text):
         return "add"
     return None
+
+
+# ---------- "Do you remember…?" (earlier conversations) ----------
+# Lea, 2026-11-12: "i need sylvie to remember conversations between chats or things i have said". Measured
+# the same day: "el día que me salté la clase de Macro…" got "No tengo registro… pero sí recuerdo que…"
+# with no search, then a made-up memory. The search tool exists; the model rarely calls it on its own.
+# Now code searches earlier conversations first whenever Lea points back at something.
+PAST_RE = re.compile(
+    r"\b(do you remember|you remember|remember (when|what|the (day|time|thing))|did i (ever )?(tell|told|mention|say)|"
+    r"what (did )?i (told|tell|said|say|asked|ask|mentioned|mention) (you|to you|before|earlier)|"
+    r"(what|the thing|that thing) i (told|said|mentioned|asked) (you|to you)|i (already )?(told|said to) you|"
+    r"i (already )?(mentioned|said) (it|that|this) (before|earlier)|you told me|you said (that )?(i|we)|"
+    r"last time|the other day|the day (that |when )?(i|we|you)|we (talked|spoke|were talking) about|"
+    r"(earlier|yesterday|last week|the other night)\b.{0,30}\b(i|we) (said|talked|told|asked|spoke)|"
+    r"te acuerdas|(te )?recuerdas (lo|que|cu[aá]ndo|el|la|qu[eé])|lo que te (dije|cont[eé]|ped[ií]|coment[eé])|"
+    r"te (dije|cont[eé]|habl[eé]|coment[eé])|me dijiste|la otra vez|el otro d[ií]a|el d[ií]a (que|en que)|"
+    r"la [uú]ltima vez|(ya )?hablamos (de|sobre)|"
+    r"tu te souviens|tu te rappelles|je t'ai (dit|parl[ée]|demand[ée]|racont[ée])|tu m'as dit|l'autre jour|"
+    r"la derni[eè]re fois|le jour o[uù]|on a parl[ée])",
+    re.I,
+)
+
+
+def past_reference(text: str) -> bool:
+    """Lea points back at something said before ("do you remember…", "el día que…", "what I told you")."""
+    return bool(PAST_RE.search(text))
+
+
+PAST_NOTE = (
+    "\n(Above: the closest things from Lea's earlier conversations with you, with their dates; she seems to "
+    "refer back to something. If one of them is what she means, answer from it and say when it was. If she "
+    "asks about something said before and it isn't here or in this chat, say plainly that you can't find it "
+    "and ask her to remind you. Never make up a memory.)"
+)
 
 
 TODO_ADD_NOTE = (
@@ -301,7 +347,15 @@ TODO_NUDGE = (
 )
 TODO_LIST_NOTE = (
     "\n(These are Lea's open reminders, her to-do list. Tell her what's on it in plain spoken sentences: "
-    "only the things to do and any due dates, not the list names. Don't add anything that isn't there.)"
+    "only the things to do and any due dates, not the list names. Don't add anything that isn't there, "
+    'and don\'t start with "Got it".)'
+)
+# Measured 2026-11-12: the eight to-dos Lea said on 10 Nov (before T54) never reached Reminders, so
+# "what I told you was in my to-do list" found none of them. What she asked for in chats counts too.
+TOLD_TODOS_NOTE = (
+    "\n\nWhat Lea asked you to note in earlier chats that never went into Reminders (her words, with dates):\n"
+    "{items}\n(These are on her list too: tell her these as well, shortly, then offer once to put them in "
+    "Reminders.)"
 )
 # Lea, 2026-11-10: "when I ask you for reminders and anything, just say, got it."
 GOT_IT = {"English": "Got it.", "Spanish": "Apuntado.", "French": "C'est noté."}

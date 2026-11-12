@@ -468,3 +468,23 @@ Every technical or design decision, with what / why / alternatives. Lea can chan
   - before today's fixes (5ac202f): requests **18/22**, todo **4/15**;
   - after: requests **21/22**, todo **15/15**.
   - Still missed: "veux-tu song One Republic please?" (mixed languages): she said the title wasn't found without searching.
+
+### T56 — Remembering what Lea said in earlier chats (2026-11-12)
+- **Lea:** "i need sylvie to remember conversations between chats or things i have said, because is not working".
+- **What went wrong today (her real messages):**
+  - "El día que me salté la clase de Macro… lo del ISML model" (probably IS-LM): no search. She answered "No tengo registro… pero sí recuerdo que…" and made up the rest. That work isn't in Sylvie's chats or in Claude Code on this Mac (probably claude.ai). The background learner also saved two wrong facts from the question ("Lea dropped out of her Macro class"). Both are now hidden (forget, reversible).
+  - "what i told you was in my to do list" was taken as a **new** to-do (any "to do list" counted as adding). The model was sent to `create_reminder`, nothing came, and she answered "Got it. … retesting test 3 on the iPhone… is there". That line was a fact learned from a Claude Code session, read out as a to-do.
+  - Her eight 10 Nov to-dos (before T54) never reached Reminders, so reading Reminders could not find them.
+  - Of her 241 active facts, **217 came from her Claude coding sessions**, mostly task chatter ("Lea needs Sylvie to retest test 3…", "the formulas-more branch is not merged"). They filled the 6 recalled facts ahead of what she told Sylvie herself.
+- **What (code decides, like T54):**
+  - **Questions about her list read it.** "What did I tell you… list", "what was on my to-do list", "qué te dije… lista", and any what/which-question naming her to-do list → `list` (`core/intent.py`).
+  - **Reading her list includes what she said in chats.** Her messages from the last 45 days that asked for a to-do but whose turn saved no reminder (`told_todos`) are added under the Reminders list, with dates. She tells Lea those too and offers once to put them in Reminders. On Lea's real chats this finds exactly her 7 to-do messages of 10 Nov and nothing else.
+  - **"Do you remember… / el día que… / te acuerdas / je t'ai dit / last time" searches earlier chats first** (`past_reference` → `search_past_conversations` runs before she answers). A note says: answer from what was found and say when; if it isn't there, say so and ask her to remind you; never make up a memory.
+  - **Her own words come first in recall** (`memory/recall.py`, `for_answer`):
+    - facts from Claude sessions score half and fill at most half the slots;
+    - Claude-session facts about the assistant ("Sylvie/Claude/the assistant…") are left out;
+    - new ones of that kind are no longer saved.
+    - Learning and "forget that" still see every fact.
+  - Her "Got it" preference (#15) now says "add a reminder or note something down" (not "remind her of something") and "when she asks what is on her list, tell her". The list note says not to start with "Got it".
+- **Measured:** unit tests (387 pass), and `told_todos` on her real database (7/7, no false ones). New eval set `memory` (10 items: made-up earlier chats in EN/ES/FR, two "not there" questions, her real "what i told you was in my to do list", one ordinary question). **Not run yet:** the memory guard refused it (7.8 GB free, 8 needed, Lea using the Mac). Run `SYLVIE_EVAL_GB=8 uv run python -m evals.run --label memfix --sets memory,todo` when memory allows.
+- **Not fixed here:** things done with Claude on claude.ai are only known to Sylvie from a data export (LEA-TODO 26). "Tell me the report of the last training session": Sylvie can't read her own training reports (idea logged, not built).

@@ -134,6 +134,12 @@ def everyday_problems(item: dict, answer: str, tools: list[str], calls: list | N
     if c.get("contains") and _norm(c["contains"]) not in _norm(answer):
         if not (re.fullmatch(r"[\d.,]+", c["contains"]) and _num(c["contains"]) in number_candidates(answer)):
             problems.append(f"no '{c['contains']}' in the answer")
+    # memory set: an honest "I can't find it" can be worded many ways; a made-up memory names a detail
+    if c.get("contains_any") and not any(_norm(w) in _norm(answer) for w in c["contains_any"]):
+        problems.append(f"none of {c['contains_any']} in the answer")
+    for w in c.get("not_contains", []):
+        if _norm(w) in _norm(answer):
+            problems.append(f"'{w}' in the answer (made up)")
     if not answer.strip():
         problems.append("empty answer")
     elif any(answer.strip().startswith(t) for t in PHRASES["lost"].values()):
@@ -231,6 +237,12 @@ def run(
     for item in load_items(sets, limit):
         for fact in item.get("facts", []):
             s.memory.add(fact, source="eval")
+        if item.get("earlier"):  # an earlier conversation (made up, never Lea's): [her words, the answer]
+            old = s.convs.create()["id"]
+            for said, reply in item["earlier"]:
+                q = s.convs.add_message(old, "user", said)
+                s.convs.add_message(old, "assistant", reply)
+                s.episodes.add(old, q, said, reply, item.get("earlier_at"))
         cid = None
         for before in item.get("before", []):  # earlier turns of the same conversation
             for ev in s.turn(before, conversation_id=cid):

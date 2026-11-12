@@ -53,14 +53,43 @@ def hybrid_search(
     return sorted(scores.items(), key=lambda x: -x[1])[: k * 3]
 
 
-def recall(db: Database, embedder, query: str, k: int = 6, include_sensitive: bool = True) -> list[Fact]:
+# Lea, 2026-11-12: "i need sylvie to remember … things i have said, because is not working". Measured that
+# day: 217 of her 241 facts came from her coding sessions with Claude (memory/claude_history.py), mostly
+# task chatter ("Lea needs Sylvie to retest test 3 on the iPhone…"), and filled the recalled facts ahead
+# of what she told Sylvie herself; one was then read out as a to-do. What she said to Sylvie comes first;
+# at most half the facts come from Claude sessions, and none that is about the assistant rather than her.
+FROM_CLAUDE_WEIGHT = 0.5
+ABOUT_ASSISTANT_RE = re.compile(r"\b(Sylvie|the assistant|Claude|the AI)\b", re.I)
+
+
+def from_claude(f: Fact) -> bool:
+    return (f.source or "").startswith("claude:")
+
+
+def recall(
+    db: Database, embedder, query: str, k: int = 6, include_sensitive: bool = True, for_answer: bool = False
+) -> list[Fact]:
+    """for_answer: the facts given to Sylvie before she answers (Lea's own words first, see above).
+    Learning and "forget that" search all facts alike."""
     hits = hybrid_search(db, embedder, query, "facts_fts", "facts_vec", k=k)
-    out = []
-    for rowid, _ in hits:
+    ranked: list[tuple[float, Fact]] = []
+    for rowid, score in hits:
         r = db.one(f"SELECT * FROM facts WHERE id = ? AND {ACTIVE}", (rowid,))
         if r is None or (r["sensitive"] and not include_sensitive):
             continue
-        out.append(Fact.from_row(r))
+        f = Fact.from_row(r)
+        if for_answer and from_claude(f):
+            if ABOUT_ASSISTANT_RE.search(f.text):
+                continue
+            score *= FROM_CLAUDE_WEIGHT
+        ranked.append((score, f))
+    out, claude_n = [], 0
+    for _, f in sorted(ranked, key=lambda x: -x[0]):
+        if for_answer and from_claude(f):
+            if claude_n >= max(1, k // 2):
+                continue
+            claude_n += 1
+        out.append(f)
         if len(out) >= k:
             break
     return out

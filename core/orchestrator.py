@@ -12,6 +12,7 @@ import threading
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 
 from actions.confirm import is_clear_yes, is_undo
 from actions.log import ActionLog
@@ -28,6 +29,7 @@ from core.intent import (
     LIVE_NOTE,
     MUSIC_DONE_EXAMPLE,
     MUSIC_DONE_NOTE,
+    PAST_NOTE,
     QUIET_REPLY,
     REPLY_LANGUAGE_NOTE,
     SEARCH_NUDGE,
@@ -35,6 +37,7 @@ from core.intent import (
     TODO_ADD_NOTE,
     TODO_LIST_NOTE,
     TODO_NUDGE,
+    TOLD_TODOS_NOTE,
     UNSENT_NUDGE,
     WRITING_NOTE,
     accepts_search_offer,
@@ -45,6 +48,7 @@ from core.intent import (
     looks_like_writing,
     looks_live,
     music_control,
+    past_reference,
     promises_search,
     says_no_access,
     todo_request,
@@ -73,7 +77,7 @@ from learning.teacher import Teacher, is_criticism, is_wrong_feedback
 from memory.episodes import Episodes
 from memory.extract import REMEMBER_RE, run_extraction
 from memory.forget import forget
-from memory.recall import recall
+from memory.recall import ABOUT_ASSISTANT_RE, recall
 from memory.store import MemoryStore
 from tools.registry import ToolContext, available_tools, execute, validate
 
@@ -657,7 +661,13 @@ class Sylvie:
 
             # 3. Recall memories + interest noticing
             with trace.stage("recall"):
-                facts = recall(self.db, self.embedder, text, k=self.cfg.get_path("memory.recall_top_k", 6))
+                facts = recall(
+                    self.db,
+                    self.embedder,
+                    text,
+                    k=self.cfg.get_path("memory.recall_top_k", 6),
+                    for_answer=True,
+                )
                 aside = None
                 max_asides = self.cfg.get_path("proactivity.max_asides_per_conversation", 2)
                 if (conv.get("aside_used") or 0) < max_asides and self.cfg.get_path(
@@ -788,8 +798,32 @@ class Sylvie:
                     yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
                     lang = LANG_NAMES.get(said_in or guess_language(text), "English")
                     content = result.content + (TODO_LIST_NOTE if result.ok else "")
+                    told = self.told_todos()
+                    if told:
+                        content += TOLD_TODOS_NOTE.format(items="\n".join(told))
                     messages.append(
                         {"role": "tool", "content": content + REPLY_LANGUAGE_NOTE.format(lang=lang)}
+                    )
+                    self.convs.add_message(cid, "tool", "", model_content=content)
+                    tool_chars += len(content)
+            # 5e. "Do you remember…?", "el día que…": search earlier conversations before she answers
+            # (core/intent.py PAST_RE). Measured 2026-11-12: without it she said she remembered and made it up.
+            elif todo is None and past_reference(text) and "search_past_conversations" in has_tool:
+                call = ToolCall("search_past_conversations", {"query": text[:500]})
+                trace.mark("first_status")
+                result = self._run_tool(call, tools, tctx, trace)
+                if result is not None:
+                    assistant_msg = {"role": "assistant", "content": "", "tool_calls": [call.to_message()]}
+                    messages.append(assistant_msg)
+                    self.convs.add_message(cid, "assistant", "", model_content="",
+                                           tool_calls=assistant_msg["tool_calls"], mode=mode)  # fmt: skip
+                    yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
+                    lang = LANG_NAMES.get(said_in or guess_language(text), "English")
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "content": result.content + PAST_NOTE + REPLY_LANGUAGE_NOTE.format(lang=lang),
+                        }
                     )
                     self.convs.add_message(cid, "tool", "", model_content=result.content)
                     tool_chars += len(result.content)
@@ -1188,6 +1222,33 @@ class Sylvie:
             return execute(call, tctx)
 
     # ---------- background learning ----------
+    def told_todos(self, days: int = 45, limit: int = 15) -> list[str]:
+        """Things Lea asked Sylvie to note in a chat whose turn saved no reminder (before T54, or when
+        Reminders failed): "- [2026-11-10] her words". Oldest first."""
+        since = (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="seconds")
+        rows = self.db.query(
+            "SELECT id, conversation_id, role, content, tool_calls, created_at FROM messages "
+            "WHERE created_at >= ? AND role IN ('user', 'assistant') ORDER BY id",
+            (since,),
+        )
+        open_todo: dict[str, dict] = {}  # conversation → its last to-do message, until a reminder is saved
+        found: list[dict] = []
+        for r in rows:
+            cid = r["conversation_id"]
+            if r["role"] == "user":
+                if cid in open_todo:
+                    found.append(open_todo.pop(cid))
+                if todo_request(r["content"] or "") == "add":
+                    open_todo[cid] = r
+            elif cid in open_todo and "create_reminder" in (r["tool_calls"] or ""):
+                open_todo.pop(cid)
+        found += open_todo.values()
+        found.sort(key=lambda r: r["id"])
+        return [
+            f"- [{r['created_at'][:10]}] {' '.join((r['content'] or '').split())[:220]}"
+            for r in found[-limit:]
+        ]
+
     def learn_from_claude(self, message: str, source: str, stop: threading.Event) -> None:
         """One of Lea's own messages to Claude (memory/claude_history.py). Facts and interests
         are learned as usual; a rule about answers is saved switched off, for Lea to approve."""
@@ -1258,6 +1319,9 @@ class Sylvie:
         ex = run_extraction(_Stoppable(self.small, stop), message, reply, existing, note=note)
         if stop.is_set():
             return False  # interrupted: the job is re-queued and will run again
+        if source.startswith("claude:"):
+            # "Lea needs Sylvie to retest test 3…": a task for the coding assistant, not a fact about her.
+            ex.facts = [f for f in ex.facts if not ABOUT_ASSISTANT_RE.search(f["fact"])]
         for f in ex.facts:
             self.memory.add(
                 f["fact"], key=f["key"], category=f["category"], source=source, sensitive=f["sensitive"]

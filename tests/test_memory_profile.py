@@ -41,6 +41,22 @@ def test_add_recall_and_supersede(db, emb):
     assert hits and hits[0].text == "Lea lives in Madrid"
 
 
+def test_what_she_told_sylvie_comes_before_coding_sessions(db, emb):
+    """2026-11-12: 217 of 241 facts came from her Claude coding sessions and crowded out her own words."""
+    m = MemoryStore(db, emb)
+    for i in range(6):
+        m.add(f"Lea's app project step {i} for the Azure deployment is done", key=f"lea.step{i}",
+              source=f"claude:s#{i}")  # fmt: skip
+    m.add("Lea needs Sylvie to retest the Azure step on the iPhone", key="lea.retest", source="claude:s#9")
+    m.add("Lea has to finish the Azure setup for Microsoft", key="lea.azure", source="c1#5")
+    hits = recall(db, emb, "Azure", k=4, for_answer=True)
+    assert hits[0].text == "Lea has to finish the Azure setup for Microsoft"
+    assert sum(f.source.startswith("claude:") for f in hits) <= 2
+    assert all("Sylvie" not in f.text for f in hits)
+    # Learning and "forget that" still see everything
+    assert any("Sylvie" in f.text for f in recall(db, emb, "Azure", k=8))
+
+
 def test_duplicate_is_not_added_twice(db, emb):
     m = MemoryStore(db, emb)
     m.add("Lea studies computer science", key="lea.studies")

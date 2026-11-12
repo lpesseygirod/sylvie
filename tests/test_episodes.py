@@ -9,15 +9,11 @@ def test_an_earlier_conversation_is_remembered_in_a_new_one(tmp_path):
     assert s.db.one("SELECT count(*) n FROM episodes")["n"] == 1
     s.llm.replies = ["You told me you're going to Barcelona in March.", extraction(), "{}"]
     run(s, "Where did I say I'm going to Barcelona to see the Sagrada Família?")
-    prompt = (
-        s.llm.calls[-1]["messages"][-1]["content"]
-        if s.llm.calls[-1]["messages"][-1]["role"] == "user"
-        else ""
-    )
+    # Everything she read for that answer (her message, and the earlier conversations searched first)
     prompt = next(
-        c["messages"][-1]["content"]
+        "\n".join(str(m["content"]) for m in c["messages"])
         for c in s.llm.calls
-        if "Barcelona to see" in c["messages"][-1]["content"]
+        if any("Barcelona to see" in str(m["content"]) for m in c["messages"])
     )
     assert (
         "From earlier conversations" in prompt and "Sagrada Família tickets" in prompt and "today" in prompt

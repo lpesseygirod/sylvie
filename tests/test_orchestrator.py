@@ -294,6 +294,54 @@ def test_whats_on_my_todo_list_reads_reminders_first(tmp_path):
     assert "Call dad" in seen and "to-do list" in seen
 
 
+def test_list_also_tells_todos_said_in_earlier_chats(tmp_path):
+    """2026-11-12: her 10 Nov to-dos never reached Reminders, so "what I told you was in my to-do list"
+    found none of them. What she asked for in a chat, with no reminder saved, is read to her too."""
+    from actions.osa import FakeOSA
+
+    osa = FakeOSA({"completed is false": "\tCall dad\tPersonal\n"})
+    s = make(tmp_path, ["You need to call your dad and do the Azure setup."], osa=osa)
+    old = s.convs.create()["id"]
+    s.convs.add_message(old, "user", "Remind me to finish the Azure setup for Microsoft.")
+    s.convs.add_message(old, "assistant", "Got it, I'll keep a note.")
+    s.convs.add_message(old, "user", "Remind me to buy milk.")  # this one was saved
+    s.convs.add_message(old, "assistant", "", tool_calls=[{"function": {"name": "create_reminder"}}])
+    s.convs.add_message(old, "user", "When I ask for reminders just say got it.")  # how, not what
+    ev = run(s, "what i told you was in my to do list")
+    assert [e["name"] for e in ev if e["type"] == "tool"] == ["list_reminders"]
+    seen = s.llm.calls[-1]["messages"][-1]["content"]
+    assert "Call dad" in seen and "Azure setup" in seen and "never went into Reminders" in seen
+    assert "buy milk" not in seen and "just say" not in seen
+
+
+def test_do_you_remember_searches_earlier_chats_first(tmp_path):
+    """2026-11-12: "el día que me salté la clase de Macro…" got "sí recuerdo que…" and a made-up memory."""
+    s = make(tmp_path, ["Sí: el 3 de noviembre hablamos del modelo IS-LM."])
+    old = s.convs.create()["id"]
+    s.episodes.add(old, None, "Help me with the IS-LM model group assignment for Macro", "Here's a plan…",
+                   "2026-11-03T10:00:00+00:00")  # fmt: skip
+    ev = run(s, "¿Te acuerdas del día que hicimos el assignment del modelo IS-LM de Macro?")
+    assert [e["name"] for e in ev if e["type"] == "tool"] == ["search_past_conversations"]
+    seen = s.llm.calls[-1]["messages"][-1]["content"]
+    assert "IS-LM model group assignment" in seen and "Never make up a memory" in seen
+    # An ordinary question doesn't search
+    s.llm.replies = ["4."]
+    ev = run(s, "What's 2+2?")
+    assert not [e for e in ev if e["type"] == "tool"]
+
+
+def test_past_references():
+    from core.intent import past_reference
+
+    assert past_reference("Sylvie, do you remember what my favourite band is?")
+    assert past_reference("El día que me salté la clase de Macro, ¿sabes?")
+    assert past_reference("what i told you yesterday about the trip")
+    assert past_reference("Tu te souviens de ce que je t'ai dit ?")
+    assert past_reference("¿Te acuerdas de lo que te conté?")
+    assert not past_reference("What's the weather tomorrow?")
+    assert not past_reference("Remind me to call my dad")
+
+
 def test_todo_requests():
     from core.intent import todo_request
 
@@ -305,6 +353,11 @@ def test_todo_requests():
     assert todo_request("Apúntame que tengo que comprar leche") == "add"
     assert todo_request("Sylvie, can you remind me of the things that I need to do?") == "list"
     assert todo_request("¿Qué tengo que hacer?") == "list"
+    # Questions about the list read it (2026-11-12: these were taken as new to-dos)
+    assert todo_request("what i told you was in my to do list") == "list"
+    assert todo_request("Sylvie, what was on my to-do list?") == "list"
+    assert todo_request("¿Qué te dije que tenía en mi lista?") == "list"
+    assert todo_request("Can you add buy milk to my to-do list?") == "add"
     # Not to-dos: questions, calendar events, and how she should answer
     assert todo_request("Remind me what the capital of Australia is") is None
     assert todo_request("Remind me to add the meeting to my calendar") is None
