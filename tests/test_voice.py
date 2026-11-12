@@ -102,7 +102,7 @@ def test_voice_answer_follows_the_language_whisper_heard(tmp_path):
 
 
 def test_stop_and_stop_listening_need_no_model(tmp_path):
-    """Lea, 2026-11-08: "stop listening" stops her completely; "stop" cuts her and listens again."""
+    """Saying "stop listening" stops her completely; "stop" cuts her and listens again."""
     from tests.test_orchestrator import make
     from voice.loop import stop_command, voice_turn
     from voice.stt import Transcript

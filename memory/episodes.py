@@ -1,11 +1,11 @@
 """Episodic memory: what was actually said in past conversations, searchable by words and meaning.
 
 Facts (memory/store.py) keep what Sylvie learned about Lea; this keeps the conversations themselves.
-Lea, 2026-11-06: "if I said something even 2 months ago she should remember". Each exchange (Lea's
+"if I said something even 2 months ago she should remember". Each exchange (Lea's
 message + Sylvie's answer) is one episode, indexed with FTS5 and an embedding. Every turn, the few
 most relevant episodes from *other* conversations are given to Sylvie with their dates, and she has
 a tool to search on purpose. Deleting a conversation only hides it from the list: Sylvie still
-remembers what was said in it (Lea, 2026-11-07: "delete conversations but Sylvie not lose the
+remembers what was said in it ("delete conversations but Sylvie not lose the
 knowledge learned from it").
 """
 

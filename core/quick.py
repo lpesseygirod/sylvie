@@ -1,6 +1,6 @@
 """Instant replies to greetings, thanks, "how are you" and goodbyes: no model, no thinking.
 
-Lea asked (2026-11-06) that "hello" gets an answer right away. Only a message that is *nothing but*
+I asked that "hello" gets an answer right away. Only a message that is *nothing but*
 one of these phrases (in English, Spanish or French, optionally with "Sylvie") is answered here;
 anything more ("hi, what's the weather?") goes to the model as usual. The replies are editable in
 config.yaml → quick_replies; they're conversation strings like the wake greeting, never training data.

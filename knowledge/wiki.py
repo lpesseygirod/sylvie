@@ -1,6 +1,6 @@
 """Sylvie's offline Wikipedia (English, Spanish, French): general knowledge she looks up, with credit.
 
-Lea, 2026-11-07: "can we add her knowledge?" Facts belong in a library, not in the weights (a small
+I asked "can we add her knowledge?". Facts belong in a library, not in the weights (a small
 model trained on facts mixes them up). So Sylvie searches this first for facts about the world
 (history, science, people, places, definitions) — fast, offline, without her question leaving the
 Mac — and keeps web search for what is recent (news, prices, schedules).

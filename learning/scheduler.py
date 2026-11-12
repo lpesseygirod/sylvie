@@ -72,7 +72,7 @@ class Scheduler:
             cfg.get_path("schedule.window_start", "01:00"),
             cfg.get_path("schedule.window_end", "07:00"),
         )
-        # Permanent mode (Lea, 2026-11-07: "keep training until I start using Sylvie, then when I
+        # Permanent mode ("keep training until I start using Sylvie, then when I
         # finish train again"): any time of day, after a short quiet spell, no nightly cap.
         self.always = bool(cfg.get_path("schedule.always", False))
         self.idle_minutes = (
@@ -96,7 +96,7 @@ class Scheduler:
         self.used_tonight = 0.0
         self.night: str | None = None
         self.last_reason = "not checked yet"
-        # Memory guard (efficiency plan A2): the job starts only if what it needs is free once Sylvie
+        # Memory guard: the job starts only if what it needs is free once Sylvie
         # has let go of her models, and is stopped past a hard cap or when macOS reports pressure.
         self.job_memory_gb = float(cfg.get_path("schedule.job_memory_gb", 20))
         self.max_job_gb = float(cfg.get_path("schedule.max_job_gb", 24))
@@ -194,7 +194,7 @@ class Scheduler:
             self._launch(job)
 
     def run_now(self, minutes: int = 180, finetune: bool = True) -> tuple[bool, str]:
-        """Lea asked to train now (2026-11-07). Same job as at night; still plugged in only, and it
+        """I asked to train now. Same job as at night; still plugged in only, and it
         stops the moment she talks to Sylvie (progress is saved per batch)."""
         with self._lock:
             if self.proc is not None and self.proc.poll() is None:

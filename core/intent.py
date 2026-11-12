@@ -60,7 +60,7 @@ ACTION_NOTE = (
     "Only if her request is really unclear, ask ONE short question instead of acting."
 )
 
-# Appended to a successful music tool result (Lea, 2026-11-08: "just say done", no questions after a song).
+# Appended to a successful music tool result ("just say done", no questions after a song).
 # 2026-11-08 (make apps): with a concrete example song ("La Reina, by Maluma") she copied it when the
 # result named no song. Now: the opening word only, and the song only if the result names it.
 MUSIC_DONE_NOTE = (
@@ -302,7 +302,7 @@ def todo_request(text: str) -> str | None:
 
 
 # ---------- "Do you remember…?" (earlier conversations) ----------
-# Lea, 2026-11-12: "i need sylvie to remember conversations between chats or things i have said". Measured
+# "i need sylvie to remember conversations between chats or things i have said". Measured
 # the same day: "el día que me salté la clase de Macro…" got "No tengo registro… pero sí recuerdo que…"
 # with no search, then a made-up memory. The search tool exists; the model rarely calls it on its own.
 # Now code searches earlier conversations first whenever Lea points back at something.
@@ -357,7 +357,7 @@ TOLD_TODOS_NOTE = (
     "{items}\n(These are on her list too: tell her these as well, shortly, then offer once to put them in "
     "Reminders.)"
 )
-# Lea, 2026-11-10: "when I ask you for reminders and anything, just say, got it."
+# "when I ask you for reminders and anything, just say, got it."
 GOT_IT = {"English": "Got it.", "Spanish": "Apuntado.", "French": "C'est noté."}
 
 
@@ -390,7 +390,7 @@ def fix_due_day(text: str, due: str, today) -> str:
     return due
 
 
-# "Just stop talking, I want to listen the song" (Lea, 2026-11-08) got "Entendido. Voy a pausar el audio…":
+# "Just stop talking, I want to listen the song" got "Entendido. Voy a pausar el audio…":
 # the model paused her music and explained itself. "Be quiet" is answered by code: one word, no tools.
 QUIET_RE = re.compile(
     r"\b(stop talking|stop speaking|just stop|be quiet|quiet,? please|shut up|enough talking|don'?t talk|"
@@ -406,7 +406,7 @@ def wants_quiet(text: str) -> bool:
     return bool(QUIET_RE.search(text)) and "?" not in text and len(re.findall(r"\w+", text)) <= 14
 
 
-# Playback controls with no song name: code runs them, she says "Done" (Lea, 2026-11-08: "just say done").
+# Playback controls with no song name: code runs them, she says "Done" ("just say done").
 # Measured 2026-11-11 on her own words: "Skip backwards." got "Skip" or "I'll go back to the previous
 # message", and "the song that was before" once got a web search.
 MUSIC_CONTROLS = [

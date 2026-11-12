@@ -882,7 +882,7 @@
   pollHealth();
   refreshBadge();
   setInterval(refreshBadge, 60000);
-  // First run: ask which apps she uses most, so Sylvie can learn what she likes (Lea, 2026-11-08).
+  // First run: ask which apps she uses most, so Sylvie can learn what she likes.
   if (!PANEL) api("/api/apps").then((ov) => {
     if (ov.asked || $("#memory-dialog").open) return;
     memTab = "apps";

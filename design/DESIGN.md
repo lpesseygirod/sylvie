@@ -1,10 +1,8 @@
 # Sylvie — Design Spec
 
-This is how Sylvie must look and feel. Build the real interface to match it. The reference screens are in `design/reference/` (open them to see layout and copy) and on Lea's design canvas: https://claude.ai/artifact/QKWLdVJAuBY5pGZhfBwQJe
+This is how Sylvie looks and feels: the "midnight glass" design I made before building the interface. Where the real app had to differ, the change is written down in `docs/decisions.md` (T30).
 
-The reference files are mockups written in a design-tool format (`.dc.html`): use them for layout, spacing, colors and copy, not as production code. Rebuild the UI in the stack from the build plan (web UI served by FastAPI for chat; SwiftUI for the menu bar, panel and iPhone app).
-
-If something in this spec conflicts with what works technically, keep the look as close as possible, write the change in `docs/decisions.md`, and tell Lea.
+The UI is built with a web front end served by FastAPI for the chat, and SwiftUI for the menu bar, panel and iPhone app.
 
 ---
 
@@ -36,7 +34,7 @@ Dark, calm, minimal. One accent color. Sylvie's "face" is a glowing animated orb
 
 Orb colors: lilac `#C59BFF`, blue `#5B7CFF`, cyan `#6FE0FF`, core `#FFFFFF` → `#E6DEFF`.
 
-All text must keep 4.5:1 contrast on its background. Support light mode later only if Lea asks; dark is the default.
+All text must keep 4.5:1 contrast on its background. Dark is the default; light mode may come later.
 
 ### Type
 
@@ -57,14 +55,14 @@ All text must keep 4.5:1 contrast on its background. Support light mode later on
 
 ## 2. Screens
 
-### 2.1 Chat workspace (like Claude)
+### 2.1 Chat workspace
 
 Three areas side by side:
 
 1. **Left sidebar (≈240 px):** Sylvie logo (small breathing orb + name), "New chat" button, search, conversations grouped by Today / This week / Older, and at the bottom "About Lea", "Learning dashboard" and a status line "Running on this Mac" with a green dot.
 2. **Center chat:** header with conversation title, a small chip showing the model version (e.g. "Sylvie v003 · local"), and a **Voice mode** button that switches to the orb screen.
    - Lea's messages: right-aligned bubbles (`bubble` color, radius 16/16/4/16).
-   - Sylvie's messages: no bubble, plain text on the background (like Claude).
+   - Sylvie's messages: no bubble, plain text on the background.
    - Above Sylvie's answer, small muted activity notes when relevant: "Remembered: …", "Searched your course files and the web", "Played on Spotify".
    - Sources as small pill chips under the answer.
    - Under each answer: thumbs up, thumbs down, "Edit to what I wanted".
@@ -107,15 +105,15 @@ Same look as voice mode, in portrait.
 
 A tiny orb glyph that shows state: dim (idle), glowing (listening), slowly turning (thinking), pulsing (speaking), crossed out (muted). Click for: Open chat, Mute mic, Pause learning, Dashboard, Quit.
 
-### 2.6 Dashboard (Phase 6)
+### 2.6 Dashboard
 
-Not designed yet. Use the same tokens: sidebar navigation (About Lea, Memory, Corrections, Versions, Actions, Privacy), cards on `surface`, tables with `divider` lines. Ask Lea to review a first version.
+The same tokens: sidebar navigation (About Lea, Memory, Corrections, Versions, Actions, Privacy), cards on `surface`, tables with `divider` lines.
 
 ---
 
 ## 3. The orb
 
-The orb is the most important visual element. Build it once and reuse it (menu bar glyph, wake panel 44 px, iPhone 200 px, voice mode 300 px).
+The orb is the most important visual element. It is built once and reused (menu bar glyph, wake panel 44 px, iPhone 200 px, voice mode 300 px).
 
 **Construction (layered, all blurred and blended with "screen"):**
 

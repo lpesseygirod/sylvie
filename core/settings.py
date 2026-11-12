@@ -1,5 +1,5 @@
 """Settings Lea can change just by asking Sylvie ("speak faster", "use the Bella voice in English",
-"turn off web search"). Lea, 2026-11-06: "if I want to change something of the configuration I can
+"turn off web search"). "if I want to change something of the configuration I can
 say it directly to Sylvie and it must change".
 
 Only the settings listed here can be changed this way; each value is checked. Security settings

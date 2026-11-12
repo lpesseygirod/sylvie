@@ -307,7 +307,7 @@ class Overnight:
 
     def status_for(self, it: Item) -> str:
         """General pairs that code verified or the judge re-graded highly train without waiting for
-        Lea's spot-check (`learning.auto_approve_judged`; Lea chose autonomy, 2026-11-07). Pairs from
+        my spot-check (`learning.auto_approve_judged`; I chose autonomy). Pairs from
         her own questions (personal) always wait for her."""
         if it.tag != "general" or not self.cfg.get_path("learning.auto_approve_judged", False):
             return "staged"

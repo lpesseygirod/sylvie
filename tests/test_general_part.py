@@ -1,4 +1,4 @@
-"""The general (shareable) part of Sylvie stays free of Lea (Lea, 2026-11-07)."""
+"""The general (shareable) part of Sylvie stays free of Lea."""
 
 import json
 import random

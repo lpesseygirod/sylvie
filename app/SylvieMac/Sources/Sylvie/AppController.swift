@@ -91,7 +91,7 @@ final class AppController: ObservableObject {
     private var turnDone = false  // the server sent "done": once speech ends, listen for a follow-up
     private var spokeThisTurn = false
     /// A song was put on (or the volume changed): don't keep the music down listening for more
-    /// (Lea, 2026-11-08: "when I ask for a song I don't want her to wait").
+    /// ("when I ask for a song I don't want her to wait").
     private var musicThisTurn = false
 
     private let photosSync = PhotosSync()
@@ -244,7 +244,7 @@ final class AppController: ObservableObject {
         if state == .idle { beginListening(chime: true) }
     }
 
-    /// After an answer, listen again without the wake word (Lea, 2026-11-06: "I need to repeat her name
+    /// After an answer, listen again without the wake word ("I need to repeat her name
     /// every sentence"). If she says nothing within the voice detector's 6 s, back to waiting for "Sylvie".
     /// Off by default since 2026-11-08 (Lea: "not be activated unless I say her name"): in a room with other
     /// people every answer was followed by her picking up whatever was said next ("la la la", "no, no, no").
@@ -431,7 +431,7 @@ final class AppController: ObservableObject {
         }
     }
 
-    /// "stop" (Lea, 2026-11-08): cut herself off at once and listen for the next order, no name needed.
+    /// "stop": cut herself off at once and listen for the next order, no name needed.
     /// A short wait first, so "stop listening" can still turn into stopCompletely().
     private var listenAfterStop: DispatchWorkItem?
     private func stopTalking() {

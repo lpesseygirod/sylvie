@@ -370,7 +370,7 @@ class Sylvie:
         except Exception:
             pass
 
-    # ---------- voice models: loaded when voice is used (efficiency plan A2) ----------
+    # ---------- voice models: loaded when voice is used ----------
     def warm_voice(self) -> None:
         """Load and compile Whisper and Kokoro. Whisper's first transcription compiles its GPU kernels
         (~4 s), Kokoro's first sentence per language too, so both get a throwaway run."""
@@ -781,7 +781,7 @@ class Sylvie:
                     self.convs.add_message(cid, "tool", "", model_content=result.content)
                     tool_chars += len(result.content)
 
-            # 5d. Her to-do list (Lea, 2026-11-10): reading it is a lookup code does first; adding to it is
+            # 5d. Her to-do list: reading it is a lookup code does first; adding to it is
             # one model round that may only call create_reminder, then a fixed "Got it" (core/intent.py).
             has_tool = {t["function"]["name"] for t in tools}
             if todo == "list" and "list_reminders" in has_tool:
@@ -1070,7 +1070,7 @@ class Sylvie:
                         yield {"type": "tool", "name": call.name, "args": call.arguments, "ok": result.ok}
                         reply_lang = LANG_NAMES.get(said_in or guess_language(text), "English")
                         if call.name in ("play_music", "music") and result.ok:
-                            # Lea, 2026-11-08: a song request gets "done", not questions ("¿Te gusta el ritmo?").
+                            # A song request gets "done", not questions ("¿Te gusta el ritmo?").
                             example = MUSIC_DONE_EXAMPLE.get(reply_lang, MUSIC_DONE_EXAMPLE["English"])
                             turn_note = MUSIC_DONE_NOTE.format(lang=reply_lang, example=example)
                         else:

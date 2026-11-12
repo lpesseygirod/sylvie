@@ -1,5 +1,4 @@
 Rubric for judging one of Sylvie's answers to Lea. Score each criterion 1 (bad) to 5 (excellent).
-Draft written by Claude — Lea should review and change it (plan: "rubric written with Lea").
 
 1. correct — facts, numbers and reasoning are right; nothing made up. Checkable things (math, code, formulas, dates relative to today) are actually correct.
 2. answers_the_question — answers what Lea actually asked (not a nearby question); asks one short clarifying question only if truly needed.

@@ -1,4 +1,4 @@
-"""Terminal commands for Sylvie (Lea, 2026-11-06: "she's free to do all this type of stuff, she has
+"""Terminal commands for Sylvie ("she's free to do all this type of stuff, she has
 control over my computer").
 
 Three kinds of command:

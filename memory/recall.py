@@ -53,7 +53,7 @@ def hybrid_search(
     return sorted(scores.items(), key=lambda x: -x[1])[: k * 3]
 
 
-# Lea, 2026-11-12: "i need sylvie to remember … things i have said, because is not working". Measured that
+# "i need sylvie to remember … things i have said, because is not working". Measured that
 # day: 217 of her 241 facts came from her coding sessions with Claude (memory/claude_history.py), mostly
 # task chatter ("Lea needs Sylvie to retest test 3 on the iPhone…"), and filled the recalled facts ahead
 # of what she told Sylvie herself; one was then read out as a to-do. What she said to Sylvie comes first;

@@ -3,7 +3,8 @@
 Three kinds:
 - harmless (music controls, reading the calendar, timers, opening apps) → run directly;
 - undoable (creating an event or reminder) → run, log how to undo;
-- needs a "yes" (sending email, running a Shortcut) → saved as pending, read back to Lea, run
+- needs a "yes" (sending an email or message; a command or Shortcut right after Sylvie read a web page
+  or email; anything else the `actions.confirm` setting adds) → saved as pending, read back to Lea, run
   only when her next message is a clear yes and the Mac is unlocked (actions/confirm.py).
 """
 
@@ -148,7 +149,7 @@ TOOLS = {
         {"to": STR, "subject": STR, "body": STR},
         ["to", "subject", "body"],
     ),
-    # Lea, 2026-11-08: "put Bridgerton on Netflix", "send a message to…", "and much more"
+    # "put Bridgerton on Netflix", "send a message to…", "and much more"
     "watch": _fn(
         "watch",
         "Put on a series, film or video for Lea: Netflix (default), YouTube, Prime Video, Disney+, Max, "
@@ -319,7 +320,7 @@ def _web_api_search(query: str) -> tuple[str, str] | None:
 def find_on_spotify(cfg, query: str, searx=None) -> tuple[str, str] | None:
     """A spotify: URI for a song/playlist/album/artist named in words. Uses the Spotify key if Lea set
     one up; otherwise searches the web (Lea's local SearXNG) for its open.spotify.com page, which needs
-    no key (Lea, 2026-11-06: "why can't she just play the music?")."""
+    no key ("why can't she just play the music?")."""
     try:
         return _web_api_search(query)
     except SpotifyNotSetUp:
@@ -394,7 +395,7 @@ class ActionRunner:
         self.timers: dict[int, threading.Timer] = {}
 
     def needs_yes(self, name: str, args: dict, after_untrusted: bool) -> bool:
-        """actions.confirm (Lea's choice): 'delete_or_send' (default since 2026-11-06), 'changes' (also
+        """actions.confirm (my choice): 'delete_or_send' (the default), 'changes' (also
         anything that changes something) or 'never'. After outside content was read in the turn, a
         command or Shortcut always needs her yes: text in a web page or email must not make Sylvie act."""
         mode = self.cfg.get_path("actions.confirm", "delete_or_send")
@@ -402,7 +403,7 @@ class ActionRunner:
         if name in ("run_command", "run_shortcut") and after_untrusted:
             return True
         if name in ("send_message", "send_email"):
-            # Lea, 2026-11-08: "Yes, ask me first" — anything sent to a person is read back for her yes,
+            # "Yes, ask me first" — anything sent to a person is read back for her yes,
             # whatever the confirm setting says.
             return True
         if mode == "never":

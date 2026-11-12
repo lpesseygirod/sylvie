@@ -1,4 +1,4 @@
-"""Lea's WhatsApp chats, read on this Mac, read-only (Lea, 2026-11-08: "connect to my WhatsApp").
+"""Lea's WhatsApp chats, read on this Mac, read-only ("connect to my WhatsApp").
 
 WhatsApp Desktop keeps every chat in a local database (ChatStorage.sqlite in its group container).
 Sylvie reads a snapshot copy of it, so WhatsApp's own file is never touched or locked. Nothing is

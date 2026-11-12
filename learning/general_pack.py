@@ -1,6 +1,6 @@
 """The general part of Sylvie, kept apart from Lea's personal data, ready to give to other people.
 
-Lea, 2026-11-07: "make sure the general things learned are stored in another part than my personal
+My request: "make sure the general things learned are stored in another part than my personal
 preferences… I would like to be able to put a base model to other people and it would help them,
 learning from them."
 

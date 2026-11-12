@@ -16,7 +16,7 @@ paths:
   adapters_dir: ~/Library/Application Support/Sylvie/adapters
 
 llm:
-  # Lea chose speed (2026-11-06): the 27B (~18 GB) made the Mac swap with her other apps (9-10 tok/s,
+  # I chose speed: the 27B (~18 GB) made the Mac swap with my other apps (9-10 tok/s,
   # 15-35 s answers). Back to the 27B any time: mlx-community/Qwen3.8-27B-4bit (still downloaded).
   model: mlx-community/Qwen3.5-9B-4bit
   adapter: null              # e.g. v001 once a fine-tune is promoted
@@ -75,10 +75,10 @@ shortcuts:
 
 proactivity:
   mode: only_when_topic_comes_up   # default — Lea can change (decision 10)
-  max_asides_per_conversation: 2   # Lea wants more initiative (2026-11-06)
+  max_asides_per_conversation: 2   # I want more initiative
 
 knowledge:
-  # Lea, 2026-11-08: "access to … docs". Code projects (.git), app libraries and cloud-only files are skipped.
+  # "access to … docs". Code projects (.git), app libraries and cloud-only files are skipped.
   folders: []                    # opt in, e.g. [~/Documents, ~/Desktop]
   reindex_hours: 6
 
@@ -87,12 +87,12 @@ voice:
   stt_model: mlx-community/whisper-large-v3-turbo
   # Speech output: "kokoro" (Kokoro-82M on this Mac, decision T27) or "system" (macOS/iOS voices, T11).
   # The Mac app falls back to the system voice if Kokoro isn't available. The iPhone Shortcut uses Siri's voice.
-  speak_full_answer: true   # Lea's rule (2026-11-06): read the whole answer aloud; she says "stop" to interrupt
+  speak_full_answer: true   # My rule: read the whole answer aloud; she says "stop" to interrupt
   tts: kokoro
   load_on_demand: true          # efficiency plan A2: Whisper/Kokoro (~1.9 GB) load when voice is used, not at startup
   unload_after_minutes: 10      # …and unload after this long without voice (2 min while memory is tight)
   tts_model: mlx-community/Kokoro-82M-bf16
-  kokoro_voices: {en: af_heart, es: ef_dora, fr: ff_siwis}   # Lea tried Isabella, went back to Heart (2026-11-06)
+  kokoro_voices: {en: af_heart, es: ef_dora, fr: ff_siwis}   # I tried Isabella and went back to Heart
   speed: 1.0
   # How names should sound (espeak reads "Lea" as "Lee"). Default — Lea can change.
   respell: {en: {Lea: Leia}, es: {Sylvie: Silvi}, fr: {Lea: Léa}}
@@ -103,7 +103,7 @@ actions:
   # Allowlist: only these can ever be called. Remove one to switch it off; [] turns all actions off.
   enabled: [music, play_music, save_playlist, calendar_events, create_event, create_reminder, set_timer,
             open_app, open_in_browser, run_shortcut, read_emails, draft_email, send_email,
-            watch, send_message, call, directions, create_note, list_reminders, contact_info]   # the last seven: Lea, 2026-11-08
+            watch, send_message, call, directions, create_note, list_reminders, contact_info]   # the last seven: app actions
   # run_command (Terminal commands) is off by default; add it above to switch it on. Even then sudo,
   # disk erasing, wiping folders, Keychain passwords and curl|sh never run.
   confirm: delete_or_send   # ask before deleting or sending (never | delete_or_send | changes)
@@ -119,9 +119,9 @@ schedule:
   window_start: "01:00"         # heavy jobs only at night…
   window_end: "07:00"
   idle_minutes: 30              # …when Lea hasn't used Sylvie for this long…
-  max_hours_per_night: 4        # …plugged in (never on battery), within this cap (Lea, 2026-11-08: 4 h)
+  max_hours_per_night: 4        # …plugged in (never on battery), within this cap (4 h)
   finetune_every_days: 3        # was 10; with permanent training there's enough new data sooner
-  always: false                 # Lea, 2026-11-08: back to nights only (was: any hour Sylvie is unused, from 2026-11-07)
+  always: false                 # back to nights only (was: any hour Sylvie is unused, from 2026-11-07)
   always_idle_minutes: 5        # …after this many quiet minutes (plugged in only; never on battery)
   always_job_minutes: 240       # one practice run, then the next starts while she's still unused
   job_memory_gb: 20             # A2: a night job starts only if this much is free once Sylvie unloads (judge ~18 GB)
@@ -130,11 +130,11 @@ schedule:
 learning:
   learn_after_quiet_minutes: 5  # A5: facts/interests/style learned once a conversation is quiet this long (not after every message)
   small_model: auto             # A3: fact extraction by Apple's on-device model once it passed `make extraction-check` (auto), apple, or sylvie
-  # Lea chose autonomy (2026-11-07): night pairs on GENERAL questions that code verified, or that the
+  # I chose autonomy: night pairs on GENERAL questions that code verified, or that the
   # local judge re-graded at least this high, train without her spot-check. Personal ones still wait.
   auto_approve_judged: true
   auto_approve_min_score: 8
-  cycle_minutes: 90             # time kept free at the end of a run for train + evals (9B: ~20 min train)      # Lea wants Sylvie to learn more on her own (2026-11-06); off | weekly | daily
+  cycle_minutes: 90             # time kept free at the end of a run for train + evals (9B: ~20 min train)      # I want Sylvie to learn more on her own; off | weekly | daily
 
 zotero:
   enabled: false                # opt in

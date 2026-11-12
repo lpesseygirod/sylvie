@@ -1,4 +1,4 @@
-"""Claude's own memory notes about Lea, offered to her as suggestions (Lea, 2026-11-07: "Yes, as suggestions").
+"""Claude's own memory notes about Lea, offered to her as suggestions ("Yes, as suggestions").
 
 Claude wrote these notes, not Lea, so nothing is used until she says so. Each note becomes a
 suggestion in About Lea, where she can keep it as a fact, use it as a rule for answers, or dismiss

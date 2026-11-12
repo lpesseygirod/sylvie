@@ -1,4 +1,4 @@
-"""Learning what Lea likes from the apps she uses most (Lea's request, 2026-11-08).
+"""Learning what Lea likes from the apps she uses most (my request).
 
 No logins and no scraping: Sylvie never signs in to Lea's accounts (and TikTok/Instagram forbid
 automated access). Every one of these apps lets Lea download her own data ("Download your data",

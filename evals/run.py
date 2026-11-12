@@ -116,7 +116,7 @@ def everyday_problems(item: dict, answer: str, tools: list[str], calls: list | N
         problems.append(f"didn't call {' or '.join(wanted)} (called {', '.join(tools) or 'nothing'})")
     if c.get("not_tool") and c["not_tool"] in tools:
         problems.append(f"called {c['not_tool']}")
-    # Lea, 2026-11-10: "when I ask you for reminders… just say got it" (todo set)
+    # "when I ask you for reminders… just say got it" (todo set)
     if c.get("max_words") and len(re.findall(r"\w+", answer)) > c["max_words"]:
         problems.append(f"answer longer than {c['max_words']} words")
     if "<doc" in answer and item.get("channel") == "voice":
@@ -350,7 +350,7 @@ def main() -> None:
             print(f"  {name:<14} {sm['correct']}/{sm['scored']}  ({sm['accuracy']})")
         return
     # An eval loads its own copy of Sylvie next to the live one: A1 found 11 runs adding to the day's
-    # memory pressure. Refuse when that doesn't fit (efficiency plan A2). Measured 2026-11-09: the eval
+    # memory pressure. Refuse when that doesn't fit. Measured 2026-11-09: the eval
     # peaked at 9.8 GB; started with 9.2 GB free, it swapped 4.5 GB and answers slowed 1.4 → 4.3 s.
     from core.config import load_config
     from core.memguard import MemoryGuard

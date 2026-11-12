@@ -217,7 +217,7 @@ final class PanelController: NSObject, WKScriptMessageHandler, WKNavigationDeleg
     }
 }
 
-/// The full chat window, like Claude. Also hosts voice mode (/voice), whose microphone and
+/// The full chat window, like other AI chat apps. Also hosts voice mode (/voice), whose microphone and
 /// speaker are the app's own (wake word, echo cancellation, Kokoro): the page sends button presses
 /// here and the app sends it states and events.
 final class ChatWindowController: NSObject, WKScriptMessageHandler, WKNavigationDelegate {

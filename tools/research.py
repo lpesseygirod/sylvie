@@ -1,6 +1,6 @@
 """Parallel research: one big question → sub-questions searched at the same time → notes.
 
-Lea asked (2026-11-06) for Sylvie to split work across "several Sylvies". On a 36 GB Mac only one
+I asked for Sylvie to split work across "several Sylvies". On a 36 GB Mac only one
 27B model fits, so the helpers share it: their web searches run at the same time (network-bound),
 and their notes are written in one batched generation (mlx-lm batch_generate) instead of one
 after another. Sylvie then writes the final answer from the notes, with sources.

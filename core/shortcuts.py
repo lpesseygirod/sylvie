@@ -1,6 +1,6 @@
 """Learned shortcuts: requests Lea makes often get their lookup started right away.
 
-Lea asked (2026-11-06) that things she asks frequently be automated and answered faster. After
+I asked that things I ask often be automated and answered faster. After
 each answer where Sylvie used a read-only tool, the request is remembered (with its embedding).
 Once Lea has asked about the same thing MIN_REPEATS times, it becomes a shortcut: next time,
 Sylvie runs that lookup immediately instead of first spending a model round deciding to. The

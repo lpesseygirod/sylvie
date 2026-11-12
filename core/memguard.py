@@ -1,4 +1,4 @@
-"""The memory guard (efficiency plan A2): heavy work only when the Mac has room and Lea isn't using it.
+"""The memory guard: heavy work only when the Mac has room and Lea isn't using it.
 
 Measured 2026-11-08: the freezes came from heavy work
 running next to Lea's own apps (~20–25 GB: Docker, browsers, editors). The guard reads macOS's

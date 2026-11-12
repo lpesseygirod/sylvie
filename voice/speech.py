@@ -105,7 +105,7 @@ class SentenceStreamer:
         self.spoken = 0
         self.max = max_sentences
         self.done = False
-        # full: speak the whole answer (Lea's rule, 2026-11-06: "don't cut yourself off unless I say
+        # full: speak the whole answer (my rule: "don't cut yourself off unless I say
         # stop"). Code blocks and tables are still skipped: they can't be read aloud sensibly.
         self.full = full
         self.in_code = False

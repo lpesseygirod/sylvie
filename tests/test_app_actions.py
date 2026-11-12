@@ -1,4 +1,4 @@
-"""The app actions Lea asked for on 2026-11-08: watch, send_message, call, directions, create_note.
+"""The app actions I asked for: watch, send_message, call, directions, create_note.
 Everything runs against a FAKE AppleScript runner and a fake `open`: nothing real happens."""
 
 import subprocess
@@ -56,7 +56,7 @@ def test_send_message_reads_contacts_and_sends(tmp_path):
     out = r.call("send_message", {"to": "Mamá", "text": "Llego tarde, a las 9"}, None)
     assert (
         out.pending_id and "Send a message to Mama" in out.content
-    )  # even with confirm: never (Lea, 2026-11-08)
+    )  # even with confirm: never
     out = r.confirm(out.pending_id)
     assert out.ok and out.content == "Message sent to Mama."
     sent = [args for script, args in osa.calls if script == MESSAGES_SEND]

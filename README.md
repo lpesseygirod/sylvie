@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/lpesseygirod/sylvie/actions/workflows/ci.yml/badge.svg)](https://github.com/lpesseygirod/sylvie/actions/workflows/ci.yml)
 
-Sylvie is my personal AI assistant. She runs completely on my laptop, so nothing personal goes to the cloud. I wanted an assistant that knows me, speaks my three languages, and that I can train myself.
+Sylvie is my personal AI assistant. Her models run on my laptop, so my conversations and memory stay there; only web searches (with my name taken out) and things I explicitly hand to Claude leave the Mac. I wanted an assistant that knows me, speaks my three languages, and that I can train myself.
 
 ![Sylvie's chat: a document in the side panel, and an email she asks about before sending](docs/media/chat.png)
 
@@ -24,7 +24,7 @@ uv run python scripts/ui_dev.py     # then open http://127.0.0.1:8766/auth?t=dev
 - Talk by voice in English, Spanish and French, and start answering as soon as the first sentence is ready
 - Remember what I tell her, and forget it when I ask
 - Search the web privately, a local copy of Wikipedia and my own documents, and show where the answer came from
-- Use my calendar, reminders, email and Spotify. She asks before deleting or sending anything, and I can undo it
+- Use my calendar, reminders, email and Spotify. She asks before sending anything to a person, and I can undo new events, reminders and notes
 - Work from a menu bar app on my Mac, and from my iPhone
 
 ![About me: what Sylvie has learned, with guesses I confirm or delete](docs/media/about-me.png)
@@ -57,12 +57,12 @@ She uses open-source Qwen models through Apple's MLX: a 9B model for everyday ch
 
 This is the part I've enjoyed the most. I built my own pipeline to fine-tune the model with LoRA:
 
-1. A dataset builder that only uses licensed data and keeps my personal data out ([`learning/privacy.py`](learning/privacy.py) checks every example for my name, phone numbers and other personal terms)
+1. A dataset builder that only takes examples from an allowlist of openly licensed sources and filters my personal data out ([`learning/privacy.py`](learning/privacy.py) checks every example for my name, phone numbers and other personal terms)
 2. Training at night, only when the Mac is plugged in and I'm not using it
 3. Test sets that she's never trained on: maths, finance, languages, tool use, general knowledge and style ([`evals/sets/`](evals/sets))
-4. A new version only replaces the old one if it doesn't get worse on any test ([`learning/promote.py`](learning/promote.py))
+4. Each new version is compared with the current one on every test set ([`evals/run.py`](evals/run.py)). I only make it the default if no set drops by more than 5% and it also wins a blind A/B test against the old one ([`learning/promote.py`](learning/promote.py))
 
-At night, a second model also reviews her answers and suggests better ones for me to check.
+At night, a second model (Gemma) grades her answers and Sylvie rewrites the weak ones. General examples that pass the checks go into training without me reviewing each one; anything personal waits for my OK.
 
 **My best version of the 27B (v004):**
 
@@ -75,11 +75,11 @@ At night, a second model also reviews her answers and suggests better ones for m
 | General knowledge | 8/8 |
 | Style | went from 4/12 to 6/12 |
 
-**The gate doing its job.** v002 of the 27B lost points in finance, so it was rejected; v004 came after I fixed the bug below and has no regressions. On the 9B, my latest adapter (v005) got better at style (7/12 → 9/12) but worse at maths (25 → 23/25), finance (14 → 10/14) and tool use (9 → 7/9), so it was rejected too and Sylvie stays on the base 9B day to day. Passing the tests isn't the last step: a version also has to win my blind A/B before it becomes the default. All the scores are in [`evals/results/`](evals/results).
+**The comparison doing its job.** v002 of the 27B lost points in finance, languages and tool use, so I rejected it; v004 came after I fixed the bug below and has no regressions. On the 9B, my latest adapter (v005) got better at style (7/12 → 9/12) but worse at maths (25 → 23/25), finance (14 → 10/14) and tool use (9 → 7/9), so it was rejected too and Sylvie stays on the base 9B day to day. Passing the tests isn't the last step: a version also has to win my blind A/B before it becomes the default. All the scores are in [`evals/results/`](evals/results).
 
 **Tests drive the fixes too.** When she handled to-do requests badly, I wrote a 15-question set first: 3/15 before the fix, 15/15 after.
 
-**Speed on my laptop (27B):** about 25 tokens per second. In a long chat, the next answer starts in about 0.2 s instead of 14 s, because I reuse the earlier part of the conversation (prompt caching). By voice, she starts speaking 0.8 to 1.5 s after I stop talking.
+**Speed on my laptop:** the 27B generates about 25 tokens per second on its own, but only 9–10 with my other apps open, which is why she uses the 9B day to day. On the 9B, in a long chat the next answer starts in about 0.2 s because I reuse the earlier part of the conversation (prompt caching), and by voice she starts speaking about 0.8 s after I stop talking.
 
 ## Problems I ran into
 
@@ -110,7 +110,7 @@ To change a setting, copy `config.yaml` to `config.local.yaml` and edit that. Mo
 
 ## How I built it
 
-I designed Sylvie and made the product calls; I built her with Claude Code as my pair programmer. Every technical decision is written down with what, why and the alternatives in [`docs/decisions.md`](docs/decisions.md).
+I designed Sylvie and made every product decision. I built her using Claude Code as a coding assistant, and reviewed and tested every change. Every technical decision is written down with what, why and the alternatives in [`docs/decisions.md`](docs/decisions.md).
 
 ## What I'm working on next
 

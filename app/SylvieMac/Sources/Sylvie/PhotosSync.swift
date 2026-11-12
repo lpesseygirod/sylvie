@@ -8,7 +8,7 @@ let photosLog = Logger(subsystem: "app.sylvie.mac", category: "photos")
 
 /// Copies the Photos library's two index databases (Photos.sqlite: photos, dates, faces → people;
 /// search/psi.sqlite: places, things, events) into Sylvie's data folder, where the server searches
-/// them (lea_profile/photos.py). Lea, 2026-11-08: "show me the photos with…".
+/// them (lea_profile/photos.py). "show me the photos with…".
 ///
 /// macOS only lets an app with Full Disk Access read inside the library; Lea grants it in System
 /// Settings (Sylvie can't, and wouldn't). Without it this does nothing and says so in status.json.
@@ -33,7 +33,7 @@ final class PhotosSync {
 
     func start() {
         sync()
-        // Photos.sqlite is large (867 MB on Lea's Mac, 2026-11-08) and Photos touches it all the time:
+        // Photos.sqlite is large (867 MB on my Mac) and Photos touches it all the time:
         // a copy every 6 hours keeps it fresh enough without wearing the disk.
         timer = Timer.scheduledTimer(withTimeInterval: 6 * 60 * 60, repeats: true) { [weak self] _ in self?.sync() }
     }

@@ -22,7 +22,7 @@ def test_an_earlier_conversation_is_remembered_in_a_new_one(tmp_path):
 
 
 def test_search_tool_still_remembers_deleted_conversations(tmp_path):
-    """Lea, 2026-11-07: deleting a conversation must not make Sylvie lose what she learned from it."""
+    """Deleting a conversation must not make Sylvie lose what she learned from it."""
     s = make(tmp_path, [])
     keep = s.convs.create(title="a")["id"]
     gone = s.convs.create(title="b")["id"]

@@ -16,12 +16,12 @@ from collections.abc import Iterator
 from core.lang import PHRASES, guess_language
 from voice.speech import DocFilter, SentenceStreamer
 
-# Lea (2026-11-06): when an answer takes a while, say a little sentence so she knows Sylvie is on it.
+# When an answer takes a while, say a little sentence so she knows Sylvie is on it.
 FIRST_FILLER_S = 2.5  # nothing spoken yet after this → "One moment…"
 STILL_WORKING_S = 12.0  # then, while still quiet → "Still on it…" (at most twice)
 _DONE = object()
 
-# Lea, 2026-11-08: "stop listening" = stop talking AND stop listening, completely (the app mutes the mic);
+# "stop listening" = stop talking AND stop listening, completely (the app mutes the mic);
 # a bare "stop" = stop talking and listen for the next order right away. No model needed for either.
 STOP_LISTENING_RE = re.compile(
     r"\b(stop|quit) listening\b|\b(deja|dejas|para|parar|dejar) de (escuchar|o[ií]r)(me)?\b|"

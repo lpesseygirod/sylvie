@@ -338,7 +338,7 @@ def test_spanish_claims_and_volume_requests_are_caught():
 
 
 def test_after_a_song_she_just_says_done(tmp_path):
-    """Lea, 2026-11-08: no "¿Te gusta el ritmo?" after a song, just done."""
+    """No "¿Te gusta el ritmo?" after a song, just done."""
     play = "<tool_call>\n<function=play_music>\n<parameter=query>\nReina Maluma\n</parameter>\n</function>\n</tool_call>"
     s = make(
         tmp_path,

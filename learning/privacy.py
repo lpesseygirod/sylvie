@@ -1,6 +1,6 @@
 """Is a piece of training text about Lea? Keeps her out of the shared ("general") part of Sylvie.
 
-Lea, 2026-11-07: the general things Sylvie learns must be stored apart from her personal ones, so a
+The general things Sylvie learns must be stored apart from her personal ones, so a
 base Sylvie can be given to other people and learn from them. Personal facts already live in memory,
 not in the model's weights (rule 12), and training already leaves out examples tagged "personal".
 But a "general" example can still carry her: an answer written with her profile in the prompt greets

@@ -1,6 +1,6 @@
 """Handing a task to Claude when Lea asks for it ("ask Claude…", "pregúntale a Claude", "délègue à Claude").
 
-Lea, 2026-11-06: delegate to Claude and pass the answer back. This is the one thing Sylvie does that
+It delegates to Claude and passes the answer back. This is the one thing Sylvie does that
 leaves the Mac: the task text goes to Anthropic through Claude Code (already installed and signed in),
 so it only runs when Lea's own message asks for Claude. Claude runs with no tools, no MCP servers and
 an empty working folder: it can only write an answer, never read or change anything here. The answer

@@ -1,8 +1,8 @@
 # Eval results
 
-Scores copied from the runs saved on my Mac (`evals/run.py` writes one JSON per run). A fine-tuned version is only
-allowed to replace the current model if it scores no worse on every set (`learning/promote.py`), and then it still
-has to win my blind A/B.
+Scores copied from the runs saved on my Mac (`evals/run.py` writes one JSON per run). I only make a fine-tuned version
+the default if no set drops by more than 5% (`evals/run.py`) and it also wins my blind A/B (`learning/promote.py`).
+None has been made the default yet: Sylvie still runs on the base models.
 
 ## Qwen 27B: base vs my fine-tunes (5–6 Nov 2026)
 

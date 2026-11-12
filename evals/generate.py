@@ -162,7 +162,7 @@ def style_items() -> list[dict]:
     ]
 
 
-# Everyday questions (Lea, 2026-11-08: "make tests of common questions and see if she is able to do it").
+# Everyday questions ("make tests of common questions and see if she is able to do it").
 # Each checks what she must DO, never a written answer: the tool she must call, the language she must
 # answer in, and that she doesn't say she has no access. "before" turns set up a conversation in another
 # language; "channel"/"heard" make it a voice turn with the language Whisper detected.
@@ -239,7 +239,7 @@ EVERYDAY = [
 ]
 
 
-# Lea, 2026-11-08: "make more tests of access to apps… and see that she does it". Each checks the tool
+# "make more tests of access to apps… and see that she does it". Each checks the tool
 # she calls and one argument it must carry. Run against fake apps, a made-up photo library and made-up
 # WhatsApp chats (evals/run.py): nothing is sent, played or opened for real.
 APPS = [
@@ -276,7 +276,7 @@ APPS = [
     ("Recuérdame comprar el regalo de mamá mañana a las 6", "es", "create_reminder", ("title", "regalo")),
     ("Pon un temporizador de 20 minutos para la pasta", "es", "set_timer", ("minutes", "20")),
     ("Lee mis últimos correos", "es", "read_emails", None),
-    # calendar, Blackboard deadlines, reminders, contacts, documents (Lea, 2026-11-08)
+    # calendar, Blackboard deadlines, reminders, contacts, documents
     ("¿Qué tengo esta semana?", "es", "calendar_events", None),
     ("When is my criminology essay due?", "en", "calendar_events", ("search", "")),
     ("What are my reminders?", "en", "list_reminders", None),

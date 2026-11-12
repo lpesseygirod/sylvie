@@ -1,4 +1,4 @@
-"""Lea's photo library: find photos by who's in them, where, what, and when (Lea, 2026-11-08:
+"""Lea's photo library: find photos by who's in them, where, what, and when (
 "show me the photos with…").
 
 Apple Photos already did the hard part on the Mac: it names the people Lea tagged, recognises things

@@ -149,7 +149,7 @@ def build(
     """`measure(messages, tools) -> (total_tokens, prompt_tokens)` (see `token_measure`) checks each
     example against the training length exactly as mlx-lm will tokenize it.
     `privacy` (learning/privacy.PersonalTerms): a "general" example that mentions Lea (her name, a
-    phone number, her projects…) is treated as personal and left out (Lea, 2026-11-07)."""
+    phone number, her projects…) is treated as personal and left out."""
     from learning.privacy import example_text
 
     guard = EvalGuard()

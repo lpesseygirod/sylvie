@@ -1,4 +1,4 @@
-"""Offline Wikipedia: indexing, search, and the tool Sylvie calls (Lea, 2026-11-07)."""
+"""Offline Wikipedia: indexing, search, and the tool Sylvie calls."""
 
 import threading
 

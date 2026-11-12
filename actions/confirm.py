@@ -11,7 +11,7 @@ import re
 import subprocess
 
 # A clear yes: a short reply made only of yes-words (and fillers like "please", "Sylvie"), in any of
-# Lea's languages. Lea, 2026-11-06: "a yes from me should be enough", so "Sylvie, yes", "Yes please,
+# Lea's languages. "a yes from me should be enough", so "Sylvie, yes", "Yes please,
 # go ahead" and "Sí, claro, hazlo" all count. Any "no / but / wait / change" makes it not a yes.
 _YES = {
     "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "confirm", "confirmed", "go", "ahead", "do", "send",
@@ -57,7 +57,7 @@ def screen_is_locked() -> bool:
     try:
         out = subprocess.run(
             # Full path: the background service (launchd) has no /usr/sbin in its PATH, so plain "ioreg"
-            # failed there and the safe fallback said "locked" every time (Lea, 2026-11-06).
+            # failed there and the safe fallback said "locked" every time.
             ["/usr/sbin/ioreg", "-n", "Root", "-d1", "-a"],
             capture_output=True,
             text=True,

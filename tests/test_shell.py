@@ -83,7 +83,7 @@ def test_never_ask_mode(tmp_path):
         ("run_shortcut", {"name": "Spotify"}),
     ]:
         assert not s.actions.needs_yes(name, args, after_untrusted=False)
-    # …but anything sent to a person is read back first (Lea, 2026-11-08: "Yes, ask me first")
+    # …but anything sent to a person is read back first ("Yes, ask me first")
     assert s.actions.needs_yes("send_email", {"to": "a@b.c"}, after_untrusted=False)
     assert s.actions.needs_yes("send_message", {"to": "Mamá", "text": "hola"}, after_untrusted=False)
     # text from a web page or email still can't make her run things on its own
