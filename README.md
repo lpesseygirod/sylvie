@@ -75,7 +75,7 @@ At night, a second model (Gemma) grades her answers and Sylvie rewrites the weak
 | General knowledge | 8/8 |
 | Style | went from 4/12 to 6/12 |
 
-**The comparison doing its job.** v002 of the 27B lost points in finance, languages and tool use, so I rejected it; v004 came after I fixed the bug below and has no regressions. On the 9B, my latest adapter (v005) got better at style (7/12 → 9/12) but worse at maths (25 → 23/25), finance (14 → 10/14) and tool use (9 → 7/9), so it was rejected too and Sylvie stays on the base 9B day to day. Passing the tests isn't the last step: a version also has to win my blind A/B before it becomes the default. All the scores are in [`evals/results/`](evals/results).
+**The comparison doing its job.** v002 of the 27B lost two finance questions against its base run, so I rejected it; v004 came after I fixed the bug below and has no regressions. On the 9B, my latest adapter (v005) got better at style (7/12 → 9/12) but worse at maths (25 → 23/25), finance (14 → 10/14) and tool use (9 → 7/9), so it was rejected too and Sylvie stays on the base 9B day to day. Passing the tests isn't the last step: a version also has to win my blind A/B before it becomes the default. All the scores are in [`evals/results/`](evals/results).
 
 **Tests drive the fixes too.** When she handled to-do requests badly, I wrote a 15-question set first: 3/15 before the fix, 15/15 after.
 

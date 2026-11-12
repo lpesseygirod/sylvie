@@ -1,0 +1,910 @@
+{
+ "label": "current",
+ "model": "mlx-community/Qwen3.8-27B-4bit",
+ "adapter": null,
+ "date": "2026-11-06T06:03:48",
+ "summary": {
+  "math": {
+   "n": 25,
+   "scored": 25,
+   "correct": 25,
+   "accuracy": 1.0
+  },
+  "finance": {
+   "n": 14,
+   "scored": 14,
+   "correct": 14,
+   "accuracy": 1.0
+  },
+  "multilingual": {
+   "n": 10,
+   "scored": 10,
+   "correct": 10,
+   "accuracy": 1.0
+  },
+  "tools": {
+   "n": 9,
+   "scored": 9,
+   "correct": 9,
+   "accuracy": 1.0
+  },
+  "general": {
+   "n": 8,
+   "scored": 8,
+   "correct": 8,
+   "accuracy": 1.0
+  },
+  "style": {
+   "n": 12,
+   "scored": 12,
+   "correct": 4,
+   "accuracy": 0.333
+  }
+ },
+ "results": [
+  {
+   "id": "math-0",
+   "set": "math",
+   "prompt": "What is 2228 minus 831? Just the number.",
+   "answer": "1397",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.41,
+   "total_s": 0.61
+  },
+  {
+   "id": "math-1",
+   "set": "math",
+   "prompt": "What is 2594 minus 875? Just the number.",
+   "answer": "1719",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 5.42,
+   "total_s": 5.73
+  },
+  {
+   "id": "math-2",
+   "set": "math",
+   "prompt": "What is 1729 minus 432? Just the number.",
+   "answer": "1297",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.58,
+   "total_s": 0.86
+  },
+  {
+   "id": "math-3",
+   "set": "math",
+   "prompt": "What is 2902 plus 445? Just the number.",
+   "answer": "3347",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.63,
+   "total_s": 0.9
+  },
+  {
+   "id": "math-4",
+   "set": "math",
+   "prompt": "What is 2910 minus 977? Just the number.",
+   "answer": "1933",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.28,
+   "total_s": 4.61
+  },
+  {
+   "id": "math-5",
+   "set": "math",
+   "prompt": "What is 7592 plus 631? Just the number.",
+   "answer": "8223",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.09,
+   "total_s": 4.33
+  },
+  {
+   "id": "math-6",
+   "set": "math",
+   "prompt": "What is 3141 times 186? Just the number.",
+   "answer": "584226",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.94,
+   "total_s": 4.32
+  },
+  {
+   "id": "math-7",
+   "set": "math",
+   "prompt": "What is 5152 plus 286? Just the number.",
+   "answer": "5438.\n\n\n5438.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.53,
+   "total_s": 1.51
+  },
+  {
+   "id": "math-8",
+   "set": "math",
+   "prompt": "What is 909 times 509? Just the number.",
+   "answer": "462681",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.99,
+   "total_s": 4.37
+  },
+  {
+   "id": "math-9",
+   "set": "math",
+   "prompt": "What is 7944 times 589? Just the number.",
+   "answer": "4679016",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.9,
+   "total_s": 4.32
+  },
+  {
+   "id": "math-10",
+   "set": "math",
+   "prompt": "What is 7982 minus 178? Just the number.",
+   "answer": "7804",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.51,
+   "total_s": 0.76
+  },
+  {
+   "id": "math-11",
+   "set": "math",
+   "prompt": "What is 6307 plus 125? Just the number.",
+   "answer": "6432.\n\n\n6432",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.62,
+   "total_s": 1.36
+  },
+  {
+   "id": "math-12",
+   "set": "math",
+   "prompt": "What is 4518 plus 571? Just the number.",
+   "answer": "5089",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.94,
+   "total_s": 4.2
+  },
+  {
+   "id": "math-13",
+   "set": "math",
+   "prompt": "What is 885 minus 819? Just the number.",
+   "answer": "66",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.56,
+   "total_s": 0.68
+  },
+  {
+   "id": "math-14",
+   "set": "math",
+   "prompt": "What is 8583 minus 764? Just the number.",
+   "answer": "7819",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.46,
+   "total_s": 0.67
+  },
+  {
+   "id": "pct-0",
+   "set": "math",
+   "prompt": "What is 21% of 1961?",
+   "answer": "21% of 1961 is **411.81**.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.86,
+   "total_s": 5.02
+  },
+  {
+   "id": "pct-1",
+   "set": "math",
+   "prompt": "What is 33% of 261?",
+   "answer": "33% of 261 is **86.13**.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.83,
+   "total_s": 5.01
+  },
+  {
+   "id": "pct-2",
+   "set": "math",
+   "prompt": "What is 17.5% of 1873?",
+   "answer": "17.5% of 1873 is **327.775** (about 327.78).",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.07,
+   "total_s": 6.26
+  },
+  {
+   "id": "pct-3",
+   "set": "math",
+   "prompt": "What is 17.5% of 1461?",
+   "answer": "17.5% of 1461 is **255.675** (about 255.68 if you round to two decimals).",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.99,
+   "total_s": 6.74
+  },
+  {
+   "id": "pct-4",
+   "set": "math",
+   "prompt": "What is 21% of 561?",
+   "answer": "117.81",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.79,
+   "total_s": 4.15
+  },
+  {
+   "id": "pct-5",
+   "set": "math",
+   "prompt": "What is 12% of 485?",
+   "answer": "12% of 485 is **58.2**.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.69,
+   "total_s": 4.58
+  },
+  {
+   "id": "pct-6",
+   "set": "math",
+   "prompt": "What is 12% of 162?",
+   "answer": "19.44",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.84,
+   "total_s": 4.14
+  },
+  {
+   "id": "pct-7",
+   "set": "math",
+   "prompt": "What is 33% of 2126?",
+   "answer": "33% of 2126 is **701.58**.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.89,
+   "total_s": 5.0
+  },
+  {
+   "id": "pct-8",
+   "set": "math",
+   "prompt": "What is 5% of 868?",
+   "answer": "5% of 868 is **43.4**.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 3.89,
+   "total_s": 5.1
+  },
+  {
+   "id": "pct-9",
+   "set": "math",
+   "prompt": "What is 21% of 329?",
+   "answer": "69.09",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.68,
+   "total_s": 5.02
+  },
+  {
+   "id": "fv-0",
+   "set": "finance",
+   "prompt": "I invest 12000 euros at 4% per year, compounded yearly, for 14 years. How much do I have at the end? Round to 2 decimals.",
+   "answer": "You'd end up with **€20,780.12** — about €8,780 of interest on top of your €12,000.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 5.41,
+   "total_s": 8.42
+  },
+  {
+   "id": "fv-1",
+   "set": "finance",
+   "prompt": "I invest 12000 euros at 2% per year, compounded yearly, for 4 years. How much do I have at the end? Round to 2 decimals.",
+   "answer": "You'd have **€12,989.19** at the end.\n\nThat's 12,000 × 1.02⁴ = 12,989.18592, rounded to 12,989.19.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.75,
+   "total_s": 9.78
+  },
+  {
+   "id": "fv-2",
+   "set": "finance",
+   "prompt": "I invest 12000 euros at 8% per year, compounded yearly, for 13 years. How much do I have at the end? Round to 2 decimals.",
+   "answer": "You'd have **€32,635.48** at the end of 13 years.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.76,
+   "total_s": 6.21
+  },
+  {
+   "id": "fv-3",
+   "set": "finance",
+   "prompt": "I invest 5000 euros at 8% per year, compounded yearly, for 14 years. How much do I have at the end? Round to 2 decimals.",
+   "answer": "You'd have **€14,685.97** at the end of the 14 years.\n\nThat's 5000 × 1.08¹⁴, where the interest earns its own interest each year.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.96,
+   "total_s": 8.94
+  },
+  {
+   "id": "fv-4",
+   "set": "finance",
+   "prompt": "I invest 5000 euros at 4% per year, compounded yearly, for 11 years. How much do I have at the end? Round to 2 decimals.",
+   "answer": "You'd have **7,697.27 €** at the end.\n\nThat's 2,697.27 € of interest earned over the 11 years — the compounding does the quiet heavy lifting, since simple interest would only give you 2,200 €.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.66,
+   "total_s": 9.68
+  },
+  {
+   "id": "fv-5",
+   "set": "finance",
+   "prompt": "I invest 5000 euros at 6% per year, compounded yearly, for 6 years. How much do I have at the end? Round to 2 decimals.",
+   "answer": "You'll have **€7,092.60** at the end of 6 years.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.44,
+   "total_s": 5.73
+  },
+  {
+   "id": "fv-6",
+   "set": "finance",
+   "prompt": "I invest 1000 euros at 8% per year, compounded yearly, for 11 years. How much do I have at the end? Round to 2 decimals.",
+   "answer": "You'd have **€2,331.64** at the end.\n\nThat's 1000 × 1.08¹¹ = 1000 × 2.33164 ≈ 2331.64.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.95,
+   "total_s": 9.34
+  },
+  {
+   "id": "fv-7",
+   "set": "finance",
+   "prompt": "I invest 2500 euros at 2% per year, compounded yearly, for 3 years. How much do I have at the end? Round to 2 decimals.",
+   "answer": "**€2,653.02** at the end of 3 years.\n\nThat's €153.02 in interest on your €2,500.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.44,
+   "total_s": 7.55
+  },
+  {
+   "id": "npv-0",
+   "set": "finance",
+   "prompt": "Cash flows by year starting at year 0: [-1000, 889, 585]. What's the NPV at a 8% discount rate? Round to 2 decimals.",
+   "answer": "889/1.08 = 823.15, 585/1.1664 = 501.55. Summing: -1000 + 823.15 + 501.55 ≈ 324.69.\n\n**NPV ≈ 324.69** (a positive project — worth doing at 8%).",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 24.19,
+   "total_s": 32.39
+  },
+  {
+   "id": "npv-1",
+   "set": "finance",
+   "prompt": "Cash flows by year starting at year 0: [-2000, 1622, 819, 2071]. What's the NPV at a 10% discount rate? Round to 2 decimals.",
+   "answer": "The NPV is **1707.38**.\n\nBreakdown:\n- Year 0: −2000.00\n- Year 1: 1622 / 1.1 = 1474.55\n- Year 2: 819 / 1.1² = 676.86\n- Year 3: 2071 / 1.1³ = 1555.97\n\nSum = **1707.38** — a positive NPV, so the project clears the 10% hurdle.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 39.74,
+   "total_s": 51.36
+  },
+  {
+   "id": "npv-2",
+   "set": "finance",
+   "prompt": "Cash flows by year starting at year 0: [-1000, 877, 1701]. What's the NPV at a 8% discount rate? Round to 2 decimals.",
+   "answer": "The NPV is **1270.37**.\n\nQuick breakdown:\n- Year 0: −1000\n- Year 1: 877 / 1.08 = 812.04\n- Year 2: 1701 / 1.08² = 1458.34\n\nSum: −1000 + 812.04 + 1458.34 = **1270.37**",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 35.49,
+   "total_s": 45.57
+  },
+  {
+   "id": "npv-3",
+   "set": "finance",
+   "prompt": "Cash flows by year starting at year 0: [-1000, 375, 1814, 2318]. What's the NPV at a 5% discount rate? Round to 2 decimals.",
+   "answer": "The NPV is **3,004.87**.\n\nQuick breakdown:\n- Year 0: −1,000.00\n- Year 1: 375 / 1.05¹ = 357.14\n- Year 2: 1,814 / 1.05² = 1,645.36\n- Year 3: 2,318 / 1.05³ = 2,002.37\n\nSum = 3,004.87\n\n(That's a comfortably positive NPV, so the project clears the 5% hurdle with room to spare.)",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 43.8,
+   "total_s": 57.56
+  },
+  {
+   "id": "npv-4",
+   "set": "finance",
+   "prompt": "Cash flows by year starting at year 0: [-5000, 1807, 771, 1304, 2343]. What's the NPV at a 8% discount rate? Round to 2 decimals.",
+   "answer": "**NPV = 91.49**\n\nThe project just barely breaks even — a small positive net present value at 8%.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 59.83,
+   "total_s": 62.51
+  },
+  {
+   "id": "npv-5",
+   "set": "finance",
+   "prompt": "Cash flows by year starting at year 0: [-5000, 347, 826]. What's the NPV at a 8% discount rate? Round to 2 decimals.",
+   "answer": "NPV = **-3970.54**\n\nBreakdown:\n- Year 0: -5000\n- Year 1: 347 / 1.08 = 321.30\n- Year 2: 826 / 1.08² = 708.16\n\nTotal: -5000 + 321.30 + 708.16 = **-3970.54** — a deeply negative project, so it would destroy value at 8%.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 71.98,
+   "total_s": 83.63
+  },
+  {
+   "id": "multi-0",
+   "set": "multilingual",
+   "prompt": "¿Cuál es la capital de Portugal?",
+   "answer": "Lisboa.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.73,
+   "total_s": 0.97
+  },
+  {
+   "id": "multi-1",
+   "set": "multilingual",
+   "prompt": "¿Cuántos días tiene un año bisiesto?",
+   "answer": "Un año bisiesto tiene 366 días.\n\nEl normal tiene 365, pero los bisiestos suman uno extra el 29 de febrero para mantener el calendario alineado con las estaciones (un año solar dura unos 365,24 días).\n\nComo dato: 2026 **no** es bisiesto. Los más cercanos son 2024 y 2028.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.53,
+   "total_s": 8.95
+  },
+  {
+   "id": "multi-2",
+   "set": "multilingual",
+   "prompt": "¿Qué planeta es el más grande del sistema solar?",
+   "answer": "Júpiter, sin duda. Es el planeta más grande del sistema solar: su diámetro es unas 11 veces el de la Tierra, y su masa supera la de todos los demás planetas juntos.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.68,
+   "total_s": 4.62
+  },
+  {
+   "id": "multi-3",
+   "set": "multilingual",
+   "prompt": "Quelle est la capitale de l'Italie ?",
+   "answer": "Rome.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.58,
+   "total_s": 0.76
+  },
+  {
+   "id": "multi-4",
+   "set": "multilingual",
+   "prompt": "Combien de côtés a un hexagone ?",
+   "answer": "Un hexagone a **6 côtés**. C'est même ça qui donne son nom : \"hexa\" vient du grec, qui signifie \"six\".",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.5,
+   "total_s": 3.27
+  },
+  {
+   "id": "multi-5",
+   "set": "multilingual",
+   "prompt": "Quel est le symbole chimique de l'or ?",
+   "answer": "Le symbole chimique de l'or est **Au**.\n\nIl vient du latin *aurum*, qui signifie « or ». (Le symbole est tiré du nom latin, pas du nom français — c'est aussi pour ça qu'on a « Fe » pour le fer, de *ferrum*.)",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.75,
+   "total_s": 6.43
+  },
+  {
+   "id": "multi-6",
+   "set": "multilingual",
+   "prompt": "What's the chemical symbol for sodium?",
+   "answer": "Na — from *natrium*, its Latin name.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.57,
+   "total_s": 1.33
+  },
+  {
+   "id": "multi-7",
+   "set": "multilingual",
+   "prompt": "How many minutes are in three hours?",
+   "answer": "180 minutes.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.67,
+   "total_s": 0.99
+  },
+  {
+   "id": "multi-8",
+   "set": "multilingual",
+   "prompt": "Oye, ¿cuántos segundos hay en una hora? Quick answer please",
+   "answer": "3600 segundos. (60 min × 60 seg)",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.56,
+   "total_s": 2.13
+  },
+  {
+   "id": "multi-9",
+   "set": "multilingual",
+   "prompt": "Dis-moi, what's the capital of Japan?",
+   "answer": "Tokyo. It's been the capital since 1868, when it replaced Kyoto.\n\n(It's 5:57 in the morning, by the way — everything okay, or are you just up early?)",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.65,
+   "total_s": 4.82
+  },
+  {
+   "id": "tool-0",
+   "set": "tools",
+   "prompt": "What is 48213 times 9172?",
+   "answer": "48213 × 9172 = **442,209,636**",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.42,
+   "total_s": 6.51
+  },
+  {
+   "id": "tool-1",
+   "set": "tools",
+   "prompt": "Calcula 17,5% de 23.480 euros",
+   "answer": "El 17,5% de 23.480 € son **4.109 €**.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": true,
+   "first_word_s": 4.61,
+   "total_s": 6.68
+  },
+  {
+   "id": "tool-2",
+   "set": "tools",
+   "prompt": "What's the latest news about the European Central Bank interest rate decision?",
+   "answer": "I couldn't search the web — the search service isn't running right now — so I can't pull the latest ECB news. Here's what I can offer from what I know, with the caveat that it may be out of date:\n\nThe ECB's Governing Council typically meets on the last week of a month (so the next decision would likely land in late November 2026). The main rates to watch are the deposit facility rate, the main refinancing operations (MRO) rate, and the marginal lending facility rate.\n\nIf you want the current numbers and any recent decision, I'd suggest checking the ECB's official site (ecb.europa.eu) or a news source directly — or let me know if you'd like me to retry the search in a few minutes once the service is back up.",
+   "tools": [
+    "web_search"
+   ],
+   "ok": true,
+   "first_word_s": 4.97,
+   "total_s": 20.51
+  },
+  {
+   "id": "tool-3",
+   "set": "tools",
+   "prompt": "¿Quién ganó el último Gran Premio de Fórmula 1?",
+   "answer": "No puedo buscar en la web ahora mismo (el servicio de búsqueda no está funcionando), así que no tengo forma de confirmarte el último GP con datos fiables. Lo que sé puede estar desactualizado.\n\nPor el calendario, el último fin de semana de carrera antes del 6 de noviembre de 2026 sería el **Gran Premio de México** (México City, a finales de octubre). Pero no quiero adivinar el ganador sin poder verificarlo, y prefiero no darte un nombre a ciegas.\n\n¿Quieres que lo intente de nuevo en unos minutos, o me pasas el enlace de la carrera y lo abro directamente?",
+   "tools": [
+    "web_search"
+   ],
+   "ok": true,
+   "first_word_s": 4.96,
+   "total_s": 17.89
+  },
+  {
+   "id": "tool-4",
+   "set": "tools",
+   "prompt": "Hi Sylvie!",
+   "answer": "Hi Lea! It's early — 05:58 on a Friday. Up before the city, or can't sleep?\n\nAnything you need, or are we just chatting?",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.77,
+   "total_s": 4.07
+  },
+  {
+   "id": "tool-5",
+   "set": "tools",
+   "prompt": "Can you explain what a hash table is, in two sentences?",
+   "answer": "A hash table is a data structure that stores key-value pairs by running the key through a hash function, which produces an index into an array of buckets where the value lives. Lookups, inserts and deletes are O(1) on average, because the hash takes you straight to the right spot instead of scanning a list — collisions (two keys hashing to the same bucket) are handled by chaining or open addressing.\n\n\nA hash table is a data structure that stores key-value pairs by running the key through a hash function, which produces an index into an array of buckets where the value lives. Lookups, inserts and deletes are O(1) on average, because the hash takes you straight to the right spot instead of scanning a list — collisions (two keys hashing to the same bucket) are handled by chaining or open addressing.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.72,
+   "total_s": 16.97
+  },
+  {
+   "id": "tool-6",
+   "set": "tools",
+   "prompt": "Pause the music",
+   "answer": "Paused.",
+   "tools": [
+    "music"
+   ],
+   "ok": true,
+   "first_word_s": 3.49,
+   "total_s": 3.63
+  },
+  {
+   "id": "tool-7",
+   "set": "tools",
+   "prompt": "Set a timer for 10 minutes for the pasta",
+   "answer": "Timer set for 10 minutes on the pasta — it'll go off at 06:09. Enjoy the cook!",
+   "tools": [
+    "set_timer"
+   ],
+   "ok": true,
+   "first_word_s": 5.07,
+   "total_s": 7.21
+  },
+  {
+   "id": "tool-8",
+   "set": "tools",
+   "prompt": "Mets un rappel pour appeler maman demain à 18h",
+   "answer": "C'est fait — rappel « Appeler maman » pour demain, samedi 7 novembre à 18h.",
+   "tools": [
+    "create_reminder"
+   ],
+   "ok": true,
+   "first_word_s": 6.66,
+   "total_s": 8.5
+  },
+  {
+   "id": "gen-0",
+   "set": "general",
+   "prompt": "Who wrote 'One Hundred Years of Solitude'?",
+   "answer": "Gabriel García Márquez.\n\n\nGabriel García Márquez.\n\n\nThe answer is: Gabriel García Márquez.\n\n**Gabriel García Márquez** wrote *One Hundred Years of Solitude* (*Cien años de soledad*), published in 1967. (I couldn't double-check online right now, but this one's rock solid.)",
+   "tools": [
+    "web_search"
+   ],
+   "ok": true,
+   "first_word_s": 0.79,
+   "total_s": 12.25
+  },
+  {
+   "id": "gen-1",
+   "set": "general",
+   "prompt": "What's the boiling point of water at sea level in Celsius?",
+   "answer": "100 °C.\n\nThat's the standard definition at 1 atm (sea-level pressure). It drops a bit at higher altitudes — roughly 1 °C for every 285 m of elevation — so on a mountain top you'd need a lower number.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.69,
+   "total_s": 5.98
+  },
+  {
+   "id": "gen-2",
+   "set": "general",
+   "prompt": "Which language is primarily spoken in Brazil?",
+   "answer": "Portuguese. It's the only country in the Americas where Portuguese is the primary language, a legacy of the Portuguese colonization in the 16th century.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.67,
+   "total_s": 3.42
+  },
+  {
+   "id": "gen-3",
+   "set": "general",
+   "prompt": "What does CPU stand for?",
+   "answer": "CPU stands for **Central Processing Unit** — the part of a computer that carries out the instructions of a program.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.68,
+   "total_s": 2.63
+  },
+  {
+   "id": "gen-4",
+   "set": "general",
+   "prompt": "In what year did the Berlin Wall fall?",
+   "answer": "1989. Specifically, the Wall opened on 9 November 1989, and demolition began the following month.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.74,
+   "total_s": 3.09
+  },
+  {
+   "id": "gen-5",
+   "set": "general",
+   "prompt": "What is the derivative of x squared?",
+   "answer": "2x. Power rule: bring the exponent down and subtract one from the power.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 14.02,
+   "total_s": 16.93
+  },
+  {
+   "id": "gen-6",
+   "set": "general",
+   "prompt": "What is the time complexity of binary search?",
+   "answer": "O(log n) — each comparison cuts the search space in half, so you need at most log₂(n) steps to find (or rule out) an element in a sorted array of size n.\n\nSpace is O(1) for the iterative version, or O(log n) if you do it recursively (stack frames).",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 15.41,
+   "total_s": 21.96
+  },
+  {
+   "id": "gen-7",
+   "set": "general",
+   "prompt": "Which gas do plants absorb from the air for photosynthesis?",
+   "answer": "Carbon dioxide (CO₂). Plants take it in through tiny pores called stomata, then use light energy to combine it with water into glucose and oxygen — the oxygen being what we breathe out and they take back in.\n\nThe full picture: CO₂ + water + light → glucose + O₂.\n\n\nCarbon dioxide (CO₂). Plants take it in through tiny pores called stomata, then use light energy to combine it with water into glucose and oxygen — the oxygen being what we breathe out and they take back in.\n\nThe full picture: CO₂ + water + light → glucose + O₂.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.72,
+   "total_s": 12.74
+  },
+  {
+   "id": "style-0",
+   "set": "style",
+   "prompt": "hey sylvie, how are you?",
+   "answer": "Hey Lea! I'm good, thanks — running smooth this early morning. It's 6 AM, so either you're up early or you can't sleep.\n\nWhat's on your mind?",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.69,
+   "total_s": 4.14
+  },
+  {
+   "id": "style-1",
+   "set": "style",
+   "prompt": "what's a good name for a study group chat?",
+   "answer": "Honestly? It depends on the vibe you want — serious, funny, or somewhere in between. Here are my top three:\n\n1. **The Brain Trust** — clean, a little serious, works for any subject.\n2. **Cram Central** — fun and self-aware, great if you all half-joke about how much you actually study.\n3. **Group Chat of Scholars** — deadpan humor, the kind that gets a laugh every time someone joins.\n\nIf I had to pick, I'd go with **Cram Central** — it's short, memorable, and sets a \"we're in this together\" tone without being stiff.\n\nWant a few more in a different direction (subject-specific, in another language, punny)?",
+   "tools": [],
+   "ok": false,
+   "first_word_s": 0.71,
+   "total_s": 15.66
+  },
+  {
+   "id": "style-2",
+   "set": "style",
+   "prompt": "¿me das un consejo rápido para concentrarme?",
+   "answer": "La técnica más fiable y fácil: **bloques de 25 minutos de trabajo a fondo + 5 de descanso** (un pomodoro).\n\nLa clave no es el cronómetro, es que durante esos 25 minutos *una sola cosa*: móvil en otra habitación o en silencio, una sola pestaña, y si te viene un pensamiento, anótalo en un papel y vuelve. Así el cerebro deja de \"vigilar\" lo que queda pendiente.\n\nTruco extra: antes de empezar, escribe en una línea qué vas a lograr en el bloque (\"terminar la intro del informe\"). Con objetivo concreto es mucho más fácil arrancar que con \"ponerse a trabajar\".\n\nSi hoy llevas mal día, haz el primer bloque a medias (15 min) solo para romper la inercia; luego ya arranca solo.",
+   "tools": [
+    "calculator"
+   ],
+   "ok": false,
+   "first_word_s": 3.77,
+   "total_s": 20.13
+  },
+  {
+   "id": "style-3",
+   "set": "style",
+   "prompt": "c'est quoi un ETF, en deux mots ?",
+   "answer": "Un ETF (Exchange-Traded Fund), c'est un fonds d'investissement qui regroupe un panier d'actions (ou d'autres actifs) pour suivre un indice, et que tu achètes/vends en bourse comme une action classique.\n\nEn deux mots : **un panier d'actions, coté en bourse.**\n\nAvantages : diversification instantanée, frais bas, transparence. C'est le moyen le plus simple d'investir sans choisir des actions une par une.\n\nTu veux que je t'en dise plus sur comment ça marche concrètement ?",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.7,
+   "total_s": 11.83
+  },
+  {
+   "id": "style-4",
+   "set": "style",
+   "prompt": "is it worth learning Rust this year?",
+   "answer": "Honestly? Yes — but it depends on what you want out of it. I couldn't check the latest Rust news right now (search is down), so take this as a general take that may be a bit stale.\n\n**Why it's worth it:**\n- **Systems & performance-critical work** — Rust has genuinely become the default choice for new high-performance, memory-safe tooling. If you ever touch infrastructure, embedded, CLI tools, or want to write C++/Go workloads with fewer segfaults, it pays off.\n- **It teaches you to think differently** — the borrow checker forces a mental model of ownership that makes you a better programmer in *any* language. Even if you never use Rust again, that's a real gain.\n- **Ecosystem momentum** — strong tooling (cargo, clippy, rustfmt), a growing job market, and adoption in places like the Linux kernel, Cloudflare, and Windows. It's no longer a \"hype experiment.\"\n\n**The honest caveats:**\n- **Steep learning curve** — the borrow checker will humble you for weeks. If you're busy and want a quick win, Go or Zig are gentler.\n- **Only worth it if you have a use case** — if you're a pure web-frontend dev, the ROI is lower (though you can still use it for backend services and WASM).\n\n**My pick:** learn it *if* you're doing backend, systems, or performance work, or you want a deep conceptual upgrade. The best path is a project, not tutorials — I'd start with *The Rust Programming Language* (the free book) and then build something small that actually needs Rust.\n\nWhat's pulling you toward it — a project, a job, or just curiosity? That'd tell me whether it's a great fit for you this year.",
+   "tools": [
+    "web_search"
+   ],
+   "ok": false,
+   "first_word_s": 4.73,
+   "total_s": 41.24
+  },
+  {
+   "id": "style-5",
+   "set": "style",
+   "prompt": "tell me something interesting about octopuses",
+   "answer": "Here's a good one: octopuses can taste with their arms.\n\nTheir suckers contain taste receptors, so they don't just feel objects — they taste them. An octopus exploring its surroundings is essentially licking everything it touches, which is a pretty wild way to \"see\" the world.\n\nBonus: they're one of the few invertebrates that can genuinely learn from observation, and in the wild they've been caught cracking open snails, crabs, and even fish — sometimes escaping aquariums to explore.",
+   "tools": [],
+   "ok": false,
+   "first_word_s": 0.69,
+   "total_s": 10.66
+  },
+  {
+   "id": "style-6",
+   "set": "style",
+   "prompt": "any ideas for a birthday present for my sister? she likes hiking",
+   "answer": "A few good ones for a hiker:\n\n1. **A solid pair of hiking poles** (carbon, like Leki or Black Diamond) — if she doesn't already have good ones, it's the kind of thing people always want but never buy themselves.\n2. **A trail map or topo book of a region she loves**, or a gift card for a hiking trip she's been eyeing — low risk, high \"thought you of it\" factor.\n3. **A quality insulated bottle or a trail-proof daypack** (Deuter, Osprey) — practical, she'll use it every weekend.\n\nIf you tell me her budget and whether she already has gear, I can narrow it down or check current prices.",
+   "tools": [],
+   "ok": false,
+   "first_word_s": 0.65,
+   "total_s": 14.83
+  },
+  {
+   "id": "style-7",
+   "set": "style",
+   "prompt": "¿qué serie me recomiendas para esta noche?",
+   "answer": "No puedo buscar en la web ahora mismo (el servicio no está disponible), así que te respondo desde lo que conozco; puede estar un poco desactualizado.\n\nPara una noche como esta, tres opciones según el mood:\n\n1. **Severance** (temporada 2 ya está en marcha) — si quieres algo que te absorba, tenso y brillante. Mi pick.\n2. **The Bear** — si prefieres algo intenso, corto y con mucha energía.\n3. **Shogun** — si quieres algo épico y pausado, con guion impecable.\n\n¿Te tira más lo oscuro y cerebral, o prefieres algo más ligero para desconectar?",
+   "tools": [
+    "web_search"
+   ],
+   "ok": false,
+   "first_word_s": 4.85,
+   "total_s": 18.37
+  },
+  {
+   "id": "style-8",
+   "set": "style",
+   "prompt": "donne-moi une idée de dîner rapide",
+   "answer": "Voici trois idées rapides, à moins de 20 minutes :\n\n1. **Pâtes à l'ail, huile d'olive et poivrons** — une poêle, un peu d'ail, des poivrons en lamelles, et le tour est joué. C'est mon choix : simple, réconfortant, zéro vaisselle compliquée.\n2. **Omelette garnie** — 3 œufs, fromage, restes de légumes ou jambon. 8 minutes chrono.\n3. **Tortilla de riz** — riz réchauffé, œufs, poivre, un peu de tomate. La version espagnole du « j'ai faim et pas le temps ».\n\nTu veux que je te fasse une liste de courses pour l'une d'elles ?",
+   "tools": [],
+   "ok": false,
+   "first_word_s": 0.71,
+   "total_s": 16.98
+  },
+  {
+   "id": "style-9",
+   "set": "style",
+   "prompt": "what should I name my new plant?",
+   "answer": "Honestly, plant names are 90% vibes and 10% botany. Here are my top three:\n\n1. **Fernanda** — classic, a little dramatic, and it actually *is* a plant name, so it's honest.\n2. **Bruno** — for the \"no, you are not a diva, you are a fern\" energy.\n3. **Zorro** — if it's a pothos or something that trails and hides in corners.\n\nI'd go with Fernanda if it's a proper leafy plant, Bruno if it's cactus-adjacent, and Zorro if it's a vine. What are you actually growing?",
+   "tools": [],
+   "ok": false,
+   "first_word_s": 0.66,
+   "total_s": 14.02
+  },
+  {
+   "id": "style-10",
+   "set": "style",
+   "prompt": "who painted the Mona Lisa?",
+   "answer": "Leonardo da Vinci, around 1503–1519. It's been in the Louvre ever since.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.67,
+   "total_s": 3.02
+  },
+  {
+   "id": "style-11",
+   "set": "style",
+   "prompt": "¿cuántos días tiene un año bisiesto?",
+   "answer": "Un año bisiesto tiene 366 días. El día extra se añade en febrero, que pasa a tener 29 días en lugar de 28.\n\nLa regla es: un año es bisiesto si es divisible entre 4, excepto los divisibles entre 100 (que no lo son), a menos que también sean divisibles entre 400 (que sí lo son). Por ejemplo, 2024 fue bisiesto, 2100 no lo será, pero 2000 sí.",
+   "tools": [],
+   "ok": true,
+   "first_word_s": 0.67,
+   "total_s": 11.39
+  }
+ ]
+}

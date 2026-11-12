@@ -1,0 +1,309 @@
+{
+ "label": "todo-after",
+ "model": "mlx-community/Qwen3.5-9B-4bit",
+ "adapter": null,
+ "date": "2026-11-10T23:44:57",
+ "summary": {
+  "todo": {
+   "n": 15,
+   "scored": 15,
+   "correct": 15,
+   "accuracy": 1.0
+  }
+ },
+ "results": [
+  {
+   "id": "todo-0",
+   "set": "todo",
+   "prompt": "Okay, so I'm going to give you a list of to do things that I need to do and when I ask you I want you to remember me the things that I need to do. So I need to do the Azure for Microsoft.",
+   "answer": "Got it.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Do Azure for Microsoft"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 1.54,
+   "total_s": 1.54
+  },
+  {
+   "id": "todo-1",
+   "set": "todo",
+   "prompt": "Yes, Sylvie, I need you also to remember me that to send the two emails to the professors and to send an email to the for the application. Okay.",
+   "answer": "Got it.",
+   "tools": [
+    "create_reminder",
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Send emails to the professors"
+     }
+    ],
+    [
+     "create_reminder",
+     {
+      "title": "Send email for the application"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.96,
+   "total_s": 0.96
+  },
+  {
+   "id": "todo-2",
+   "set": "todo",
+   "prompt": "Yes, Sylvie, I also want you to give me a reminder to look for the computer that I need to build, like the computer for Christmas.",
+   "answer": "Got it.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Look for the computer for Christmas"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.57,
+   "total_s": 0.57
+  },
+  {
+   "id": "todo-3",
+   "set": "todo",
+   "prompt": "Sylvie, can you please also add to inform myself about finishing study ply, like all the payments and things that I need to do for it.",
+   "answer": "Got it.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Finish study ply payments and tasks"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 1.25,
+   "total_s": 1.25
+  },
+  {
+   "id": "todo-4",
+   "set": "todo",
+   "prompt": "Okay, Sylvie, can you please also remind me that I need to do the programming, finishing programming to put the API and that I need to finish the technology.",
+   "answer": "Got it.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Finish programming API and technology"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.56,
+   "total_s": 0.56
+  },
+  {
+   "id": "todo-5",
+   "set": "todo",
+   "prompt": "Okay Sylvie, I also need you to remind me to call my dad.",
+   "answer": "Got it.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Call dad"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.51,
+   "total_s": 0.51
+  },
+  {
+   "id": "todo-6",
+   "set": "todo",
+   "prompt": "Sylvie, also add that I need to work into looking what I want for Christmas.",
+   "answer": "Got it.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Work into looking what I want for Christmas"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.59,
+   "total_s": 0.59
+  },
+  {
+   "id": "todo-7",
+   "set": "todo",
+   "prompt": "Sylvie, recuérdame que tengo que llamar al dentista.",
+   "answer": "Apuntado.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Llamar al dentista"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.57,
+   "total_s": 0.57
+  },
+  {
+   "id": "todo-8",
+   "set": "todo",
+   "prompt": "Apúntame que tengo que comprar leche y pan.",
+   "answer": "Apuntado.",
+   "tools": [
+    "create_reminder",
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Comprar leche"
+     }
+    ],
+    [
+     "create_reminder",
+     {
+      "title": "Comprar pan"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.88,
+   "total_s": 0.88
+  },
+  {
+   "id": "todo-9",
+   "set": "todo",
+   "prompt": "Rappelle-moi d'appeler ma grand-mère.",
+   "answer": "C'est noté.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "title": "Appeler ma grand-mère"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.56,
+   "total_s": 0.56
+  },
+  {
+   "id": "todo-10",
+   "set": "todo",
+   "prompt": "Remind me tomorrow at 9 to hand in the criminology essay.",
+   "answer": "Got it.",
+   "tools": [
+    "create_reminder"
+   ],
+   "calls": [
+    [
+     "create_reminder",
+     {
+      "due": "2026-11-21T09:00",
+      "title": "Hand in the criminology essay"
+     }
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.97,
+   "total_s": 0.97
+  },
+  {
+   "id": "todo-11",
+   "set": "todo",
+   "prompt": "Sylvie, can you remind me of the things that I need to do?",
+   "answer": "You have two reminders: call Ana and buy a gift. The gift purchase was due yesterday at 6 p.m., so it’s overdue. Anything else you need help with right now?",
+   "tools": [
+    "list_reminders"
+   ],
+   "calls": [
+    [
+     "list_reminders",
+     {}
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.44,
+   "total_s": 0.77
+  },
+  {
+   "id": "todo-12",
+   "set": "todo",
+   "prompt": "Sylvie, ¿qué tengo en mi lista de cosas por hacer?",
+   "answer": "Tienes dos cosas pendientes: llamar a Ana y comprar un regalo, aunque ese último tenía que hacerse ayer a las 18:00. ¿Quieres que te acuerde de alguna otra cosa o que le deis a alguien más?",
+   "tools": [
+    "list_reminders"
+   ],
+   "calls": [
+    [
+     "list_reminders",
+     {}
+    ]
+   ],
+   "ok": true,
+   "first_word_s": 0.41,
+   "total_s": 0.92
+  },
+  {
+   "id": "todo-13",
+   "set": "todo",
+   "prompt": "Remind me what the capital of Australia is.",
+   "answer": "The capital of Australia is Canberra.",
+   "tools": [],
+   "calls": [],
+   "ok": true,
+   "first_word_s": 0.29,
+   "total_s": 0.29
+  },
+  {
+   "id": "todo-14",
+   "set": "todo",
+   "prompt": "Sylvie, do you remember what my favourite band is?",
+   "answer": "I think your favourite band is Arctic Monkeys. Let me know if I’m right or if it’s someone else!",
+   "tools": [],
+   "calls": [],
+   "ok": true,
+   "first_word_s": 0.29,
+   "total_s": 0.45
+  }
+ ]
+}
