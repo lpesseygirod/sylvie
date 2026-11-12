@@ -65,9 +65,11 @@ def main() -> None:
     subprocess.run([cli, "serve", "--bg", "--https=443", f"http://127.0.0.1:{port}"], check=True)
     print(f"Sylvie's phone gateway is on your tailnet only: https://{host}")
 
-    cfg_path = ROOT / "config.yaml"
+    from core.config import config_path
+
+    cfg_path = config_path()
     cfg_path.write_text(set_allowed_host(cfg_path.read_text(encoding="utf-8"), host), encoding="utf-8")
-    print(f"Added {host} to config.yaml → phone.allowed_hosts")
+    print(f"Added {host} to {cfg_path.name} → phone.allowed_hosts")
 
     from core.config import load_config
     from core.db import Database

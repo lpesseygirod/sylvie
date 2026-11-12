@@ -45,8 +45,17 @@ class Config(dict):
         return self.data_dir / "sylvie.db"
 
 
+def config_path(path: str | None = None) -> Path:
+    """The config in use: an explicit path, $SYLVIE_CONFIG, else config.local.yaml (your own settings,
+    not in git) if it exists, else the shared config.yaml with safe defaults."""
+    if path or os.environ.get("SYLVIE_CONFIG"):
+        return Path(path or os.environ["SYLVIE_CONFIG"])
+    local = ROOT / "config.local.yaml"
+    return local if local.exists() else ROOT / "config.yaml"
+
+
 @lru_cache(maxsize=1)
 def load_config(path: str | None = None) -> Config:
-    cfg_path = Path(path or os.environ.get("SYLVIE_CONFIG") or ROOT / "config.yaml")
+    cfg_path = config_path(path)
     with open(cfg_path, encoding="utf-8") as f:
         return Config(yaml.safe_load(f) or {})

@@ -15,3 +15,16 @@ tests/ui-shots/
 Claude exports/
 App exports/
 voice-samples/
+
+# your own settings and data (never in git)
+config.local.yaml
+.env
+.env.*
+*.db
+*.sqlite*
+*.safetensors
+*.wav
+*.zip
+adapters/
+logs/
+.claude/

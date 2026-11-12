@@ -121,6 +121,7 @@ def zot(tmp_path, monkeypatch):
     zotero._open.clear()
     cfg = Config(dict(load_config()))
     cfg["paths"] = {**cfg["paths"], "data_dir": str(tmp_path / "data")}
+    cfg["zotero"] = {**cfg.get("zotero", {}), "enabled": True}  # whatever the shared config says
     return cfg, zdir
 
 
@@ -318,6 +319,7 @@ def test_essay_looks_in_zotero_first_and_flags_references_no_tool_found(zot, tmp
     )
     s = make(tmp_path, [invented, json.dumps({"facts": [], "interests": [], "style": []})])
     s.cfg["paths"] = cfg["paths"]
+    s.cfg["zotero"] = cfg["zotero"]
     ev = list(s.turn("Write a short essay on coal and electric vehicle emissions", conversation_id=None))
     tools_run = [e["name"] for e in ev if e["type"] == "tool"]
     assert tools_run[0] == "zotero_library"  # before the model wrote a word

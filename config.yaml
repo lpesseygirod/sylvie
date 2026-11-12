@@ -1,4 +1,6 @@
-# Sylvie configuration. Everything swappable lives here (plan section 5).
+# Sylvie configuration. Everything swappable lives here.
+# This shared file has SAFE DEFAULTS: personal data sources are off and actions ask first.
+# Your own settings go in config.local.yaml (same format, not in git), which is used instead when it exists.
 # Values marked "default — Lea can change" are decisions Lea hasn't made yet.
 
 user:
@@ -49,7 +51,7 @@ memory:
   # Learn from Lea's own messages to Claude: Claude Code (~/.claude/projects) and claude.ai exports, read locally.
   # Only what she typed — never Claude's answers. Rules about answers arrive switched off for her to approve.
   claude_history:
-    enabled: true
+    enabled: false                 # opt in
     folder: ~/.claude/projects
     exclude_projects: []           # folder names under ~/.claude/projects to skip
     exports_folder: ~/Documents/Projects/Apps/Sylvie/Claude exports   # claude.ai export zips (web/phone chats); not in git
@@ -77,7 +79,7 @@ proactivity:
 
 knowledge:
   # Lea, 2026-11-08: "access to … docs". Code projects (.git), app libraries and cloud-only files are skipped.
-  folders: [~/Documents, ~/Desktop, ~/Library/CloudStorage/OneDrive-Personal, "~/Library/Mobile Documents/com~apple~CloudDocs"]
+  folders: []                    # opt in, e.g. [~/Documents, ~/Desktop]
   reindex_hours: 6
 
 voice:
@@ -100,11 +102,11 @@ voice:
 actions:
   # Allowlist: only these can ever be called. Remove one to switch it off; [] turns all actions off.
   enabled: [music, play_music, save_playlist, calendar_events, create_event, create_reminder, set_timer,
-            open_app, open_in_browser, run_shortcut, run_command, read_emails, draft_email, send_email,
+            open_app, open_in_browser, run_shortcut, read_emails, draft_email, send_email,
             watch, send_message, call, directions, create_note, list_reminders, contact_info]   # the last seven: Lea, 2026-11-08
-  # run_command: Terminal commands (Lea, 2026-11-06). sudo, disk erasing, wiping folders, Keychain
-  # passwords and curl|sh never run. Remove it here to switch off.
-  confirm: never   # Lea, 2026-11-06: "never ask" (delete_or_send | changes are the other options)
+  # run_command (Terminal commands) is off by default; add it above to switch it on. Even then sudo,
+  # disk erasing, wiping folders, Keychain passwords and curl|sh never run.
+  confirm: delete_or_send   # ask before deleting or sending (never | delete_or_send | changes)
   mail_from: ""          # empty = Mail's default account (decision 5, default — Lea can change)
 
 phone:
@@ -135,14 +137,14 @@ learning:
   cycle_minutes: 90             # time kept free at the end of a run for train + evals (9B: ~20 min train)      # Lea wants Sylvie to learn more on her own (2026-11-06); off | weekly | daily
 
 zotero:
-  enabled: true
+  enabled: false                # opt in
   data_dir: ~/Zotero            # read only; Sylvie indexes a copy (knowledge/zotero.py)
 
-photos:                         # Lea, 2026-11-08: find photos by people/places/things (needs Full Disk Access for the Mac app)
-  enabled: true
+photos:                         # find photos by people/places/things (needs Full Disk Access for the Mac app)
+  enabled: false                # opt in
 
-whatsapp:                       # Lea, 2026-11-08: read her chats on this Mac (read-only, never sent anywhere)
-  enabled: true
+whatsapp:                       # read chats on this Mac (read-only, never sent anywhere)
+  enabled: false                # opt in
   folder: ~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared
 
 scholar:

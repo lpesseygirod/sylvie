@@ -78,6 +78,7 @@ def test_tool_shows_photos_on_screen(tmp_path):
     from tests.test_orchestrator import make, run
 
     s = make(tmp_path, [])
+    s.cfg["photos"] = {**s.cfg.get("photos", {}), "enabled": True}  # whatever the shared config says
     fake_library(s.cfg.data_dir / "app-data" / "photos")
     lib = PhotoLibrary(s.cfg.data_dir / "app-data" / "photos")
     text, cards = answer(lib, person="Ana")
