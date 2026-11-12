@@ -3,8 +3,8 @@
 Answers are computed by code, not written by hand. These sets are for evaluation ONLY:
 learning/dataset.py refuses any training example whose prompt matches an eval prompt.
 
-Sets: math, finance, multilingual, tools, general, style. Lea's own sets (lea_questions,
-conversations, interests) are templates she fills in (evals/sets/README.md).
+Sets: math, finance, multilingual, tools, general, style. My own sets (lea_questions,
+conversations, interests) I write by hand (evals/sets/README.md).
 """
 
 from __future__ import annotations

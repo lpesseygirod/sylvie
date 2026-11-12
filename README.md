@@ -59,7 +59,7 @@ This is the part I've enjoyed the most. I built my own pipeline to fine-tune the
 
 1. A dataset builder that only takes examples from an allowlist of openly licensed sources and filters my personal data out ([`learning/privacy.py`](learning/privacy.py) checks every example for my name, phone numbers and other personal terms)
 2. Training at night, only when the Mac is plugged in and I'm not using it
-3. Test sets that she's never trained on: maths, finance, languages, tool use, general knowledge and style ([`evals/sets/`](evals/sets))
+3. Test sets that she's never trained on: 13 sets, 360 questions, from maths, finance, languages, tool use, general knowledge and style to everyday requests, to-dos and memory ([`evals/sets/`](evals/sets))
 4. Each new version is compared with the current one on every test set ([`evals/run.py`](evals/run.py)). I only make it the default if no set drops by more than 5% and it also wins a blind A/B test against the old one ([`learning/promote.py`](learning/promote.py))
 
 At night, a second model (Gemma) grades her answers and Sylvie rewrites the weak ones. General examples that pass the checks go into training without me reviewing each one; anything personal waits for my OK.

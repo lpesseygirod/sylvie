@@ -239,7 +239,7 @@ def claims_sent(text: str) -> bool:
 # Measured 2026-11-10 by voice: eight "remind me to…" / "add that I need to…" requests in a row got
 # "Got it, I'll add a reminder…" (often with a <doc> block and "anything else?") and no tool call, so
 # nothing was saved; "remind me of the things I need to do" was answered from the open chat only.
-# Lea asked four times for just "Got it". Now code decides: a to-do goes into Reminders and the
+# I asked four times for just "Got it". Now code decides: a to-do goes into Reminders and the
 # answer is a fixed "Got it"; "what do I need to do?" reads Reminders before she answers.
 _NOT_A_QUESTION = r"(?!\s+(of |about )?(what|who|whom|where|when|why|how|which|if|whether|the things|everything|all the things)\b)"
 
@@ -350,8 +350,8 @@ TODO_LIST_NOTE = (
     "only the things to do and any due dates, not the list names. Don't add anything that isn't there, "
     'and don\'t start with "Got it".)'
 )
-# Measured 2026-11-12: the eight to-dos Lea said on 10 Nov (before T54) never reached Reminders, so
-# "what I told you was in my to-do list" found none of them. What she asked for in chats counts too.
+# Measured 2026-11-12: the eight to-dos I said on 10 Nov (before T54) never reached Reminders, so
+# "what I told you was in my to-do list" found none of them. What I asked for in chats counts too.
 TOLD_TODOS_NOTE = (
     "\n\nWhat Lea asked you to note in earlier chats that never went into Reminders (her words, with dates):\n"
     "{items}\n(These are on her list too: tell her these as well, shortly, then offer once to put them in "

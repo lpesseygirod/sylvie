@@ -1152,7 +1152,7 @@ class Sylvie:
         failed: the results are then in `messages`, so she can say what went wrong).
 
         Nothing the model writes here is shown: measured 2026-11-10, its text was "Got it. I'll add a
-        reminder…" plus a <doc> block and "anything else?", which Lea asked four times not to hear."""
+        reminder…" plus a <doc> block and "anything else?", which I asked four times not to hear."""
         attempt = list(messages)
         for _ in range(2):
             sp = StreamSplitter(thinking=False)

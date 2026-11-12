@@ -3,7 +3,7 @@ import Foundation
 /// Energy-based voice activity detector with an adaptive noise floor.
 ///
 /// Decides when Lea started and stopped talking. Works on 20 ms frames of 16 kHz mono audio.
-/// (The plan names Silero VAD; this simpler detector is the first version — see docs/decisions.md.)
+/// (My plan named Silero VAD; this simpler detector is the first version.)
 public final class VoiceActivityDetector {
     public enum Event: Equatable {
         case speechStarted

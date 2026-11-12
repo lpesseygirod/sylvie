@@ -1,7 +1,7 @@
 # Sylvie configuration. Everything swappable lives here.
 # This shared file has SAFE DEFAULTS: personal data sources are off and actions ask first.
 # Your own settings go in config.local.yaml (same format, not in git), which is used instead when it exists.
-# Values marked "default — Lea can change" are decisions Lea hasn't made yet.
+# Values marked "default — I can change" are ones I haven't settled yet.
 
 user:
   name: Lea
@@ -31,7 +31,7 @@ llm:
   thinking_top_p: 0.95
 
 embeddings:
-  model: mlx-community/Qwen3-Embedding-0.6B-8bit   # default — Lea can change
+  model: mlx-community/Qwen3-Embedding-0.6B-8bit   # default — I can change
   dim: 1024
 
 server:
@@ -48,8 +48,8 @@ search:
 memory:
   recall_top_k: 6
   extract_in_background: true
-  # Learn from Lea's own messages to Claude: Claude Code (~/.claude/projects) and claude.ai exports, read locally.
-  # Only what she typed — never Claude's answers. Rules about answers arrive switched off for her to approve.
+  # Learn from my own messages to Claude: Claude Code (~/.claude/projects) and claude.ai exports, read locally.
+  # Only what I typed, never Claude's answers. Rules about answers arrive switched off until I approve them.
   claude_history:
     enabled: false                 # opt in
     folder: ~/.claude/projects
@@ -57,9 +57,9 @@ memory:
     exports_folder: ~/Documents/Projects/Apps/Sylvie/Claude exports   # claude.ai export zips (web/phone chats); not in git
 
 persona:
-  default_language: match_lea      # default — Lea can change (decision 2)
-  tone: warm, direct, a little playful   # default — Lea can change
-  length: short_by_default         # default — Lea can change
+  default_language: match_lea      # default — I can change (decision 2)
+  tone: warm, direct, a little playful   # default — I can change
+  length: short_by_default         # default — I can change
 
 quick_replies:
   # "Hello", "thanks", "bye", "how are you" (EN/ES/FR) are answered instantly, without the model.
@@ -68,13 +68,13 @@ quick_replies:
   enabled: true
 
 shortcuts:
-  # Requests Lea makes often (3+ times, e.g. "what's on my calendar today?") get their lookup started
+  # Requests I make often (3+ times, e.g. "what's on my calendar today?") get their lookup started
   # right away instead of after a model round. Only read-only lookups; answers are always fresh.
   # See them: GET /api/shortcuts; switch one off: POST /api/shortcuts/<id> {"status": "off"}.
   enabled: true
 
 proactivity:
-  mode: only_when_topic_comes_up   # default — Lea can change (decision 10)
+  mode: only_when_topic_comes_up   # default — I can change (decision 10)
   max_asides_per_conversation: 2   # I want more initiative
 
 knowledge:
@@ -87,14 +87,14 @@ voice:
   stt_model: mlx-community/whisper-large-v3-turbo
   # Speech output: "kokoro" (Kokoro-82M on this Mac, decision T27) or "system" (macOS/iOS voices, T11).
   # The Mac app falls back to the system voice if Kokoro isn't available. The iPhone Shortcut uses Siri's voice.
-  speak_full_answer: true   # My rule: read the whole answer aloud; she says "stop" to interrupt
+  speak_full_answer: true   # My rule: read the whole answer aloud; I say "stop" to interrupt
   tts: kokoro
   load_on_demand: true          # efficiency plan A2: Whisper/Kokoro (~1.9 GB) load when voice is used, not at startup
   unload_after_minutes: 10      # …and unload after this long without voice (2 min while memory is tight)
   tts_model: mlx-community/Kokoro-82M-bf16
   kokoro_voices: {en: af_heart, es: ef_dora, fr: ff_siwis}   # I tried Isabella and went back to Heart
   speed: 1.0
-  # How names should sound (espeak reads "Lea" as "Lee"). Default — Lea can change.
+  # How names should sound (espeak reads "Lea" as "Lee"). Default — I can change.
   respell: {en: {Lea: Leia}, es: {Sylvie: Silvi}, fr: {Lea: Léa}}
   voices: {en: "Samantha", es: "Mónica", fr: "Thomas"}   # system voices (fallback and iPhone)
   wake_greeting: {en: "Hello Lea", es: "Hola Lea", fr: "Bonjour Lea"}
@@ -107,34 +107,34 @@ actions:
   # run_command (Terminal commands) is off by default; add it above to switch it on. Even then sudo,
   # disk erasing, wiping folders, Keychain passwords and curl|sh never run.
   confirm: delete_or_send   # ask before deleting or sending (never | delete_or_send | changes)
-  mail_from: ""          # empty = Mail's default account (decision 5, default — Lea can change)
+  mail_from: ""          # empty = Mail's default account (decision 5, default — I can change)
 
 phone:
   # Hostnames the phone gateway answers on, e.g. ["lea-mac.tail1234.ts.net"] once Tailscale is set up
-  # (decision 8, default — Lea can change). Empty = phone access off.
+  # (decision 8, default — I can change). Empty = phone access off.
   allowed_hosts: []
 
 schedule:
   enabled: true
   window_start: "01:00"         # heavy jobs only at night…
   window_end: "07:00"
-  idle_minutes: 30              # …when Lea hasn't used Sylvie for this long…
+  idle_minutes: 30              # …when I haven't used Sylvie for this long…
   max_hours_per_night: 4        # …plugged in (never on battery), within this cap (4 h)
   finetune_every_days: 3        # was 10; with permanent training there's enough new data sooner
   always: false                 # back to nights only (was: any hour Sylvie is unused, from 2026-11-07)
   always_idle_minutes: 5        # …after this many quiet minutes (plugged in only; never on battery)
-  always_job_minutes: 240       # one practice run, then the next starts while she's still unused
+  always_job_minutes: 240       # one practice run, then the next starts while Sylvie is still unused
   job_memory_gb: 20             # A2: a night job starts only if this much is free once Sylvie unloads (judge ~18 GB)
   max_job_gb: 24                # A2: hard cap; the job (and its training child) is stopped above it, or after 3 min of pressure
-  interest_research: daily
+  interest_research: daily     # I want Sylvie to learn more on her own; off | weekly | daily
 learning:
   learn_after_quiet_minutes: 5  # A5: facts/interests/style learned once a conversation is quiet this long (not after every message)
   small_model: auto             # A3: fact extraction by Apple's on-device model once it passed `make extraction-check` (auto), apple, or sylvie
   # I chose autonomy: night pairs on GENERAL questions that code verified, or that the
-  # local judge re-graded at least this high, train without her spot-check. Personal ones still wait.
+  # local judge re-graded at least this high, train without my spot-check. Personal ones still wait.
   auto_approve_judged: true
   auto_approve_min_score: 8
-  cycle_minutes: 90             # time kept free at the end of a run for train + evals (9B: ~20 min train)      # I want Sylvie to learn more on her own; off | weekly | daily
+  cycle_minutes: 90             # time kept free at the end of a run for train + evals (9B: ~20 min train)
 
 zotero:
   enabled: false                # opt in
@@ -151,7 +151,7 @@ scholar:
   enabled: true                 # find_papers (OpenAlex) and check_reference (Crossref); only search words leave the Mac
 
 writing:
-  citation_style: apa           # apa | mla | chicago | harvard (Lea can ask for another in any request)
+  citation_style: apa           # apa | mla | chicago | harvard (I can ask for another in any request)
   practice_per_night: 6         # writing practice on open-access CC BY papers (learning/writing.py); 0 = off
 
 memwatch:
@@ -159,7 +159,7 @@ memwatch:
 
 memguard:                       # efficiency plan A2 (core/memguard.py): heavy work only when the Mac has room
   enabled: true
-  lea_away_minutes: 5           # backlog jobs (indexing, old chats, downloads) wait until Lea is away from the Mac this long
+  lea_away_minutes: 5           # backlog jobs (indexing, old chats, downloads) wait until I've been away from the Mac this long
   backlog_min_free_gb: 6        # …and this much memory is really free (free + cached files, not macOS's "free %")
   start_margin_gb: 2            # a job needs this much more to start than to keep running (no start/pause flapping)
   pause_cooldown_minutes: 10    # after a pause, background jobs wait this long before trying again

@@ -1,4 +1,4 @@
-"""Finds what to play on Spotify by name, so Sylvie can start it herself (Lea: "no, you click it,
+"""Finds what to play on Spotify by name, so Sylvie can start it herself (I told her: "no, you click it,
 it's your job"). The Spotify app on the Mac can only play a known spotify: URI; finding one from words
 needs Spotify's Web API search.
 

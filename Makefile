@@ -77,10 +77,10 @@ spotify:   # once: lets Sylvie start songs/playlists by name (free Spotify devel
 eval:
 	$(UV) python evals/run.py --label base
 
-everyday:   # ~32 everyday questions (weather, TV, songs, language switching); fake apps, throwaway memory
+everyday:   # 35 everyday questions (weather, TV, songs, language switching); fake apps, throwaway memory
 	$(UV) python evals/run.py --label everyday --sets everyday
 
-apps:   # 28 app requests (Netflix, photos, messages, calls, maps, notes…); fake apps, made-up photos and chats
+apps:   # 34 app requests (Netflix, photos, messages, calls, maps, notes…); fake apps, made-up photos and chats
 	$(UV) python evals/run.py --label apps --sets apps
 
 learn-now:   # practice + fine-tune now instead of waiting for the night (stops when you talk to Sylvie)

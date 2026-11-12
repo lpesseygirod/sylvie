@@ -4,7 +4,7 @@ Adapted from misaki/espeak.py (hexgrad/misaki, Apache-2.0): the espeak → Kokor
 below are theirs. Vendored instead of installed because misaki's package metadata excludes
 Python 3.13, and its full English pipeline needs spaCy + PyTorch; espeak-ng covers all three of
 Lea's languages (docs/decisions.md, T27). espeak-ng (via espeakng-loader) and phonemizer-fork are
-GPL-3.0 — approved by Lea for private use (docs/LICENSES.md).
+GPL-3.0; I accepted that for private use (docs/LICENSES.md).
 """
 
 from __future__ import annotations

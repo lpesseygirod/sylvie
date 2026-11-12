@@ -246,7 +246,7 @@ final class AppController: ObservableObject {
 
     /// After an answer, listen again without the wake word ("I need to repeat her name
     /// every sentence"). If she says nothing within the voice detector's 6 s, back to waiting for "Sylvie".
-    /// Off by default since 2026-11-08 (Lea: "not be activated unless I say her name"): in a room with other
+    /// Off by default since 2026-11-08 (I don't want it listening unless I say her name): in a room with other
     /// people every answer was followed by her picking up whatever was said next ("la la la", "no, no, no").
     /// `defaults write app.sylvie.mac followUpListening -bool true` turns it back on.
     private func listenForFollowUp() {
@@ -270,8 +270,8 @@ final class AppController: ObservableObject {
         recordingActive = true
         state = .listening
         wake.listensForStop = false
-        // Greet only if Lea paused after "Sylvie" — if she's already talking, don't interrupt her —
-        // and only the first time in a while (Lea: not "hello" every time; the chime says "I'm listening").
+        // Greet only if Lea paused after "Sylvie" (if she's already talking, don't interrupt her),
+        // and only the first time in a while: I don't want "hello" every time, the chime says "I'm listening".
         let firstInAWhile = Date().timeIntervalSince(lastTurnAt) > 30 * 60
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
             guard greet, firstInAWhile, let self, self.recordingActive, !self.heardSpeech else { return }

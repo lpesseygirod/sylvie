@@ -2,7 +2,7 @@
 
 The Mac app asks for each sentence it is about to speak (POST /api/voice/speak) and plays the
 WAV through its echo-cancelling audio pipeline; if this fails it falls back to the system voice.
-Phonemes come from espeak-ng (voice/g2p.py). Decision T27; Lea approved the GPL parts.
+Phonemes come from espeak-ng (voice/g2p.py). Decision T27; I approved the GPL parts.
 """
 
 from __future__ import annotations

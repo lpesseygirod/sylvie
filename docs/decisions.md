@@ -17,7 +17,7 @@
 
 ### T3 — Main model: `mlx-community/Qwen3.8-27B-4bit`
 - **What:** checked on 2026-11-05: exists, Apache 2.0, 16.1 GB on disk. Most downloaded MLX 4-bit build.
-- **Alternatives:** `Qwen3.8-27B-MTP-4bit` (multi-token prediction, possibly faster; less used — worth benchmarking later, see ideas.md), OptiQ builds (community re-quantizations, less proven).
+- **Alternatives:** `Qwen3.8-27B-MTP-4bit` (multi-token prediction, possibly faster; less used — worth benchmarking later), OptiQ builds (community re-quantizations, less proven).
 
 ### T4 — Embeddings: `mlx-community/Qwen3-Embedding-0.6B-8bit` (proposal)
 - **What:** Qwen3-Embedding 0.6B, 8-bit MLX, Apache 2.0, ~0.65 GB, 1024 dims, multilingual (EN/ES/FR).
@@ -142,7 +142,7 @@
 
 ### T29 — Claude reviews Sylvie like a coach, but never writes her training data
 - **What I asked:** Claude should mentor Sylvie and give feedback on her answers to train her.
-- **What Claude does:** it reads Sylvie's real answers and fixes the *causes*: her persona and rules (prompts), the local judge's rubric, and new evaluation questions (used only to measure her, never trained on; the dataset builder blocks them). It also writes no facts about I into memory that I didn't state myself.
+- **What Claude does:** it reads Sylvie's real answers and fixes the *causes*: her persona and rules (prompts), the local judge's rubric, and new evaluation questions (used only to measure her, never trained on; the dataset builder blocks them). It also writes no facts about me into memory that I didn't state myself.
 - **What Claude doesn't do:** write example answers, grade answers that go into a dataset, or write "better answers" for her to learn from. My build plan's rule 4 forbids it, and Anthropic's terms don't allow Claude's outputs to be used to train other AI models. Training signal comes from me (👍/👎, edits, "that's wrong"), from Sylvie's own model with code checks, from the local Gemma judge, and from open datasets.
 - **First review (baseline answers, 2026-11-05 run):** strong on facts and in Spanish/French. Weak spots: 10–15-item catalogs for casual "ideas" questions; a closing "Want me to…?" on most answers; filler openers ("Honestly? … here's the honest take"); emojis (🎉 🌱); and one wrong date claim ("the Berlin Wall fell exactly 37 years ago today", asked on 5 November, not 9 November). Fixes: five new lines in `core/prompts/persona.md`, matching points in `core/prompts/rubric.md` (so the overnight judge scores them), six new style test questions, and an emoji check in the style scorer.
 
@@ -151,7 +151,7 @@
 - **How Sylvie "creates something":** she wraps it in `<doc title="…">…</doc>` (new lines in `core/prompts/persona.md`). The chat shows a card and opens the panel, and voice never reads it aloud (`voice/speech.py: DocFilter`). "Save to notes" writes `~/Library/Application Support/Sylvie/notes/saved/<date>-<title>.md` and indexes it, so Sylvie can search it later.
 - **Voice mode, two drivers:** in the Mac app the page shows the app's own microphone, wake word, echo cancellation and Kokoro voice (the app sends states, events and mic level). In a browser the page records with getUserMedia, detects the end of speech, and plays Kokoro sentences (system voice as a fallback). After an answer it listens again, until Stop.
 - **Differences from the design, on purpose:**
-  1. *Live transcript while listening:* Whisper writes down what I said only after I stop, so listening shows a caret and "Go ahead, I'm listening." The words appear a moment later. (Streaming speech recognition would be a bigger change; it's in ideas.md.)
+  1. *Live transcript while listening:* Whisper writes down what I said only after I stop, so listening shows a caret and "Go ahead, I'm listening." The words appear a moment later. (Streaming speech recognition would be a bigger change; it's on my ideas list.)
   2. *Light mode toggle removed* (spec: dark by default, light only if I ask).
   3. *Kept extras:* the Auto / Fast / Think chip in the composer and a copy button under answers (existing features).
   4. *"Remembered: …"* shows when Sylvie saves a preference. She doesn't announce every memory she recalls, because the top matches are included every turn and that would be noise.
@@ -171,7 +171,7 @@
 - **v004** (after the fixes; 509 examples: 460 oasst2 + 49 verified practice, 168 over-long dropped): clean, 33 min, val loss 1.27 → 0.90, peak 38.5 GB. Vs the current model: maths 25/25, finance 14/14, multilingual 10/10, tools 9/9, general 8/8, style 4/12 → 6/12. **No regressions** after re-scoring (one French answer was misread as Spanish by the language check; fixed in `core/lang.py`). Blind A/B (28 pairs) waiting for me. The undecided v002 round was withdrawn (exported to `_to_delete/`).
 
 ### T32 — Practice trains the decision to use the calculator
-- **What:** mlx-lm learns only an example's last message. Our tool examples ended with the write-up after a calculator result, so the *decision to call the calculator* was never trained. That is why v002 stopped using it.
+- **What:** mlx-lm learns only an example's last message. My tool examples ended with the write-up after a calculator result, so the *decision to call the calculator* was never trained. That is why v002 stopped using it.
 - **Now:** each solved GSM8K problem gives a "decision" example (question → Sylvie's own calculator call, with her reasoning in thinking mode) as well as the answer example. Thinking-mode practice also has the calculator available. 34 earlier reasoning examples made without the calculator offered are set to `retired` (kept, not trained on).
 
 ### T33 — Rule: never claim an action that didn't happen
@@ -207,14 +207,14 @@
 ### T37 — General learning kept apart from my personal data (my request, 2026-11-07)
 - What I said: the general things Sylvie learns must be stored apart from my personal ones, so a base Sylvie can be given to other people and learn from them.
 - **Already true:** personal facts live in memory, not in the weights (rule 12), and training left out examples tagged personal.
-- **The gap, measured on real data:** 3 of 91 "general" examples still carried her (answers greeting "Hola Lea", written with her profile in the prompt).
+- **The gap, measured on real data:** 3 of 91 "general" examples still carried me (answers greeting "Hola Lea", written with my profile in the prompt).
 - **Privacy check** (`learning/privacy.py`), built from Sylvie's memory:
   - My name and surnames, any phone number or email, domains from my facts.
   - Distinctive names from my facts (people, projects): capitalised words that aren't common in the open dataset.
   - Case-sensitive, so the Spanish verb "lea" is not my name.
-  - On her data it flags those 3 and nothing generic (Madrid, Step, sums).
+  - On my data it flags those 3 and nothing generic (Madrid, Step, sums).
   - Every fine-tune build runs it; the manifest records `privacy_checked`.
-- **Identity batches** are now tagged personal: they greet her and use her preferences.
+- **Identity batches** are now tagged personal: they greet me and use my preferences.
 - **The general part** is `~/Library/Application Support/Sylvie/general/`, refreshed after every night or with `make general-pack`:
   - General examples that pass the check.
   - Adapters trained only on such data (or only on open datasets).
@@ -230,7 +230,7 @@
 - **More to learn:**
   - MMLU (MIT; ~15k multiple-choice questions in 57 subjects: law, medicine, economics, history…) joins GSM8K maths and OpenAssistant questions. The letter is checked by code.
   - Considered and left out: Aya (gated), OpenBookQA and TriviaQA (license "unknown"), ARC (CC BY-SA).
-- **Auto-approval** (`learning.auto_approve_judged: true`, I chose autonomy): night pairs on general questions that code verified, or that the local judge re-graded ≥ 8, train without my spot-check. Pairs from her own questions still wait.
+- **Auto-approval** (`learning.auto_approve_judged: true`, I chose autonomy): night pairs on general questions that code verified, or that the local judge re-graded ≥ 8, train without my spot-check. Pairs from my own questions still wait.
 - **Promotion is unchanged:** a new version replaces the current one only with no eval regressions and after my blind A/B.
 
 ### T39 — Permanent training (my request, 2026-11-07)
@@ -273,19 +273,19 @@
 
 ### T42 — Academic writing: my Zotero, research papers, real citations, writing practice (my request, 2026-11-07)
 - What I said: add scientific sources "like Zotero and JSTOR" so Sylvie writes better essays; and rather than downloading papers, let her learn *how* to write from them.
-- **My Zotero library** (`knowledge/zotero.py`, tool `zotero_library`): read from a copy of `~/Zotero/zotero.sqlite` (Zotero's own files are never changed). Citation details, abstracts, my notes and highlights, and PDF full text (Zotero's `.zotero-ft-cache`, page by page; pypdf when missing). Indexed in `<data>/zotero.db`, refreshed when Zotero changes (only changed sources re-read). Her 9 sources indexed in 3 s. Personal: never training data, never in the general pack.
+- **My Zotero library** (`knowledge/zotero.py`, tool `zotero_library`): read from a copy of `~/Zotero/zotero.sqlite` (Zotero's own files are never changed). Citation details, abstracts, my notes and highlights, and PDF full text (Zotero's `.zotero-ft-cache`, page by page; pypdf when missing). Indexed in `<data>/zotero.db`, refreshed when Zotero changes (only changed sources re-read). My 9 sources indexed in 3 s. Personal: never training data, never in the general pack.
 - **JSTOR: no.** No public API, and its terms forbid automated downloading. Articles I save from JSTOR into Zotero are covered.
-- **Papers online** (`tools/scholar.py`): `find_papers` searches OpenAlex (250M+ works, CC0 metadata; abstracts, citation counts, free PDFs); `check_reference` checks a reference against Crossref and says NOT FOUND for invented ones (measured: a made-up title scored 0.04, real ones 1.0). Only the search words leave the Mac, with her name stripped; no account and no email sent (OpenAlex's anonymous budget, ~100 searches a day, is enough; a key in the Keychain `openalex-api-key` is used if she adds one).
+- **Papers online** (`tools/scholar.py`): `find_papers` searches OpenAlex (250M+ works, CC0 metadata; abstracts, citation counts, free PDFs); `check_reference` checks a reference against Crossref and says NOT FOUND for invented ones (measured: a made-up title scored 0.04, real ones 1.0). Only the search words leave the Mac, with my name stripped; no account and no email sent (OpenAlex's anonymous budget, ~100 searches a day, is enough; a key in the Keychain `openalex-api-key` is used if I add one).
 - **Citations** (`knowledge/cite.py`): APA 7 (default, `writing.citation_style`), MLA 9, Chicago author-date, Harvard. Every tool result carries the in-text citation and the reference, so a bibliography is copied from what was found, never written from memory.
 - **Writing mode** (`core/intent.py`): essays, literature reviews, theses, bibliographies (en/es/fr) get a note (Zotero first, then papers; cite exactly; no invented sources) and room for ~2,000 words (`llm.max_tokens_writing` 3072, within the 16k context).
 - **Writing practice at night** (`learning/writing.py`, `writing.practice_per_night` 6): open-access papers from Europe PMC, **CC BY or CC0 only** (NC/ND refused), on varied subjects. Exercise: write the abstract from the introduction and conclusion, or the introduction from the abstract. The local judge grades against the published text; Sylvie rewrites from the feedback (never seeing the published text); clear gains become pairs (chosen = her rewrite). Rule 4 holds: targets are her own writing. The paper isn't kept, except the excerpt in the exercise, whose license and source are on the example. Tagged general (shareable).
-- **Safeguards, measured live:** in one try without them, the 9B called no tool and wrote two invented references that looked real. Now (1) an essay request searches my Zotero before the first word; (2) after the answer, every entry of its references list must match a work a tool found this turn, or it's listed under "**Check before using:** … may be wrong or invented"; works cited in the text but left out of the list are added; (3) the style named in her message (APA/MLA/Chicago/Harvard) is used by every tool. With them, a Harvard essay came out with three real references from her Zotero, written once in the document panel.
+- **Safeguards, measured live:** in one try without them, the 9B called no tool and wrote two invented references that looked real. Now (1) an essay request searches my Zotero before the first word; (2) after the answer, every entry of its references list must match a work a tool found this turn, or it's listed under "**Check before using:** … may be wrong or invented"; works cited in the text but left out of the list are added; (3) the style named in my message (APA/MLA/Chicago/Harvard) is used by every tool. With them, a Harvard essay came out with three real references from my Zotero, written once in the document panel.
 - Why training for style but lookups for facts: fine-tuning teaches tone and structure, but a model that "learns" papers remembers them loosely, which is exactly how invented references happen.
 
 ### T40 — Claude's own memory notes, as suggestions (my answer, 2026-11-07: "Yes, as suggestions")
 - Sources, read locally: the `memories-*.zip` of a claude.ai export (dropped in `Claude exports/`) and
   Claude Code's per-project notes about me (`~/.claude/projects/*/memory/*.md`, `type: user`
-  only: her feedback/project notes are coding instructions, e.g. "never write chart drawing here"). Checked with the Claude history scan, every 5 minutes.
+  only: the feedback/project notes are coding instructions, e.g. "never write chart drawing here"). Checked with the Claude history scan, every 5 minutes.
 - Claude wrote them, so none is used until I decide in About Lea → Facts: **Keep** (becomes a fact,
   source `claude-memory`), **Use as a rule** (an active preference, scope `claude-memory`) or
   **Dismiss** (never offered again, even from a newer export).
@@ -319,7 +319,7 @@
   "Hey Nini") came from follow-up listening, not from a false wake word. Follow-up listening is now off
   (`defaults write app.sylvie.mac followUpListening -bool true` brings it back): she only wakes on "Sylvie"
   or the hotkey. This reverses my 2026-11-06 request ("I need to repeat her name every sentence");
-  her latest wish wins.
+  my latest wish wins.
 - The reply language for voice comes from Whisper's detection when the words alone don't tell
   (`core/lang.reply_language`); clear words still win. "(Reply in X.)" is the last line she reads.
 - Weather / TV / news / prices / hours questions get a "call web_search first" note; an answer saying
@@ -346,10 +346,10 @@
   folder; WhatsApp's file is never touched). A `whatsapp` tool finds messages by person/words/days or
   lists recent chats; it can't send anything. Messages are untrusted, and a turn that read them can't
   use any tool that leaves the Mac (web search, open_url, research, Claude, paper search), so nothing
-  private ends up in a query. Memory gets only "who she writes to most" (saved contacts, not numbers);
+  private ends up in a query. Memory gets only "who I write to most" (saved contacts, not numbers);
   message contents are never stored, never training data. The copy on this Mac stops at 21 Nov 2025
   (WhatsApp Desktop isn't installed any more): reinstalling and linking it makes it current.
-- Instagram/TikTok stay download-only: no way to act in them for her (no API; automated use forbidden).
+- Instagram/TikTok stay download-only: no way to act in them for me (no API; automated use forbidden).
 - Photos: Apple Photos already names people, labels things and knows places. The Mac app (which has
   Full Disk Access) copies the library's two index databases (Photos.sqlite, search/psi.sqlite) into
   Sylvie's data folder at most every 6 h (Photos.sqlite is 867 MB here); `lea_profile/photos.py` searches
@@ -368,7 +368,7 @@
 - New actions: `watch` (Netflix, YouTube, Prime Video, Disney+, Max, Movistar Plus+, Apple TV: starts the
   exact title when SearXNG finds its Netflix/YouTube page, else opens the service's search),
   `send_message` (Messages/iMessage, to a contact found in Contacts by how I call them — "mamá" finds
-  "Mama"; WhatsApp opens the chat with the text written for her to send, once WhatsApp is installed),
+  "Mama"; WhatsApp opens the chat with the text written for me to send, once WhatsApp is installed),
   `call` (FaceTime, which shows the call first), `directions` (Apple Maps), `create_note` (Notes, undoable).
   send_message follows my confirm setting like send_email (I chose "never": it sends at once).
   Several contacts with the same name → she asks which one.
@@ -394,7 +394,7 @@
   app libraries and cloud-only files (SF_DATALESS: reading would download them) are skipped. Indexed in
   the background every 6 h when I'm away. New `read_document` opens one by name (untrusted content).
   "Resume mi ensayo" is reading my own document, not academic writing (it had sent her to Zotero).
-- `list_reminders`, `contact_info`. Sylvie's data folder is now 700 (only Lea's user).
+- `list_reminders`, `contact_info`. Sylvie's data folder is now 700 (only my user).
 - Evals never read my Zotero, documents, photos or chats (Zotero had been read). apps 33/34
   (directions for "how do I get to…" sometimes answered in words), everyday 35/35.
 - Passwords (I asked to give Sylvie some "to just access"): not done. Each connection uses macOS
@@ -403,7 +403,7 @@
   TikTok forbid automated logins.
 
 ### T49 — Efficiency plan A1: measure memory before changing anything (2026-11-08)
-- **What:** a memory recorder inside the server (`core/memwatch.py`, one JSON line a minute, every 10 s under pressure, kept 14 days) and a day summary (`scripts/memreport.py`). Findings: `docs/reports/a1-memory-2026-11-08.md`.
+- **What:** a memory recorder inside the server (`core/memwatch.py`, one JSON line a minute, every 10 s under pressure, kept 14 days) and a day summary (`scripts/memreport.py`). The full findings are in my own notes (not in this repo).
 - **Why:** My Mac froze three times today (answers took 61–214 s instead of ~1.5 s). My build plan says to measure first. Main causes found: MLX's uncapped GPU cache (26.7 GB; capped in 038d988), document indexing holding the embedding model for whole e-books, ~20 GB of other apps (Docker VM 7.8 GB), test runs loading a second 9B, a night job running into the morning, and a WhatsApp permission prompt that blocks server startup.
 - **How:** kernel counters through ctypes (`proc_pid_rusage`, `sysctlbyname`), no extra process except `ioreg` for keyboard idle time. ~50 ms per sample. Nothing leaves the Mac.
 - **Alternatives:** Activity Monitor or `powermetrics` (needs sudo); a separate launchd recorder (would not know what Sylvie was doing).
@@ -429,7 +429,7 @@
 
 ### T52 — Shareable Sylvie and the welcome journey: Claude helps answer, never trains (2026-11-09)
 - **What I asked:** a plan for Sylvie as a project anyone can install. At first start, a journey where Sylvie learns what the owner wants her for, their interests, and gets access to their apps (Netflix and more) and the internet. Optionally connect a Claude account "so she can train with an external". Otherwise she trains by herself, with no judges. By default, when she doesn't know something or lacks access, she looks it up, or asks for what she needs, including an email and password.
-- **Plan:** `docs/shareable-plan.md`, S1–S7. It comes after Part A of the efficiency plan, since the journey's access step builds on A6 (live macOS data).
+- **Plan:** S1–S7, in my own notes (not in this repo). It comes after Part A of the efficiency plan, since the journey's access step builds on A6 (live macOS data).
 - **Changed from the request:** Claude can be connected as a helper for answers ("ask Claude…", `tools/claude.py`), not as a trainer. Anthropic's terms don't allow Claude's outputs to train other AI models, and build-plan rule 4 says the same. Sylvie trains alone, as I said: owner feedback, code checks plus her own thinking mode as grader (A7), and open datasets.
 - **Passwords:** saved in the Keychain only. Each is used only on its own site (against prompt-injection tricks). She asks before every login and before anything that sends, buys, deletes or posts. She never pays on her own. Each service's own sign-in page is preferred where one exists.
 - **I decide:** when to merge the new-owner branch, the license (MIT or Apache 2.0), and publishing (I push it myself).
@@ -441,21 +441,21 @@
   - Her voice then drops to 15% at once, and comes back 1.5 s after the other voice stops.
   - Meanwhile her name counts as mine: "Sylvie" interrupts her, like "stop" already did.
   - ⌥Space while she talks or thinks also stops her.
-- **Measured (built-in speakers and mic, the Mac's own voice playing Lea's part):**
+- **Measured (built-in speakers and mic, the Mac's own voice playing my part):**
   - First version (median echo): 16 false triggers during one answer. Her echo varies (mic minus played: −19 / −8 / −4 dB at the 10th / 50th / 90th percentile).
   - With the 90th percentile: 0 false triggers in a 52 s answer.
   - "Sylvie, stop" said mid-answer: heard and stopped her (2 tries out of 2).
 - **Not yet measured:** my own voice. Each answer now logs, as numbers only, how often someone talked over her and her echo spread (Console, subsystem app.sylvie.mac), to tune if needed.
 
 ### T54 — To-dos go into Reminders, and she just says "Got it" (2026-11-10)
-- **Problem (by voice, 16:26–16:31):** eight to-do requests in a row ("remind me to call my dad", "also add that I need to…"). Each got "Got it, I'll add a reminder…", often with a `<doc>` block and "anything else?", and **no tool call**: nothing was saved. "Remind me of the things I need to do" was answered from the open chat only. I asked four times for just "Got it". The claim check missed it, because "I'll add…" is a promise, not "I've added". The preference detector also narrowed her rule to "say got it when asked for a reminder to call dad".
+- **Problem (by voice, 16:26–16:31):** eight to-do requests in a row ("remind me to call my dad", "also add that I need to…"). Each got "Got it, I'll add a reminder…", often with a `<doc>` block and "anything else?", and **no tool call**: nothing was saved. "Remind me of the things I need to do" was answered from the open chat only. I asked four times for just "Got it". The claim check missed it, because "I'll add…" is a promise, not "I've added". The preference detector also narrowed my rule to "say got it when asked for a reminder to call dad".
 - **What:** code decides (`core/intent.py`: `todo_request`).
   - **Adding:** one model round whose text is never shown. It may only produce `create_reminder` calls (one per thing; it is sent back once if it only talks). Then a fixed reply: "Got it." / "Apuntado." / "C'est noté.". If a call fails (e.g. no Automation permission yet), she answers normally and says it failed.
   - **Reading:** "what do I need to do?" → `list_reminders` runs first, then she reads them out in plain sentences.
   - **Dates:** "tomorrow / mañana / demain", "today", "day after tomorrow" set the day in code (`fix_due_day`); the model keeps only the time. One run saved "tomorrow at 9" on the 10th as the 21st.
   - **Not to-dos:** calendar events, music, timers, questions ("remind me what the capital of…") and instructions about answering ("when I ask you…, just say got it").
-  - Voice answers: no `<doc>` blocks unless she asks for a document. "I'll add / I'll remind you / te lo apunto" now count as claims (the check sends her back to the tool).
-  - Her preference fixed: the narrowed one (#14) replaced by "When Lea asks you to remind her of something or to note something down, answer only 'Got it'" (#15).
+  - Voice answers: no `<doc>` blocks unless I ask for a document. "I'll add / I'll remind you / te lo apunto" now count as claims (the check sends her back to the tool).
+  - My preference fixed: the narrowed one (#14) replaced by "When Lea asks you to remind her of something or to note something down, answer only 'Got it'" (#15).
 - **Why Reminders:** it's my Mac's and iPhone's to-do list, so items sync to my phone and can be ticked off there, and `list_reminders` already existed. Notes and Sylvie's memory would only be readable through Sylvie.
 - **Measured (new eval set `todo`, 15 items: my own 8 phrasings + Spanish, French, a timed one, 2 list requests, 2 non-to-dos):** 3/15 → **15/15**. Saved to Reminders: 4/11 → **11/11**. Short answer: 0/11 → **11/11**. List requests read Reminders: 2/2 → 2/2 (one before had a `<doc>` block). Time to her reply for a to-do: ~0.5–1.5 s. Neither version saved a reminder for a question.
 - **Not measured live:** the first real reminder makes macOS ask "Sylvie wants to control Reminders" (LEA-TODO 25).
@@ -464,7 +464,7 @@
 - **What I said:** "I would like overall that Sylvie listens and actually does what I say."
 - **Audit (230 messages from me, 6–10 Nov):** 23 requests to *do* something got no tool call, and 6 times my next message was a correction. Most were already fixed on 8 Nov (music claimed but not played, "turn it up", Netflix) or on 10 Nov (to-dos, T54). Still open:
   - **"Just stop talking, I want to listen the song"** → she paused the music and explained. Now a short "stop talking / cállate / deja de hablar / tais-toi" gets "Okay." / "Vale." / "D'accord." from code: no model, no tools.
-  - **Whisper's made-up tails:** "Sylvie, stop Spotify, por favor. ¡Suscríbete al canal!" The noise filter of 8 Nov drops the whole thing, losing her real "stop Spotify". Now only the made-up sentence is dropped (`strip_noise`).
+  - **Whisper's made-up tails:** "Sylvie, stop Spotify, por favor. ¡Suscríbete al canal!" The noise filter of 8 Nov drops the whole thing, losing my real "stop Spotify". Now only the made-up sentence is dropped (`strip_noise`).
 - **Playback commands from code:** "skip backwards", "the song that was before", "next song", "stop Spotify / para la música / arrête la musique" (short, not a question) run `music` directly, then "Done." / "Listo." / "C'est fait.". "Skip backwards." had got "Skip" or "I'll go back to the previous message". "Climate / climat" now counts as a weather question (web search, not Wikipedia).
 - **New eval set `requests`:** 22 of my real voice requests, word for word (music, volume, previous song, Netflix, calendar, weather, "stop talking"). Run 2026-11-11 00:25–00:30, once memory allowed:
   - before today's fixes (5ac202f): requests **18/22**, todo **4/15**;
@@ -476,17 +476,17 @@
 - **What went wrong today (my real messages):**
   - "El día que me salté la clase de Macro… lo del ISML model" (probably IS-LM): no search. She answered "No tengo registro… pero sí recuerdo que…" and made up the rest. That work isn't in Sylvie's chats or in Claude Code on this Mac (probably claude.ai). The background learner also saved two wrong facts from the question ("Lea dropped out of her Macro class"). Both are now hidden (forget, reversible).
   - "what i told you was in my to do list" was taken as a **new** to-do (any "to do list" counted as adding). The model was sent to `create_reminder`, nothing came, and she answered "Got it. … retesting test 3 on the iPhone… is there". That line was a fact learned from a Claude Code session, read out as a to-do.
-  - Her eight 10 Nov to-dos (before T54) never reached Reminders, so reading Reminders could not find them.
-  - Of her 241 active facts, **217 came from my Claude coding sessions**, mostly task chatter ("Lea needs Sylvie to retest test 3…", "the formulas-more branch is not merged"). They filled the 6 recalled facts ahead of what she told Sylvie herself.
+  - My eight 10 Nov to-dos (before T54) never reached Reminders, so reading Reminders could not find them.
+  - Of Sylvie's 241 active facts, **217 came from my Claude coding sessions**, mostly task chatter ("Lea needs Sylvie to retest test 3…", "the formulas-more branch is not merged"). They filled the 6 recalled facts ahead of what I told Sylvie myself.
 - **What (code decides, like T54):**
-  - **Questions about her list read it.** "What did I tell you… list", "what was on my to-do list", "qué te dije… lista", and any what/which-question naming my to-do list → `list` (`core/intent.py`).
-  - **Reading my list includes what I said in chats.** My messages from the last 45 days that asked for a to-do but whose turn saved no reminder (`told_todos`) are added under the Reminders list, with dates. She tells me those too and offers once to put them in Reminders. On my real chats this finds exactly her 7 to-do messages of 10 Nov and nothing else.
-  - **"Do you remember… / el día que… / te acuerdas / je t'ai dit / last time" searches earlier chats first** (`past_reference` → `search_past_conversations` runs before she answers). A note says: answer from what was found and say when; if it isn't there, say so and ask her to remind you; never make up a memory.
-  - **Her own words come first in recall** (`memory/recall.py`, `for_answer`):
+  - **Questions about my list read it.** "What did I tell you… list", "what was on my to-do list", "qué te dije… lista", and any what/which-question naming my to-do list → `list` (`core/intent.py`).
+  - **Reading my list includes what I said in chats.** My messages from the last 45 days that asked for a to-do but whose turn saved no reminder (`told_todos`) are added under the Reminders list, with dates. She tells me those too and offers once to put them in Reminders. On my real chats this finds exactly my 7 to-do messages of 10 Nov and nothing else.
+  - **"Do you remember… / el día que… / te acuerdas / je t'ai dit / last time" searches earlier chats first** (`past_reference` → `search_past_conversations` runs before she answers). A note says: answer from what was found and say when; if it isn't there, say so and ask me to remind her; never make up a memory.
+  - **My own words come first in recall** (`memory/recall.py`, `for_answer`):
     - facts from Claude sessions score half and fill at most half the slots;
     - Claude-session facts about the assistant ("Sylvie/Claude/the assistant…") are left out;
     - new ones of that kind are no longer saved.
     - Learning and "forget that" still see every fact.
-  - Her "Got it" preference (#15) now says "add a reminder or note something down" (not "remind her of something") and "when she asks what is on her list, tell her". The list note says not to start with "Got it".
-- **Measured:** unit tests (387 pass), and `told_todos` on her real database (7/7, no false ones). New eval set `memory` (10 items: made-up earlier chats in EN/ES/FR, two "not there" questions, her real "what i told you was in my to do list", one ordinary question). **Not run yet:** the memory guard refused it (7.8 GB free, 8 needed, I using the Mac). Run `SYLVIE_EVAL_GB=8 uv run python -m evals.run --label memfix --sets memory,todo` when memory allows.
+  - My "Got it" preference (#15) now says "add a reminder or note something down" (not "remind her of something") and "when she asks what is on her list, tell her". The list note says not to start with "Got it".
+- **Measured:** unit tests (387 pass), and `told_todos` on my real database (7/7, no false ones). New eval set `memory` (10 items: made-up earlier chats in EN/ES/FR, two "not there" questions, my real "what i told you was in my to do list", one ordinary question). **Not run yet:** the memory guard refused it (7.8 GB free, 8 needed, me using the Mac). Run `SYLVIE_EVAL_GB=8 uv run python -m evals.run --label memfix --sets memory,todo` when memory allows.
 - **Not fixed here:** things done with Claude on claude.ai are only known to Sylvie from a data export (LEA-TODO 26). "Tell me the report of the last training session": Sylvie can't read her own training reports (idea logged, not built).
