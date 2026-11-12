@@ -26,7 +26,7 @@ def make(tmp_path, replies, osa=None, locked=False):
     cfg = Config(dict(load_config()))
     cfg["search"] = {**cfg["search"], "enabled": False}
     cfg["knowledge"] = {**cfg.get("knowledge", {}), "folders": []}  # never Lea's real documents
-    # Tests exercise the confirmation flow, whatever Lea chose in config.yaml (she chose "never").
+    # Tests exercise the confirmation flow, whatever the config says.
     cfg["actions"] = {**cfg["actions"], "confirm": "delete_or_send"}
     # …and night-only learning (Lea chose permanent training; tests set it where they need it).
     cfg["schedule"] = {**cfg["schedule"], "always": False}
