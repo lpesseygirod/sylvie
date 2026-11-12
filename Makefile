@@ -6,7 +6,7 @@ export TOKENIZERS_PARALLELISM=false
 
 UV := uv run --no-sync
 
-.PHONY: setup check lint test bench chat run open download search index app app-test pair phone eval everyday apps finetune ui-test general-pack import-general learn-now mmlu wikipedia small-model extraction-check
+.PHONY: setup check lint test bench chat run open download download-27b search index app app-test pair phone eval everyday apps finetune ui-test general-pack import-general learn-now mmlu wikipedia small-model extraction-check
 
 setup:
 	uv sync
@@ -34,10 +34,13 @@ run:
 open:
 	$(UV) python scripts/open_ui.py
 
-download:
-	HF_HUB_OFFLINE=0 $(UV) hf download mlx-community/Qwen3.8-27B-4bit
+download:   # the models config.yaml uses (the 9B: ~5 GB)
+	HF_HUB_OFFLINE=0 $(UV) hf download mlx-community/Qwen3.5-9B-4bit
 	HF_HUB_OFFLINE=0 $(UV) hf download mlx-community/Qwen3-Embedding-0.6B-8bit
 	HF_HUB_OFFLINE=0 $(UV) hf download mlx-community/Kokoro-82M-bf16 --include "config.json" "kokoro-v1_0.safetensors" "README.md" "voices/*.safetensors"
+
+download-27b:   # the larger model for the best answers (~18 GB); set llm.model to use it
+	HF_HUB_OFFLINE=0 $(UV) hf download mlx-community/Qwen3.8-27B-4bit
 
 SEARX := $(HOME)/Library/Application Support/Sylvie/services
 
