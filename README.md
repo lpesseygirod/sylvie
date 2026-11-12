@@ -1,5 +1,7 @@
 # Sylvie
 
+[![tests](https://github.com/lpesseygirod/sylvie/actions/workflows/ci.yml/badge.svg)](https://github.com/lpesseygirod/sylvie/actions/workflows/ci.yml)
+
 Sylvie is my personal AI assistant. She runs completely on my laptop, so nothing personal goes to the cloud. I wanted an assistant that knows me, speaks my three languages, and that I can train myself.
 
 ![Sylvie's chat: a document in the side panel, and an email she asks about before sending](docs/media/chat.png)
@@ -73,7 +75,7 @@ At night, a second model also reviews her answers and suggests better ones for m
 | General knowledge | 8/8 |
 | Style | went from 4/12 to 6/12 |
 
-**The gate doing its job.** My latest 9B adapter (v005) got better at style (7/12 → 9/12) but worse at maths (25 → 23/25), finance (14 → 10/14) and tool use (9 → 7/9). So it was not promoted, and Sylvie still runs on the base 9B. None of my 9 adapters has replaced the base model yet; the style set is small and noisy, so that's the next thing to fix.
+**The gate doing its job.** v002 of the 27B lost points in finance, so it was rejected; v004 came after I fixed the bug below and has no regressions. On the 9B, my latest adapter (v005) got better at style (7/12 → 9/12) but worse at maths (25 → 23/25), finance (14 → 10/14) and tool use (9 → 7/9), so it was rejected too and Sylvie stays on the base 9B day to day. Passing the tests isn't the last step: a version also has to win my blind A/B before it becomes the default. All the scores are in [`evals/results/`](evals/results).
 
 **Tests drive the fixes too.** When she handled to-do requests badly, I wrote a 15-question set first: 3/15 before the fix, 15/15 after.
 
